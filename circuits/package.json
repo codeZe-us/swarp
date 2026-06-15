@@ -1,0 +1,16 @@
+{
+  "name": "circuits",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "circom swarp.circom --r1cs --wasm --sym --output ./build",
+    "test": "echo \"No tests specified for circuits\" && exit 0"
+  },
+  "dependencies": {
+    "circomlibjs": "^0.1.7"
+  },
+  "devDependencies": {
+    "snarkjs": "^0.7.4",
+    "typescript": "^5.4.5"
+  }
+}

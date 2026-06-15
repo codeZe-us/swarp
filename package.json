@@ -1,0 +1,15 @@
+{
+  "name": "swarp-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:web": "pnpm --filter web build",
+    "build:contracts": "pnpm --filter contracts build",
+    "build:circuits": "pnpm --filter circuits build",
+    "test:all": "pnpm --recursive test",
+    "deploy:testnet": "pnpm --filter scripts deploy:testnet"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

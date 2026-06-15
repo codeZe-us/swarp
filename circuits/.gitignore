@@ -1,0 +1,4 @@
+build/*
+!build/verification_key.json
+*.zkey
+*.ptau
