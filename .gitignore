@@ -23,3 +23,7 @@ contracts/target/
 .env.test.local
 .env.production.local
 .env.example.local
+
+# Agents
+.agents/
+
