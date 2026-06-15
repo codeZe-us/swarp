@@ -3,17 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start --webpack",
     "lint": "eslint"
   },
   "dependencies": {
+    "@creit.tech/stellar-wallets-kit": "^2.3.0",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^12.2.0",
+    "autoprefixer": "^10.5.0",
+    "circomlibjs": "^0.1.7",
     "next": "16.2.9",
+    "postcss": "^8.5.15",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "snarkjs": "^0.7.6",
+    "tailwindcss": "3.4.17",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/node": "^20",
