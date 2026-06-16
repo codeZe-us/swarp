@@ -1,4 +1,5 @@
-build/*
-!build/verification_key.json
-*.zkey
-*.ptau
+# Noir / Barretenberg build artifacts
+target/
+
+# TypeScript compiled output (re-run `npx tsc` to regenerate)
+scripts/*.js

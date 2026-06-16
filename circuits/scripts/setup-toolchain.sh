@@ -1,64 +1,73 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+# =============================================================================
+# circuits/scripts/setup-toolchain.sh
+# Installs Noir (nargo) 1.0.0-beta.9 and Barretenberg (bb) 0.87.0.
+#
+# These exact versions are required to maintain compatibility with the
+# NethermindEth/rs-soroban-ultrahonk on-chain verifier library.
+# =============================================================================
+set -euo pipefail
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-CIRCUITS_DIR="$(dirname "$SCRIPT_DIR")"
-BIN_DIR="$CIRCUITS_DIR/bin"
-BUILD_DIR="$CIRCUITS_DIR/build"
+NOIR_VERSION="1.0.0-beta.9"
+BB_VERSION="0.87.0"
 
-mkdir -p "$BIN_DIR"
-mkdir -p "$BUILD_DIR"
+# ── Colour helpers ─────────────────────────────────────────────────────────
+CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+info()    { echo -e "${CYAN}[setup]${NC} $*"; }
+success() { echo -e "${GREEN}[setup]${NC} $*"; }
+warn()    { echo -e "${YELLOW}[setup]${NC} $*"; }
+die()     { echo -e "${RED}[setup]${NC} $*" >&2; exit 1; }
 
-if command -v circom >/dev/null 2>&1; then
-    CIRCOM_VER=$(circom --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+# ── 1. Install / update noirup ─────────────────────────────────────────────
+info "Installing noirup..."
+if command -v noirup &>/dev/null; then
+    warn "noirup already installed at $(which noirup)"
 else
-    CIRCOM_VER=""
+    curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
 fi
 
-NEED_INSTALL=true
-if [ ! -z "$CIRCOM_VER" ]; then
-    MAJOR=$(echo "$CIRCOM_VER" | cut -d. -f1)
-    MINOR=$(echo "$CIRCOM_VER" | cut -d. -f2)
-    if [ "$MAJOR" -gt 2 ] || { [ "$MAJOR" -eq 2 ] && [ "$MINOR" -ge 1 ]; }; then
-        NEED_INSTALL=false
-    fi
+# Ensure noirup is on PATH for the rest of this script
+export PATH="$HOME/.nargo/bin:$PATH"
+
+# ── 2. Pin Noir to required version ────────────────────────────────────────
+info "Switching Noir to v${NOIR_VERSION}..."
+noirup -v "${NOIR_VERSION}"
+
+# Verify
+INSTALLED_NARGO=$(nargo --version 2>&1 | grep -oP '\d+\.\d+\.\d+.*' | head -1)
+info "nargo version: ${INSTALLED_NARGO}"
+if [[ "${INSTALLED_NARGO}" != *"${NOIR_VERSION}"* ]]; then
+    die "Expected Noir ${NOIR_VERSION}, got: ${INSTALLED_NARGO}"
+fi
+success "nargo ${NOIR_VERSION} ready."
+
+# ── 3. Install / update bbup ───────────────────────────────────────────────
+info "Installing bbup (Barretenberg version manager)..."
+if command -v bbup &>/dev/null; then
+    warn "bbup already installed at $(which bbup)"
+else
+    curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/master/barretenberg/cpp/installation/install | bash
 fi
 
-if [ "$NEED_INSTALL" = true ]; then
-    if [ -f "$BIN_DIR/circom" ]; then
-        LOCAL_VER=$("$BIN_DIR/circom" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-        MAJOR=$(echo "$LOCAL_VER" | cut -d. -f1)
-        MINOR=$(echo "$LOCAL_VER" | cut -d. -f2)
-        if [ "$MAJOR" -gt 2 ] || { [ "$MAJOR" -eq 2 ] && [ "$MINOR" -ge 1 ]; }; then
-            export PATH="$BIN_DIR:$PATH"
-            NEED_INSTALL=false
-        fi
-    fi
+# Ensure bbup is on PATH
+export PATH="$HOME/.bb:$PATH"
+
+# ── 4. Pin Barretenberg to required version ────────────────────────────────
+info "Switching Barretenberg to v${BB_VERSION}..."
+bbup -v "${BB_VERSION}"
+
+# Verify
+INSTALLED_BB=$(bb --version 2>&1 | grep -oP '\d+\.\d+\.\d+' | head -1)
+info "bb version: ${INSTALLED_BB}"
+if [[ "${INSTALLED_BB}" != "${BB_VERSION}" ]]; then
+    die "Expected Barretenberg ${BB_VERSION}, got: ${INSTALLED_BB}"
 fi
+success "bb ${BB_VERSION} ready."
 
-if [ "$NEED_INSTALL" = true ]; then
-    echo "Installing Circom 2.1.6 natively..."
-    curl -L -o "$BIN_DIR/circom" https://github.com/iden3/circom/releases/download/v2.1.6/circom-linux-amd64
-    chmod +x "$BIN_DIR/circom"
-    export PATH="$BIN_DIR:$PATH"
-fi
-
-export PATH="$BIN_DIR:$PATH"
-
-if [ ! -d "$CIRCUITS_DIR/node_modules" ]; then
-    echo "Installing node dependencies..."
-    cd "$CIRCUITS_DIR" && pnpm install
-fi
-
-if [ ! -d "$CIRCUITS_DIR/node_modules/snarkjs" ]; then
-    echo "Error: snarkjs is not available."
-    exit 1
-fi
-
-PTAU_FILE="$BUILD_DIR/powersOfTau28_hez_final_15.ptau"
-if [ ! -f "$PTAU_FILE" ]; then
-    echo "Downloading Powers of Tau file..."
-    curl -L -o "$PTAU_FILE" https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_15.ptau
-fi
-
-echo "Toolchain setup completed successfully."
+# ── Done ───────────────────────────────────────────────────────────────────
+echo ""
+success "Toolchain setup complete!"
+success "  nargo : ${INSTALLED_NARGO}"
+success "  bb    : ${INSTALLED_BB}"
+echo ""
+info "Next step: run ./scripts/build.sh to compile, prove, and export the VK."

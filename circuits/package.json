@@ -3,15 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "circom swarp.circom --r1cs --wasm --sym --output ./build",
-    "test": "echo \"No tests specified for circuits\" && exit 0"
+    "witness": "npx tsc scripts/compute-swap-witness.ts --module commonjs --target es2022 --esModuleInterop --skipLibCheck --outDir scripts && node scripts/compute-swap-witness.js",
+    "test:parity": "npx tsc scripts/test-poseidon-parity.ts --module commonjs --target es2022 --esModuleInterop --skipLibCheck --outDir scripts && node scripts/test-poseidon-parity.js",
+    "build": "bash scripts/build.sh"
   },
   "dependencies": {
     "circomlibjs": "^0.1.7"
   },
   "devDependencies": {
-    "circomlib": "^2.0.5",
-    "snarkjs": "^0.7.4",
+    "@types/node": "^20",
+    "@zkpassport/poseidon2": "^0.6.2",
     "typescript": "^5.4.5"
   }
 }
