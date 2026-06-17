@@ -6,12 +6,8 @@ node_modules/
 web/.next/
 web/out/
 
-# ZK Circuits build output
-# We ignore the contents of circuits/build, but explicitly track verification_key.json
-circuits/build/*
-!circuits/build/verification_key.json
-*.zkey
-*.ptau
+# Noir / Barretenberg build artifacts
+circuits/target/
 
 # Rust / Soroban smart contract build target
 contracts/target/
@@ -23,3 +19,6 @@ contracts/target/
 .env.test.local
 .env.production.local
 .env.example.local
+
+# Agents
+.agents/
