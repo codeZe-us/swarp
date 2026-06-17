@@ -29,7 +29,7 @@ fn main(
     asset_in: Field,
     asset_out: Field,
     path_elements: [Field; 20],
-    path_indices: [u1; 20],
+    path_indices: [Field; 20],
 
     exchange_rate: pub Field,
     rate_denominator: pub Field,
@@ -72,9 +72,10 @@ fn main(
         let sibling = path_elements[i];
         let direction = path_indices[i];
 
-        let dir_field = direction as Field;
-        let left = current_hash * (1 - dir_field) + sibling * dir_field;
-        let right = sibling * (1 - dir_field) + current_hash * dir_field;
+        assert((direction == 0) | (direction == 1), "path_indices must be binary");
+
+        let left = current_hash * (1 - direction) + sibling * direction;
+        let right = sibling * (1 - direction) + current_hash * direction;
 
         current_hash = merkle_hash(left, right);
     }
