@@ -120,3 +120,40 @@ fn test_poseidon_parity() {
     ]);
     assert_eq!(res_max_64, expected_max_64, "Max 64-bit input hash mismatch");
 }
+
+#[test]
+fn test_poseidon2_parity() {
+    let env = Env::default();
+    use soroban_poseidon::poseidon2_hash;
+
+    // Test poseidon2_2([1, 2])
+    let in_2 = vec![
+        &env,
+        U256::from_u32(&env, 1),
+        U256::from_u32(&env, 2),
+    ];
+    let res_2 = poseidon2_hash::<4, Bn254Fr>(&env, &in_2);
+    let expected_2 = u256_from_bytes(&env, [
+        0x03, 0x86, 0x82, 0xaa, 0x1c, 0xb5, 0xae, 0x4e,
+        0x0a, 0x3f, 0x13, 0xda, 0x43, 0x2a, 0x95, 0xc7,
+        0x7c, 0x5c, 0x11, 0x1f, 0x6f, 0x03, 0x0f, 0xaf,
+        0x9c, 0xad, 0x64, 0x1c, 0xe1, 0xed, 0x73, 0x83,
+    ]);
+    assert_eq!(res_2, expected_2, "poseidon2_2 mismatch");
+
+    // Test poseidon2_3([1, 2, 3])
+    let in_3 = vec![
+        &env,
+        U256::from_u32(&env, 1),
+        U256::from_u32(&env, 2),
+        U256::from_u32(&env, 3),
+    ];
+    let res_3 = poseidon2_hash::<4, Bn254Fr>(&env, &in_3);
+    let expected_3 = u256_from_bytes(&env, [
+        0x23, 0x86, 0x4a, 0xdb, 0x16, 0x0d, 0xdd, 0xf5,
+        0x90, 0xf1, 0xd3, 0x30, 0x36, 0x83, 0xeb, 0xcb,
+        0x91, 0x4f, 0x82, 0x8e, 0x26, 0x35, 0xf6, 0xe8,
+        0x5a, 0x32, 0xf0, 0xa1, 0xae, 0xcd, 0x3d, 0xd8,
+    ]);
+    assert_eq!(res_3, expected_3, "poseidon2_3 mismatch");
+}
