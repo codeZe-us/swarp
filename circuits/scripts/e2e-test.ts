@@ -17,7 +17,7 @@ function toField(n: bigint): string {
 // Helper to run shell command in WSL Ubuntu
 function runCommandInWsl(cmd: string): string {
   try {
-    return execSync(`wsl -d Ubuntu bash -c "cd /mnt/c/projetcs/swarp/circuits && ${cmd}"`, { encoding: 'utf-8' });
+    return execSync(`wsl -d Ubuntu bash -c "export PATH=\\\"\$HOME/.nargo/bin:\$HOME/.bb:\\\$PATH\\\" && cd /mnt/c/projetcs/swarp/circuits && ${cmd}"`, { encoding: 'utf-8' });
   } catch (error: any) {
     throw new Error(error.stdout || error.stderr || error.message);
   }
@@ -95,7 +95,7 @@ async function runE2E(testFailure: boolean): Promise<{ proofSize: number; durati
     try {
       runCommandInWsl('nargo execute');
       // If execute succeeds (which it shouldn't because of assert), try proving
-      runCommandInWsl('nargo prove e2e_failure_proof');
+      runCommandInWsl('bb prove --scheme ultra_honk --oracle_hash keccak --bytecode_path target/swap.json --witness_path target/swap.gz --output_path target/failure_proof --output_format bytes_and_fields');
       throw new Error('Expected circuit to fail but it succeeded!');
     } catch (e: any) {
       console.log('✅ Success: Circuit correctly failed execution/proving as expected.');
@@ -112,16 +112,16 @@ async function runE2E(testFailure: boolean): Promise<{ proofSize: number; durati
   // 8. Prove
   console.log('Generating proof (UltraHonk)...');
   const startTime = Date.now();
-  runCommandInWsl('nargo prove e2e_success_proof');
+  runCommandInWsl('bb prove --scheme ultra_honk --oracle_hash keccak --bytecode_path target/swap.json --witness_path target/swap.gz --output_path target/proof --output_format bytes_and_fields');
   const durationMs = Date.now() - startTime;
 
   // 9. Verify
   console.log('Verifying proof...');
-  runCommandInWsl('nargo verify e2e_success_proof');
+  runCommandInWsl('bb verify --scheme ultra_honk --oracle_hash keccak -k target/vk/vk -p target/proof/proof -i target/proof/public_inputs');
   console.log('✅ Proof successfully verified on-chain style!');
 
   // 10. Extract proof file size
-  const proofFilePath = path.join(projectRoot, 'proofs', 'e2e_success_proof.proof');
+  const proofFilePath = path.join(projectRoot, 'target', 'proof', 'proof');
   const stats = fs.statSync(proofFilePath);
 
   console.log(`- Deposit Amount     : ${DEPOSIT_AMOUNT}`);
