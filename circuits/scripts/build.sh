@@ -54,17 +54,17 @@ WITNESS="target/swap.gz"
 
 # ── 3. Generate UltraHonk proof ─────────────────────────────────────────────
 step "Generating UltraHonk proof..."
-bb prove -b "$ACIR" -w "$WITNESS" -o target/proof
+bb prove --scheme ultra_honk --oracle_hash keccak --bytecode_path "$ACIR" --witness_path "$WITNESS" --output_path target/proof --output_format bytes_and_fields
 ok "Proof → target/proof/proof  ($(wc -c < target/proof/proof) bytes)"
 
 # ── 4. Write Verification Key ───────────────────────────────────────────────
 step "Writing Verification Key..."
-bb write_vk -b "$ACIR" -o target/vk
+bb write_vk --scheme ultra_honk --oracle_hash keccak --bytecode_path "$ACIR" --output_path target/vk --output_format bytes_and_fields
 ok "VK → target/vk/vk  ($(wc -c < target/vk/vk) bytes)"
 
 # ── 5. Verify locally ───────────────────────────────────────────────────────
 step "Verifying proof locally..."
-bb verify -k target/vk/vk -p target/proof/proof -i target/proof/public_inputs
+bb verify --scheme ultra_honk --oracle_hash keccak -k target/vk/vk -p target/proof/proof -i target/proof/public_inputs
 # ── 6. Deploy artifacts ─────────────────────────────────────────────────────
 step "Deploying VK to contract..."
 cp target/vk/vk ../contracts/ultrahonk-verifier/vk
