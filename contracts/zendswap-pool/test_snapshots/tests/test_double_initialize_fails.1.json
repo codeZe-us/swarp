@@ -219,6 +219,22 @@
                       "key": {
                         "vec": [
                           {
+                            "symbol": "RecentRates"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "vec": [
+                          {
+                            "u64": "9200000"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
                             "symbol": "RecentRoots"
                           }
                         ]
