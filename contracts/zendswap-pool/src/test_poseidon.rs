@@ -18,7 +18,6 @@ fn u256_from_bytes(env: &Env, bytes_arr: [u8; 32]) -> U256 {
 fn test_poseidon_parity() {
     let env = Env::default();
 
-    // 1. Single Input: [1]
     let in_1 = vec![&env, U256::from_u32(&env, 1)];
     // T = 2, representing (rate = 1, capacity = 1)
     let res_1 = poseidon_hash::<2, Bn254Fr>(&env, &in_1);
@@ -32,7 +31,6 @@ fn test_poseidon_parity() {
     ]);
     assert_eq!(res_1, expected_1, "Single input hash mismatch");
 
-    // 2. Two Inputs: [1, 2]
     let in_2 = vec![
         &env,
         U256::from_u32(&env, 1),
@@ -50,7 +48,6 @@ fn test_poseidon_parity() {
     ]);
     assert_eq!(res_2, expected_2, "Two inputs hash mismatch");
 
-    // 3. Three Inputs: [1, 2, 3]
     let in_3 = vec![
         &env,
         U256::from_u32(&env, 1),
@@ -69,7 +66,6 @@ fn test_poseidon_parity() {
     ]);
     assert_eq!(res_3, expected_3, "Three inputs hash mismatch");
 
-    // 4. Four Inputs: [1, 2, 3, 4]
     let in_4 = vec![
         &env,
         U256::from_u32(&env, 1),
@@ -89,7 +85,6 @@ fn test_poseidon_parity() {
     ]);
     assert_eq!(res_4, expected_4, "Four inputs hash mismatch");
 
-    // 5. Edge Case: Zero
     let in_zero = vec![&env, U256::from_u32(&env, 0)];
     let res_zero = poseidon_hash::<2, Bn254Fr>(&env, &in_zero);
 
@@ -102,12 +97,10 @@ fn test_poseidon_parity() {
     ]);
     assert_eq!(res_zero, expected_zero, "Zero input hash mismatch");
 
-    // 6. Edge Case: One
     let in_one = vec![&env, U256::from_u32(&env, 1)];
     let res_one = poseidon_hash::<2, Bn254Fr>(&env, &in_one);
     assert_eq!(res_one, expected_1, "One input hash mismatch");
 
-    // 7. Edge Case: Max 64-bit BigInt: [18446744073709551615] (0xffffffffffffffff)
     let in_max_64 = vec![&env, U256::from_u128(&env, 18446744073709551615)];
     let res_max_64 = poseidon_hash::<2, Bn254Fr>(&env, &in_max_64);
 
@@ -126,7 +119,6 @@ fn test_poseidon2_parity() {
     let env = Env::default();
     use soroban_poseidon::poseidon2_hash;
 
-    // Test poseidon2_2([1, 2])
     let in_2 = vec![
         &env,
         U256::from_u32(&env, 1),
@@ -141,7 +133,6 @@ fn test_poseidon2_parity() {
     ]);
     assert_eq!(res_2, expected_2, "poseidon2_2 mismatch");
 
-    // Test poseidon2_3([1, 2, 3])
     let in_3 = vec![
         &env,
         U256::from_u32(&env, 1),
