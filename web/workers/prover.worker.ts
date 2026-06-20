@@ -3,24 +3,16 @@
  *
  * Browser Web Worker: ZendSwap UltraHonk prover.
  *
- * Receives a ProverInput message, runs the Noir circuit with the
- * Barretenberg UltraHonk backend, and posts a ProverOutput message back.
+ * Receives a ProverInput message containing the circuit artifact and witness inputs,
+ * runs the Noir circuit with the Barretenberg UltraHonk backend, and reports progress
+ * stages: 'loading' -> 'computing' -> 'proving' -> 'done' or 'error'.
  *
  * Toolchain: @noir-lang/noir_js 1.0.0-beta.9 + @aztec/bb.js 0.87.0
- * (matches the nargo 1.0.0-beta.9 / bb 0.87.0 CLI toolchain)
- *
- * Usage:
- *   const worker = new Worker(new URL('./prover.worker.ts', import.meta.url));
- *   worker.postMessage({ type: 'PROVE', input: { ... } });
- *   worker.onmessage = (e) => { ... };
  */
 
 import { Noir } from '@noir-lang/noir_js';
 import { UltraHonkBackend } from '@aztec/bb.js';
 
-// ─── Message types ────────────────────────────────────────────────────────────
-
-/** Inputs passed from the main thread to initiate proof generation. */
 export interface SwapProverInput {
   // Private inputs
   deposit_amount:    string;   // decimal string (fits u64)
@@ -39,107 +31,86 @@ export interface SwapProverInput {
   merkle_root:       string;   // hex string with 0x prefix
 }
 
-interface ProveMessage {
+export interface ProveMessage {
   type: 'PROVE';
+  circuit: any;
   input: SwapProverInput;
 }
 
-interface ReadyMessage {
-  type: 'READY';
-}
+export type ProverWorkerMessage =
+  | { type: 'loading' }
+  | { type: 'computing' }
+  | { type: 'proving' }
+  | { type: 'done'; proof: Uint8Array; publicInputs: string[] }
+  | { type: 'error'; error: string };
 
-export interface ProverSuccessOutput {
-  type: 'SUCCESS';
-  proof:        Uint8Array;    // raw proof bytes (PROOF_BYTES = 14592)
-  publicInputs: string[];      // hex-encoded public inputs in circuit order
-}
-
-export interface ProverErrorOutput {
-  type: 'ERROR';
-  message: string;
-}
-
-export type ProverOutput = ProverSuccessOutput | ProverErrorOutput;
-
-// ─── Worker state ─────────────────────────────────────────────────────────────
-
-let noir:    Noir             | null = null;
-let backend: UltraHonkBackend | null = null;
-
-// ─── Initialise Noir + backend once ──────────────────────────────────────────
-
-async function init(): Promise<void> {
-  if (noir) return; // already initialised
-
-  // The compiled circuit ACIR is published to /public/swap.json by the build
-  // pipeline (circuits/scripts/build.sh copies target/swap.json here).
-  const circuit = await fetch('/swap.json').then((r) => {
-    if (!r.ok) throw new Error(`Failed to fetch swap.json: ${r.status}`);
-    return r.json();
-  });
-
-  backend = new UltraHonkBackend(circuit.bytecode);
-  noir    = new Noir(circuit);
-
-  self.postMessage({ type: 'READY' } satisfies ReadyMessage);
-}
-
-// ─── Proof generation ─────────────────────────────────────────────────────────
-
-async function prove(input: SwapProverInput): Promise<ProverSuccessOutput> {
-  if (!noir || !backend) throw new Error('Worker not initialised');
-
-  // Map SwapProverInput → Noir witness map (keys must match main.nr parameter names)
-  const witnessMap = {
-    deposit_amount:    input.deposit_amount,
-    withdrawal_amount: input.withdrawal_amount,
-    secret:            input.secret,
-    asset_in:          input.asset_in,
-    asset_out:         input.asset_out,
-    path_elements:     input.path_elements,
-    path_indices:      input.path_indices,
-    exchange_rate:     input.exchange_rate,
-    rate_denominator:  input.rate_denominator,
-    nullifier_hash:    input.nullifier_hash,
-    asset_out_public:  input.asset_out_public,
-    merkle_root:       input.merkle_root,
-  };
-
-  // 1. Generate witness
-  const { witness } = await noir.execute(witnessMap);
-
-  // 2. Generate UltraHonk proof
-  const { proof, publicInputs } = await backend.generateProof(witness);
-
-  return {
-    type: 'SUCCESS',
-    proof,
-    publicInputs: Array.isArray(publicInputs)
-      ? publicInputs.map((p) => (typeof p === 'string' ? p : Array.from(p as Uint8Array).map(b => b.toString(16).padStart(2, '0')).join('')))
-      : [],
-  };
-}
-
-// ─── Message handler ──────────────────────────────────────────────────────────
-
-self.onmessage = async (event: MessageEvent<ProveMessage | ReadyMessage>) => {
+self.onmessage = async (event: MessageEvent<ProveMessage>) => {
   const msg = event.data;
 
   if (msg.type !== 'PROVE') return;
 
+  const { circuit, input } = msg;
+  let backend: UltraHonkBackend | null = null;
+
   try {
-    // Initialise lazily on first prove request
-    await init();
-    const output = await prove(msg.input);
-    (self as any).postMessage(output, [output.proof.buffer]);
+    // 1. Initializing Barretenberg WASM
+    (self as any).postMessage({ type: 'loading' } as ProverWorkerMessage);
+    backend = new UltraHonkBackend(circuit.bytecode);
+    const noir = new Noir(circuit);
+
+    // 2. Computing Witness
+    (self as any).postMessage({ type: 'computing' } as ProverWorkerMessage);
+    
+    // Map input to the Noir witness layout
+    const witnessMap = {
+      deposit_amount:    input.deposit_amount,
+      withdrawal_amount: input.withdrawal_amount,
+      secret:            input.secret,
+      asset_in:          input.asset_in,
+      asset_out:         input.asset_out,
+      path_elements:     input.path_elements,
+      path_indices:      input.path_indices.map(x => x.toString()),
+      exchange_rate:     input.exchange_rate,
+      rate_denominator:  input.rate_denominator,
+      nullifier_hash:    input.nullifier_hash,
+      asset_out_public:  input.asset_out_public,
+      merkle_root:       input.merkle_root,
+    };
+
+    const { witness } = await noir.execute(witnessMap);
+
+    // 3. Proving (Generating UltraHonk Proof)
+    (self as any).postMessage({ type: 'proving' } as ProverWorkerMessage);
+    const { proof, publicInputs } = await backend.generateProof(witness);
+
+    // Format public inputs to a list of hex strings
+    const formattedPublicInputs = Array.isArray(publicInputs)
+      ? publicInputs.map((p) => {
+          if (typeof p === 'string') return p;
+          return Array.from(p as Uint8Array)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+        })
+      : [];
+
+    (self as any).postMessage(
+      {
+        type: 'done',
+        proof,
+        publicInputs: formattedPublicInputs,
+      } as ProverWorkerMessage,
+      [proof.buffer]
+    );
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    self.postMessage({ type: 'ERROR', message } satisfies ProverErrorOutput);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    (self as any).postMessage({ type: 'error', error: errorMsg } as ProverWorkerMessage);
+  } finally {
+    if (backend) {
+      try {
+        await backend.destroy();
+      } catch (destroyErr) {
+        console.error('Failed to destroy barretenberg backend:', destroyErr);
+      }
+    }
   }
 };
-
-// Kick off initialisation eagerly so the backend WASM loads in the background
-init().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
-  self.postMessage({ type: 'ERROR', message } satisfies ProverErrorOutput);
-});
