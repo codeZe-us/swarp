@@ -5,9 +5,9 @@ export interface Note {
   secret: string;
   commitment: string;
   leafIndex: number | null;
-  depositTxHash: string;
+  depositTxHash: string | null;
   withdrawTxHash: string | null;
-  status: 'pending' | 'deposited' | 'withdrawn';
+  status: 'created' | 'pending' | 'deposited' | 'withdrawn';
   createdAt: number;
 }
 
