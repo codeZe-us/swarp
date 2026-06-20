@@ -463,10 +463,24 @@ impl ZendSwapPool {
             .get(&DataKey::RecentRates)
             .unwrap_or_else(|| Vec::new(&env));
 
+        let mut unique_rates = Vec::new(&env);
+        for rate in recent_rates.iter() {
+            let mut duplicate = false;
+            for r in unique_rates.iter() {
+                if r == rate {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if !duplicate {
+                unique_rates.push_back(rate);
+            }
+        }
+
         let mut verified = false;
         let verifier: Address = env.storage().instance().get(&DataKey::Verifier).unwrap();
 
-        for rate in recent_rates.iter() {
+        for rate in unique_rates.iter() {
             // Construct the public inputs array in the exact order the Noir circuit declares its pub parameters:
             // [merkle_root, nullifier_hash, exchange_rate, rate_denominator, asset_out_public]
             let mut public_inputs = Vec::new(&env);
@@ -619,6 +633,12 @@ fn compute_root_from_leaves(env: &Env, leaves: &alloc::vec::Vec<BytesN<32>>) -> 
 
 #[cfg(test)]
 mod test_poseidon;
+
+#[cfg(test)]
+mod test_fixtures;
+
+#[cfg(test)]
+mod integration_tests;
 
 #[cfg(test)]
 mod tests {
