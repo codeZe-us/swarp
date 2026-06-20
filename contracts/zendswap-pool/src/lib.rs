@@ -421,30 +421,25 @@ impl ZendSwapPool {
     ) -> Result<(), Error> {
         extend_ttl(&env);
 
-        // 1. Validate asset_out is either the stored USDC or EURC address
         let usdc: Address = env.storage().instance().get(&DataKey::Usdc).unwrap();
         let eurc: Address = env.storage().instance().get(&DataKey::Eurc).unwrap();
         if asset_out != usdc && asset_out != eurc {
             return Err(Error::UnsupportedToken);
         }
 
-        // 2. Validate that withdrawal_amount is positive and within range
         if withdrawal_amount <= 0 || withdrawal_amount > MAX_DEPOSIT_AMOUNT {
             return Err(Error::InvalidAmount);
         }
 
-        // 3. Check that the nullifier_hash has not been spent (not in the nullifier set)
         let nullifier_key = DataKey::Nullifier(nullifier_hash.clone());
         if env.storage().persistent().has(&nullifier_key) {
             return Err(Error::NullifierSpent);
         }
 
-        // 4. Check that the merkle_root is in the recent roots buffer
         if !Self::verify_merkle_root(env.clone(), merkle_root.clone()) {
             return Err(Error::InvalidMerkleRoot);
         }
 
-        // 5. Determine the asset_out_id (0 for USDC, 1 for EURC) to match the circuit's encoding
         let asset_out_id = if asset_out == usdc { 0u64 } else { 1u64 };
 
         fn u64_to_bytes32(env: &Env, val: u64) -> BytesN<32> {
@@ -453,10 +448,8 @@ impl ZendSwapPool {
             BytesN::from_array(env, &bytes)
         }
 
-        // 6. Fetch exchange rate values
         let rate_denom: u64 = env.storage().instance().get(&DataKey::ExchangeRateDenominator).unwrap();
 
-        // 7. Get historical rates to try
         let recent_rates: Vec<u64> = env
             .storage()
             .instance()
@@ -481,7 +474,6 @@ impl ZendSwapPool {
         let verifier: Address = env.storage().instance().get(&DataKey::Verifier).unwrap();
 
         for rate in unique_rates.iter() {
-            // Construct the public inputs array in the exact order the Noir circuit declares its pub parameters:
             // [merkle_root, nullifier_hash, exchange_rate, rate_denominator, asset_out_public]
             let mut public_inputs = Vec::new(&env);
             public_inputs.push_back(merkle_root.clone());
@@ -503,19 +495,16 @@ impl ZendSwapPool {
             return Err(Error::VerificationFailed);
         }
 
-        // 9. If verification returns true:
-        // - Insert the nullifier into the spent set (effects first, checks-effects-interactions pattern to prevent reentrancy)
+        // spent set update (effects first to prevent reentrancy)
         env.storage().persistent().set(&nullifier_key, &true);
         env.storage().persistent().extend_ttl(&nullifier_key, 17280, 518400);
 
-        // - Transfer withdrawal_amount of asset_out to the recipient
         TokenClient::new(&env, &asset_out).transfer(
             &env.current_contract_address(),
             &recipient,
             &withdrawal_amount,
         );
 
-        // - Emit a withdrawal event with only the nullifier hash
         env.events().publish(
             (Symbol::new(&env, "withdraw"),),
             nullifier_hash,

@@ -173,17 +173,14 @@ impl UltraHonkVerifierContract {
         proof: Bytes,
         public_inputs: Vec<BytesN<32>>,
     ) -> bool {
-        // 1. Check proof length
         if proof.len() as usize != PROOF_BYTES {
             return false;
         }
 
-        // 2. Check public inputs count
         if public_inputs.len() != 5 {
             return false;
         }
 
-        // 3. Pre-validate G1 points in proof to avoid host panic
         if !validate_proof_g1_points(&env, &proof) {
             return false;
         }
@@ -223,7 +220,6 @@ impl UltraHonkVerifierContract {
             std::println!("proof len: {}", proof.len());
         }
 
-        // 5. Load VK and verify
         if VK_BYTES.len() < 1760 {
             return false;
         }

@@ -53,15 +53,12 @@ self.onmessage = async (event: MessageEvent<ProveMessage>) => {
   let backend: UltraHonkBackend | null = null;
 
   try {
-    // 1. Initializing Barretenberg WASM
     (self as any).postMessage({ type: 'loading' } as ProverWorkerMessage);
     backend = new UltraHonkBackend(circuit.bytecode);
     const noir = new Noir(circuit);
 
-    // 2. Computing Witness
     (self as any).postMessage({ type: 'computing' } as ProverWorkerMessage);
     
-    // Map input to the Noir witness layout
     const witnessMap = {
       deposit_amount:    input.deposit_amount,
       withdrawal_amount: input.withdrawal_amount,
@@ -79,11 +76,9 @@ self.onmessage = async (event: MessageEvent<ProveMessage>) => {
 
     const { witness } = await noir.execute(witnessMap);
 
-    // 3. Proving (Generating UltraHonk Proof)
     (self as any).postMessage({ type: 'proving' } as ProverWorkerMessage);
     const { proof, publicInputs } = await backend.generateProof(witness);
 
-    // Format public inputs to a list of hex strings
     const formattedPublicInputs = Array.isArray(publicInputs)
       ? publicInputs.map((p) => {
           if (typeof p === 'string') return p;

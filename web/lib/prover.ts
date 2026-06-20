@@ -26,19 +26,15 @@ export async function generateSwapProof(
   let timeoutId: any = null;
 
   try {
-    // 1. Fetch compiled circuit artifact from public assets
     const response = await fetch('/circuits/circuit.json');
     if (!response.ok) {
       throw new Error(`Failed to load circuit artifact: ${response.status} ${response.statusText}`);
     }
     const circuit = await response.json();
 
-    // 2. Generate the proof via background Web Worker
     return await new Promise<{ proof: Uint8Array; publicInputs: string[] }>((resolve, reject) => {
-      // Initialize the worker using Webpack/Next.js native worker import support
       worker = new Worker(new URL('../workers/prover.worker.ts', import.meta.url));
 
-      // Setup timeout guard (120 seconds)
       timeoutId = setTimeout(() => {
         if (worker) {
           worker.terminate();
@@ -92,7 +88,6 @@ export async function generateSwapProof(
         reject(new Error(`Worker error: ${err.message || 'Unknown error'}`));
       };
 
-      // Dispatch proving request to Web Worker
       worker.postMessage({
         type: 'PROVE',
         circuit,

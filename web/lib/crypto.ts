@@ -30,7 +30,6 @@ async function deriveKey(walletPublicKey: string): Promise<CryptoKey> {
   const encoder = new TextEncoder();
   const passwordBytes = encoder.encode(walletPublicKey);
 
-  // Import raw public key bytes as PBKDF2 material
   const keyMaterial = await window.crypto.subtle.importKey(
     'raw',
     passwordBytes,
@@ -39,10 +38,8 @@ async function deriveKey(walletPublicKey: string): Promise<CryptoKey> {
     ['deriveBits', 'deriveKey']
   );
 
-  // Static salt for key derivation
   const salt = encoder.encode('ZendSwapNoteSalt');
 
-  // Derive AES-GCM 256-bit key
   return window.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
@@ -79,7 +76,6 @@ export async function encryptNotes(notes: Note[], walletPublicKey: string): Prom
     combined.set(iv, 0);
     combined.set(new Uint8Array(ciphertext), iv.length);
 
-    // Convert combined binary to base64
     let binary = '';
     const len = combined.byteLength;
     for (let i = 0; i < len; i++) {
