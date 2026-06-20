@@ -110,7 +110,7 @@ export default function Home() {
           <p className="text-sm text-mutedText mt-1">Here&apos;s what&apos;s moving across your shielded accounts.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/payroll" className="px-4 py-2 border border-borderSubtle hover:border-mutedText rounded-lg text-sm font-semibold transition duration-200 bg-[#0A0A1A] text-white">
+          <Link href="/payroll" className="px-4 py-2 border border-borderSubtle hover:border-mutedText rounded-lg text-sm font-semibold transition duration-200 bg-[#000000] text-white">
             Run payroll
           </Link>
           <Link href="/swap" className="px-4 py-2 bg-primaryAccent hover:bg-primaryHover rounded-lg text-sm font-semibold transition duration-200 text-white shadow-md shadow-purple-900/10">
@@ -231,7 +231,7 @@ export default function Home() {
       <div className="bg-cardSurface border border-borderSubtle rounded-2xl p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-white">Transactions</h2>
-          <div className="flex items-center gap-1.5 bg-[#0A0A1A] border border-borderSubtle p-1 rounded-lg">
+          <div className="flex items-center gap-1.5 bg-[#000000] border border-borderSubtle p-1 rounded-lg">
             {(['all', 'swaps', 'payroll'] as const).map((t) => (
               <button
                 key={t}

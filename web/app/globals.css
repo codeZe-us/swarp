@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 html, body {
-  background-color: #0A0A1A;
+  background-color: #000000;
   color: #ffffff;
   min-height: 100vh;
   margin: 0;
@@ -18,11 +18,11 @@ html, body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0A0A1A;
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1E1E3A;
+  background: #1D1D1F;
   border-radius: 4px;
 }
 
