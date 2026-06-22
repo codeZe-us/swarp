@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useStore } from '../store/useStore';
 import { Badge } from '../components/ui/Badge';
 import { TransactionDetailModal } from '../components/ui/TransactionDetailModal';
-import { getTokenBalance } from '../lib/contracts';
+
+import { getTokenBalance, fundTestnetUSDC } from '../lib/contracts';
 import { USDC_SAC_ID, EURC_SAC_ID } from '../lib/constants';
 
 export default function Home() {
@@ -28,6 +29,34 @@ export default function Home() {
   const [balances, setBalances] = useState({ USDC: 0, EURC: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
+  // Funding state
+  const [isFunding, setIsFunding] = useState(false);
+  const [fundSuccess, setFundSuccess] = useState<string | null>(null);
+  const [fundError, setFundError] = useState<string | null>(null);
+
+  const handleFundTestnet = async () => {
+    if (!address) return;
+    setIsFunding(true);
+    setFundError(null);
+    setFundSuccess(null);
+    try {
+      const txHash = await fundTestnetUSDC(address, '200');
+      setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
+      
+      // Update balances
+      if (!USDC_SAC_ID) {
+        setBalances((prev) => ({ ...prev, USDC: prev.USDC + 200 }));
+      } else {
+        const balance = await getTokenBalance(address, USDC_SAC_ID);
+        setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
+      }
+    } catch (e: any) {
+      setFundError(e.message || 'Failed to fund testnet account');
+    } finally {
+      setIsFunding(false);
+    }
+  };
+
   // Fetch balances and pool state on connection
   useEffect(() => {
     if (isConnected && address) {
@@ -38,14 +67,13 @@ export default function Home() {
           await fetchPoolState();
 
           // Fetch balances from on-chain
-          if (USDC_SAC_ID && EURC_SAC_ID) {
-            const usdcBal = await getTokenBalance(address, USDC_SAC_ID);
-            const eurcBal = await getTokenBalance(address, EURC_SAC_ID);
-            setBalances({
-              USDC: Number(usdcBal) / 10_000_000,
-              EURC: Number(eurcBal) / 10_000_000,
-            });
-          }
+          // In mock mode, getTokenBalance handles undefined SAC IDs
+          const usdcBal = await getTokenBalance(address, USDC_SAC_ID || '');
+          const eurcBal = await getTokenBalance(address, EURC_SAC_ID || '');
+          setBalances({
+            USDC: Number(usdcBal) / 10_000_000,
+            EURC: Number(eurcBal) / 10_000_000,
+          });
         } catch (e) {
           console.warn('Failed to load live data, using fallbacks:', e);
         } finally {
@@ -207,6 +235,15 @@ export default function Home() {
               Private batch payroll coming soon
             </div>
           </div>
+          {isConnected && (
+            <button
+              onClick={handleFundTestnet}
+              disabled={isFunding}
+              className="px-4 py-2 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 font-display bg-transparent text-center disabled:opacity-50"
+            >
+              {isFunding ? 'Funding...' : 'Fund USDC'}
+            </button>
+          )}
           <Link
             href="/swap"
             className="px-4 py-2 bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 rounded-[9px] text-sm font-semibold transition duration-200 text-white shadow-[0_0_20px_rgba(123,55,168,0.25)] font-display border-none"

@@ -138,7 +138,15 @@ export async function getPoolInfo(): Promise<{
   currentRoot: string;
 }> {
   if (!POOL_CONTRACT_ID) {
-    throw new Error('Pool contract address is not configured.');
+    console.warn('MOCK MODE: getPoolInfo');
+    return {
+      usdcReserve: BigInt(18420000000),
+      eurcReserve: BigInt(9860000000),
+      currentRate: 9200000,
+      rateDenominator: 10000000,
+      totalDeposits: 42,
+      currentRoot: '2d9a6c8e3f4b5a7d8c9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c',
+    };
   }
 
   const dummyAccount = getDummyAccount();
@@ -177,7 +185,7 @@ export async function getPoolInfo(): Promise<{
 
 export async function getMerkleRoot(): Promise<string> {
   if (!POOL_CONTRACT_ID) {
-    throw new Error('Pool contract address is not configured.');
+    return '2d9a6c8e3f4b5a7d8c9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c';
   }
 
   const dummyAccount = getDummyAccount();
@@ -209,7 +217,7 @@ export async function getMerkleRoot(): Promise<string> {
 
 export async function getRate(): Promise<{ numerator: number; denominator: number }> {
   if (!POOL_CONTRACT_ID) {
-    throw new Error('Pool contract address is not configured.');
+    return { numerator: 9200000, denominator: 10000000 };
   }
 
   const dummyAccount = getDummyAccount();
@@ -243,7 +251,7 @@ export async function getRate(): Promise<{ numerator: number; denominator: numbe
 
 export async function getLeaf(index: number): Promise<string> {
   if (!POOL_CONTRACT_ID) {
-    throw new Error('Pool contract address is not configured.');
+    return '0000000000000000000000000000000000000000000000000000000000000000';
   }
 
   const dummyAccount = getDummyAccount();
@@ -275,7 +283,7 @@ export async function getLeaf(index: number): Promise<string> {
 
 export async function getLeafCount(): Promise<number> {
   if (!POOL_CONTRACT_ID) {
-    throw new Error('Pool contract address is not configured.');
+    return 42;
   }
 
   const dummyAccount = getDummyAccount();
@@ -307,7 +315,7 @@ export async function getLeafCount(): Promise<number> {
 
 export async function getReserves(): Promise<{ usdc: bigint; eurc: bigint }> {
   if (!POOL_CONTRACT_ID) {
-    throw new Error('Pool contract address is not configured.');
+    return { usdc: BigInt(18420000000), eurc: BigInt(9860000000) };
   }
 
   const dummyAccount = getDummyAccount();
@@ -365,7 +373,14 @@ export async function submitDeposit(
     throw new Error('Commitment must be a valid 32-byte (64 character) hex string.');
   }
   if (!POOL_CONTRACT_ID) {
-    throw new Error('Pool contract address is not configured.');
+    console.warn('MOCK MODE: submitDeposit');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    if (typeof window !== 'undefined') {
+      const current = BigInt(localStorage.getItem(`mock_bal_${depositor}`) || '0');
+      const subAmt = BigInt(amount);
+      localStorage.setItem(`mock_bal_${depositor}`, (current >= subAmt ? current - subAmt : 0n).toString());
+    }
+    return { txHash: 'mock-tx-' + Math.random().toString(36).substr(2, 9), leafIndex: Math.floor(Math.random() * 100) };
   }
 
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
@@ -493,7 +508,9 @@ export async function submitWithdraw(
     throw new Error('Withdrawal amount must be positive.');
   }
   if (!POOL_CONTRACT_ID) {
-    throw new Error('Pool contract address is not configured.');
+    console.warn('MOCK MODE: submitWithdraw');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    return { txHash: 'mock-tx-' + Math.random().toString(36).substr(2, 9) };
   }
 
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
@@ -606,6 +623,10 @@ export async function getTokenBalance(
   tokenAddress: string
 ): Promise<bigint> {
   if (!tokenAddress) {
+    if (typeof window !== 'undefined') {
+      const mockBal = localStorage.getItem(`mock_bal_${userAddress}`);
+      if (mockBal) return BigInt(mockBal);
+    }
     return BigInt(0);
   }
 
@@ -640,5 +661,100 @@ export async function getTokenBalance(
     console.warn('Failed to simulate token balance check, returning 0:', e);
     return BigInt(0);
   }
+}
+
+/**
+ * Hackathon Faucet / Fund logic
+ */
+export async function fundTestnetUSDC(recipientAddress: string, amount: string = '200') {
+  const issuerSecret = process.env.NEXT_PUBLIC_USDC_ISSUER_SECRET;
+  const issuerAddress = process.env.NEXT_PUBLIC_USDC_ISSUER_ADDRESS;
+
+  if (!issuerSecret || !issuerAddress || !USDC_SAC_ID) {
+    console.warn('MOCK MODE: fundTestnetUSDC');
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    if (typeof window !== 'undefined') {
+      const current = BigInt(localStorage.getItem(`mock_bal_${recipientAddress}`) || '0');
+      const addAmt = BigInt(Number(amount) * 10_000_000);
+      localStorage.setItem(`mock_bal_${recipientAddress}`, (current + addAmt).toString());
+    }
+    return 'mock-tx-' + Math.random().toString(36).substr(2, 9);
+  }
+
+  const issuerKeypair = typeof StrKey.isValidEd25519SecretSeed === 'function' && StrKey.isValidEd25519SecretSeed(issuerSecret)
+    ? (await import('@stellar/stellar-sdk')).Keypair.fromSecret(issuerSecret)
+    : (await import('@stellar/stellar-sdk')).Keypair.fromSecret(issuerSecret);
+
+  const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
+
+  let issuerAccount;
+  try {
+    issuerAccount = await withRetry(() => rpcServer.getAccount(issuerAddress));
+  } catch (e) {
+    throw new Error('Could not load issuer account from testnet. Is the issuer funded?');
+  }
+
+  // USDC requires 7 decimals of precision
+  const asset = new (await import('@stellar/stellar-sdk')).Asset('USDC', issuerAddress);
+
+  // We submit a classic Payment operation. 
+  // IMPORTANT: The recipient must already have a trustline to the asset for this to succeed via classic payment.
+  // Alternatively, since we have the Soroban token SAC, we can invoke 'mint' which bypasses the classic trustline requirement in some cases,
+  // but let's try the direct Contract mint to avoid trustline errors for new users.
+  
+  if (!USDC_SAC_ID) {
+    throw new Error('USDC SAC ID not configured');
+  }
+
+  const contract = new Contract(USDC_SAC_ID);
+  const recipientVal = new Address(recipientAddress).toScVal();
+  
+  // Convert 200 to 200_0000000 (7 decimals)
+  const amountBig = BigInt(Number(amount) * 10_000_000);
+  const amountVal = nativeToScVal(amountBig, { type: 'i128' });
+
+  let transaction = new TransactionBuilder(issuerAccount, {
+    fee: BASE_FEE,
+    networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+  })
+    .addOperation(contract.call('mint', recipientVal, amountVal))
+    .setTimeout(30)
+    .build();
+
+  // Simulate
+  let simulation;
+  try {
+    simulation = await withRetry(() => rpcServer.simulateTransaction(transaction));
+  } catch (error) {
+    throw new SorobanNetworkError('Failed to simulate mint transaction.', error);
+  }
+
+  if (rpc.Api.isSimulationError(simulation)) {
+    throw new SorobanSimulationError(parseSorobanError(simulation.error), simulation.error);
+  }
+
+  // Assemble and Sign
+  transaction = rpc.assembleTransaction(transaction, simulation).build();
+  transaction.sign(issuerKeypair);
+
+  // Submit
+  const response = await withRetry(() => rpcServer.sendTransaction(transaction));
+  if (response.status === 'ERROR') {
+    throw new SorobanTransactionError(parseSorobanError(response.errorResult), response.hash, response.errorResult);
+  }
+
+  let getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
+  let attempts = 0;
+  while (getResponse.status === 'NOT_FOUND' && attempts < 30) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
+    attempts++;
+  }
+
+  if (getResponse.status !== 'SUCCESS') {
+    throw new Error(`Fund transaction failed: ${getResponse.status}`);
+  }
+
+  return response.hash;
 }
 
