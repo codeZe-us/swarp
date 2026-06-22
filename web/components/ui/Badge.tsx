@@ -11,14 +11,14 @@ export const Badge: React.FC<BadgeProps> = ({
   className = '', 
   ...props 
 }) => {
-  const baseStyle = "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border";
+  const baseStyle = "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border font-display";
   
   let variantStyle = "";
   let dot = null;
 
   switch (variant) {
     case 'private':
-      variantStyle = "bg-primaryAccent/10 text-purple-400 border-primaryAccent/20";
+      variantStyle = "bg-primaryAccent/10 text-brandLightPurple border-primaryAccent/20";
       break;
     case 'public':
       variantStyle = "bg-slate-900/60 text-slate-400 border-borderSubtle";

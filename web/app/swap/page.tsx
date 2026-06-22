@@ -467,20 +467,20 @@ export default function SwapPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto">
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto font-sans">
       {/* Header and Subtext */}
       <div>
-        <span className="text-[10px] font-bold text-[#7C3AED] tracking-wider uppercase">Application</span>
-        <h1 className="text-3xl font-extrabold text-white mt-1">Private swap</h1>
+        <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Application</span>
+        <h1 className="text-3xl font-extrabold text-white mt-1 font-display">Private swap</h1>
         <p className="text-sm text-mutedText mt-1">Deposit one stablecoin, withdraw the other — unlinkable.</p>
       </div>
 
       {/* Custom Tabs Group Selector */}
       <div className="flex justify-center mt-2 mb-4">
-        <div className="flex bg-[#0B0B0C] border border-[#1D1D1F] p-1 rounded-xl gap-1 w-full max-w-[320px] h-[42px] items-center">
+        <div className="flex bg-[#0B0B0C] border border-[#1D1D1F] p-1 rounded-[12px] gap-1 w-full max-w-[320px] h-[42px] items-center">
           <button
             onClick={() => setActiveTab('deposit')}
-            className={`flex-1 py-1.5 text-center text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-200 h-[32px] flex items-center justify-center border ${
+            className={`flex-1 py-1.5 text-center text-xs font-bold rounded-[9px] uppercase tracking-wider transition-all duration-200 h-[32px] flex items-center justify-center border font-display ${
               activeTab === 'deposit'
                 ? 'bg-[#1D1D1F] text-white border-[#333336] shadow-sm font-extrabold'
                 : 'text-mutedText hover:text-white border-transparent'
@@ -490,7 +490,7 @@ export default function SwapPage() {
           </button>
           <button
             onClick={() => setActiveTab('withdraw')}
-            className={`flex-1 py-1.5 text-center text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-200 h-[32px] flex items-center justify-center border ${
+            className={`flex-1 py-1.5 text-center text-xs font-bold rounded-[9px] uppercase tracking-wider transition-all duration-200 h-[32px] flex items-center justify-center border font-display ${
               activeTab === 'withdraw'
                 ? 'bg-[#1D1D1F] text-white border-[#333336] shadow-sm font-extrabold'
                 : 'text-mutedText hover:text-white border-transparent'
@@ -505,11 +505,11 @@ export default function SwapPage() {
       {activeTab === 'deposit' ? (
         <div className="flex flex-col gap-6 items-center">
           {/* Deposit Card */}
-          <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-2xl p-6 relative">
+          <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6 relative">
             
             {/* Header row inside Card */}
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-md font-bold text-white">Deposit into pool</h3>
+              <h3 className="text-md font-bold text-white font-display">Deposit into pool</h3>
               <Badge variant="private">
                 <span className="mr-1">❖</span> SHIELDED
               </Badge>
@@ -519,15 +519,15 @@ export default function SwapPage() {
             <div className="flex flex-col gap-1 relative">
               
               {/* Field 1: You deposit */}
-              <div className="bg-[#000000] border border-[#1D1D1F] rounded-xl p-4 flex flex-col gap-1 h-[96px]">
+              <div className="bg-[#000000] border border-[#1D1D1F] rounded-[12px] p-4 flex flex-col gap-1 h-[96px]">
                 <div className="flex items-center justify-between text-xs text-mutedText font-semibold">
                   <span>You deposit</span>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 font-mono">
                     <span>Balance {balances[assetIn].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     {isConnected && (
                       <button 
                         onClick={handleMaxClick}
-                        className="text-[#7C3AED] hover:text-[#9F67FF] font-bold uppercase transition duration-150"
+                        className="text-[#B488DC] hover:text-[#D6C2EC] font-bold uppercase transition duration-150 font-display text-[11px]"
                       >
                         Max
                       </button>
@@ -548,7 +548,7 @@ export default function SwapPage() {
                   <div className="relative" ref={dropdownRef}>
                     <button
                       onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className="flex items-center gap-2 bg-[#0B0B0C] border border-[#1D1D1F] hover:border-mutedText/50 px-3 py-1.5 rounded-full text-white text-sm font-bold shadow transition duration-200"
+                      className="flex items-center gap-2 bg-[#0B0B0C] border border-[#1D1D1F] hover:border-mutedText/50 px-3 py-1.5 rounded-[9px] text-white text-sm font-bold shadow transition duration-200 font-display"
                     >
                       {assetIn === 'USDC' ? (
                         <>
@@ -559,7 +559,7 @@ export default function SwapPage() {
                         </>
                       ) : (
                         <>
-                          <div className="w-5 h-5 rounded-full bg-[#1A365D] border border-purple-500/30 flex items-center justify-center text-purple-300 text-[10px] font-bold font-sans">
+                          <div className="w-5 h-5 rounded-full bg-[#1A365D] border border-[#5E2A8C]/30 flex items-center justify-center text-purple-300 text-[10px] font-bold font-sans">
                             €
                           </div>
                           <span>EURC</span>
@@ -571,7 +571,7 @@ export default function SwapPage() {
                     </button>
 
                     {isDropdownOpen && (
-                      <div className="absolute right-0 mt-2 w-36 bg-[#0B0B0C] border border-[#1D1D1F] rounded-xl shadow-xl z-50 p-1">
+                      <div className="absolute right-0 mt-2 w-36 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display">
                         <button
                           onClick={() => {
                             if (assetIn !== 'USDC') {
@@ -580,7 +580,7 @@ export default function SwapPage() {
                             }
                             setIsDropdownOpen(false);
                           }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition duration-150 ${
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-[9px] text-xs font-bold transition duration-150 ${
                             assetIn === 'USDC'
                               ? 'bg-[#1D1D1F] text-white'
                               : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
@@ -599,13 +599,13 @@ export default function SwapPage() {
                             }
                             setIsDropdownOpen(false);
                           }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition duration-150 ${
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-[9px] text-xs font-bold transition duration-150 ${
                             assetIn === 'EURC'
                               ? 'bg-[#1D1D1F] text-white'
                               : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
                           }`}
                         >
-                          <div className="w-5 h-5 rounded-full bg-[#1A365D] border border-purple-500/30 flex items-center justify-center text-purple-300 text-[9px] font-bold font-sans">
+                          <div className="w-5 h-5 rounded-full bg-[#1A365D] border border-[#5E2A8C]/30 flex items-center justify-center text-purple-300 text-[9px] font-bold font-sans">
                             €
                           </div>
                           EURC
@@ -620,7 +620,7 @@ export default function SwapPage() {
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
                 <button
                   onClick={handleFlipAssets}
-                  className="w-9 h-9 rounded-full bg-[#0B0B0C] border border-[#1D1D1F] hover:border-[#7C3AED] flex items-center justify-center text-mutedText hover:text-white shadow shadow-black transition duration-200"
+                  className="w-9 h-9 rounded-full bg-[#0B0B0C] border border-[#1D1D1F] hover:border-[#5E2A8C] flex items-center justify-center text-mutedText hover:text-white shadow shadow-black transition duration-200"
                 >
                   <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
@@ -629,29 +629,29 @@ export default function SwapPage() {
               </div>
 
               {/* Field 2: You can withdraw */}
-              <div className="bg-[#000000] border border-[#1D1D1F] rounded-xl p-4 flex flex-col gap-1 h-[96px]">
+              <div className="bg-[#000000] border border-[#1D1D1F] rounded-[12px] p-4 flex flex-col gap-1 h-[96px]">
                 <div className="flex items-center justify-between text-xs text-mutedText font-semibold">
                   <span>You can withdraw</span>
                   <span>after proof</span>
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                  <div className="text-[#C084FC] text-3xl font-bold font-mono select-all">
+                  <div className="text-[#B488DC] text-3xl font-bold font-mono select-all">
                     {formattedCalculatedOut || '0.00'}
                   </div>
-                  <div className="flex items-center gap-2 bg-[#0B0B0C]/40 border border-[#1D1D1F]/60 px-3 py-1.5 rounded-full text-white text-sm font-bold select-none cursor-not-allowed">
+                  <div className="flex items-center gap-2 bg-[#0B0B0C]/40 border border-[#1D1D1F]/60 px-3 py-1.5 rounded-[9px] text-white text-sm font-bold select-none cursor-not-allowed">
                     {assetOut === 'USDC' ? (
                       <>
                         <div className="w-5 h-5 rounded-full bg-[#2775CA]/70 flex items-center justify-center text-white/70 text-[10px] font-bold font-sans">
                           $
                         </div>
-                        <span className="text-white/70">USDC</span>
+                        <span className="text-white/70 font-display">USDC</span>
                       </>
                     ) : (
                       <>
-                        <div className="w-5 h-5 rounded-full bg-[#1A365D]/70 border border-purple-500/20 flex items-center justify-center text-purple-300/70 text-[10px] font-bold font-sans">
+                        <div className="w-5 h-5 rounded-full bg-[#1A365D]/70 border border-[#5E2A8C]/20 flex items-center justify-center text-purple-300/70 text-[10px] font-bold font-sans">
                           €
                         </div>
-                        <span className="text-white/70">EURC</span>
+                        <span className="text-white/70 font-display">EURC</span>
                       </>
                     )}
                   </div>
@@ -660,8 +660,8 @@ export default function SwapPage() {
             </div>
 
             {/* Rate row */}
-            <div className="flex justify-between items-center text-xs text-mutedText mt-4 font-semibold px-1">
-              <span>Rate</span>
+            <div className="flex justify-between items-center text-xs text-mutedText mt-4 font-semibold px-1 font-mono">
+              <span className="font-sans">Rate</span>
               <span className="text-white font-bold">
                 {assetIn === 'USDC'
                   ? `1 USDC = ${decimalRate.toFixed(4)} EURC`
@@ -674,12 +674,12 @@ export default function SwapPage() {
               <button
                 onClick={handleDeposit}
                 disabled={depositTxStatus === 'loading' || (isConnected && !depositValidation.isValid)}
-                className={`w-full py-3.5 rounded-full font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
+                className={`w-full py-3.5 rounded-[12px] font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 font-display ${
                   depositTxStatus === 'loading'
-                    ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-wait'
+                    ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-wait shadow-none'
                     : isConnected && !depositValidation.isValid
-                    ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-not-allowed'
-                    : 'bg-[#5C1DAB] hover:bg-[#4C188F] text-white active:scale-[0.99] shadow-md shadow-purple-950/20'
+                    ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-not-allowed shadow-none'
+                    : 'bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white active:scale-[0.99] shadow-[0_0_28px_rgba(123,55,168,0.3)] border-none'
                 }`}
               >
                 {depositTxStatus === 'loading' ? (
@@ -754,11 +754,11 @@ export default function SwapPage() {
       ) : (
         /* Replaced Withdraw Tab with full ZK implementation */
         <div className="flex flex-col gap-6 items-center w-full">
-          <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-2xl p-6">
+          <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6">
             
             {/* Header row inside Card */}
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-md font-bold text-white">Withdraw from pool</h3>
+              <h3 className="text-md font-bold text-white font-display">Withdraw from pool</h3>
               <Badge variant="private">
                 <span className="mr-1">❖</span> SHIELDED
               </Badge>
@@ -772,7 +772,7 @@ export default function SwapPage() {
                     Select Active Shielded Note
                   </label>
                   {withdrawableNotes.length === 0 ? (
-                    <div className="bg-[#000000] border border-[#1D1D1F] rounded-xl p-6 text-center text-xs text-mutedText font-semibold flex flex-col items-center justify-center gap-2 min-h-[120px]">
+                    <div className="bg-[#000000] border border-[#1D1D1F] rounded-[12px] p-6 text-center text-xs text-mutedText font-semibold flex flex-col items-center justify-center gap-2 min-h-[120px] font-display">
                       <svg className="w-8 h-8 text-mutedText/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0V9a2 2 0 00-2-2H6a2 2 0 00-2 2v4m16 4H4" />
                       </svg>
@@ -792,25 +792,25 @@ export default function SwapPage() {
                             key={note.id}
                             type="button"
                             onClick={() => setSelectedNoteId(isSelected ? null : note.id)}
-                            className={`flex items-center justify-between p-4 rounded-xl border text-left transition duration-150 ${
+                            className={`flex items-center justify-between p-4 rounded-[12px] border text-left transition duration-150 ${
                               isSelected
-                                ? 'bg-[#7C3AED]/10 border-[#7C3AED] text-white'
+                                ? 'bg-[#5E2A8C]/10 border-[#5E2A8C] text-white'
                                 : 'bg-[#000000] border-[#1D1D1F] text-mutedText hover:border-mutedText/50 hover:text-white'
                             }`}
                           >
                             <div className="flex flex-col gap-0.5">
-                              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-white flex items-center gap-1.5 font-mono">
                                 <span>{depAmount.toLocaleString('en-US', { maximumFractionDigits: 7 })} {note.asset}</span>
-                                <svg className="w-3.5 h-3.5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="w-3.5 h-3.5 text-[#B488DC]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
-                                <span className="text-[#C084FC]">{withAmount.toLocaleString('en-US', { maximumFractionDigits: 7 })} {withAsset}</span>
+                                <span className="text-[#B488DC]">{withAmount.toLocaleString('en-US', { maximumFractionDigits: 7 })} {withAsset}</span>
                               </span>
-                              <span className="text-[10px] text-mutedText font-semibold mt-1">
+                              <span className="text-[10px] text-mutedText font-semibold mt-1 font-mono">
                                 Commitment: {note.commitment.slice(0, 8)}...{note.commitment.slice(-8)}
                               </span>
                             </div>
-                            <span className="text-[10px] text-mutedText font-bold">
+                            <span className="text-[10px] text-mutedText font-bold font-mono">
                               {new Date(note.createdAt).toLocaleDateString()}
                             </span>
                           </button>
@@ -822,7 +822,7 @@ export default function SwapPage() {
 
                 {/* Recipient Stellar Address */}
                 {selectedNoteId && (
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1.5 font-display">
                     <label className="text-xs font-bold text-mutedText uppercase tracking-wider">
                       Recipient Stellar Address
                     </label>
@@ -831,20 +831,20 @@ export default function SwapPage() {
                       placeholder="e.g. G..."
                       value={recipientAddress}
                       onChange={(e) => setRecipientAddress(e.target.value)}
-                      className="bg-[#000000] border border-[#1D1D1F] rounded-xl p-3.5 text-xs text-white focus:border-[#7C3AED] focus:ring-0 placeholder-mutedText/30 w-full outline-none font-mono"
+                      className="bg-[#000000] border border-[#1D1D1F] rounded-[12px] p-3.5 text-xs text-white focus:border-[#5E2A8C] focus:ring-0 placeholder-mutedText/30 w-full outline-none font-mono"
                     />
                   </div>
                 )}
 
                 {/* Withdraw Submit CTA */}
-                <div className="mt-2">
+                <div className="mt-2 font-display">
                   <button
                     onClick={handleWithdraw}
                     disabled={!selectedNoteId || !recipientAddress || withdrawStatus === 'loading'}
-                    className={`w-full py-3.5 rounded-full font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
+                    className={`w-full py-3.5 rounded-[12px] font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
                       !selectedNoteId || !recipientAddress
-                        ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-not-allowed'
-                        : 'bg-[#5C1DAB] hover:bg-[#4C188F] text-white active:scale-[0.99]'
+                        ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-not-allowed shadow-none'
+                        : 'bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white active:scale-[0.99] shadow-[0_0_28px_rgba(123,55,168,0.3)] border-none'
                     }`}
                   >
                     Withdraw
@@ -879,7 +879,7 @@ export default function SwapPage() {
                     const isFailed = withdrawStep === step.id && withdrawStatus === 'error';
                     
                     return (
-                      <div key={step.id} className="flex items-center justify-between p-3.5 rounded-xl border border-[#1D1D1F] bg-[#000000]/60">
+                      <div key={step.id} className="flex items-center justify-between p-3.5 rounded-[12px] border border-[#1D1D1F] bg-[#000000]/60">
                         <div className="flex items-center gap-3">
                           {/* Step visual badge */}
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition duration-200 ${
@@ -888,7 +888,7 @@ export default function SwapPage() {
                               : isFailed
                               ? 'bg-red-500 text-white'
                               : isActive
-                              ? 'bg-[#7C3AED] text-white animate-pulse'
+                              ? 'bg-[#5E2A8C] text-white animate-pulse'
                               : 'bg-[#1D1D1F] text-mutedText border border-[#333336]'
                           }`}>
                             {isCompleted ? (
@@ -903,14 +903,14 @@ export default function SwapPage() {
                           </div>
                           
                           <div className="flex flex-col">
-                            <span className={`text-xs font-bold transition duration-150 ${
+                            <span className={`text-xs font-bold transition duration-150 font-display ${
                               isActive ? 'text-white font-extrabold' : isCompleted ? 'text-slate-300' : 'text-mutedText'
                             }`}>
                               {step.label}
                             </span>
                             {/* Prover details for step 3 */}
                             {step.id === 3 && isActive && (
-                              <span className="text-[10px] text-purple-400 font-bold mt-1.5 animate-pulse">
+                              <span className="text-[10px] text-[#B488DC] font-bold mt-1.5 animate-pulse font-mono">
                                 {workerProgressMessage || 'Preparing prover (Aztec Barretenberg)...'}
                               </span>
                             )}
@@ -920,7 +920,7 @@ export default function SwapPage() {
                         {/* Right side loader/check visual */}
                         <div>
                           {isActive && (
-                            <svg className="animate-spin h-4 w-4 text-[#7C3AED]" fill="none" viewBox="0 0 24 24">
+                            <svg className="animate-spin h-4 w-4 text-[#5E2A8C]" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                             </svg>
@@ -980,21 +980,21 @@ export default function SwapPage() {
                         {withdrawError || 'Prover or submission failed.'}
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 font-display">
                       <button
                         type="button"
                         onClick={() => {
                           setWithdrawStatus('idle');
                           setWithdrawStep(0);
                         }}
-                        className="flex-1 py-3 bg-[#1D1D1F] border border-[#333336] text-white hover:bg-[#333336] font-bold rounded-full text-xs uppercase tracking-wider transition duration-150"
+                        className="flex-1 py-3 border border-[rgba(94,42,140,0.4)] text-white hover:bg-[#5E2A8C]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 bg-transparent"
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
                         onClick={handleWithdraw}
-                        className="flex-1 py-3 bg-[#5C1DAB] hover:bg-[#4C188F] text-white font-bold rounded-full text-xs uppercase tracking-wider transition duration-150"
+                        className="flex-1 py-3 bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white font-bold rounded-[12px] text-xs uppercase tracking-wider transition duration-150 shadow-[0_0_28px_rgba(123,55,168,0.3)] border-none"
                       >
                         Retry Step
                       </button>
