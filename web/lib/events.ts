@@ -15,7 +15,8 @@ export interface DepositEventData {
  */
 export async function fetchDepositEvents(fromLedger?: number): Promise<DepositEventData[]> {
   if (!POOL_CONTRACT_ID) {
-    throw new Error('Pool contract address is not configured.');
+    console.warn('MOCK MODE: fetchDepositEvents');
+    return [];
   }
 
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);

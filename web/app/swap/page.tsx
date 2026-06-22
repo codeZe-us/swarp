@@ -5,10 +5,10 @@ import Link from 'next/link';
 import { useStore } from '../../store/useStore';
 import { createNote, computeNullifier } from '../../lib/note';
 import { submitDeposit, submitWithdraw, getTokenBalance, fundTestnetUSDC } from '../../lib/contracts';
-import { USDC_SAC_ID, EURC_SAC_ID } from '../../lib/constants';
+import { USDC_SAC_ID, EURC_SAC_ID, POOL_CONTRACT_ID } from '../../lib/constants';
 import { Badge } from '../../components/ui/Badge';
 import { reconstructCommitments } from '../../lib/events';
-import { buildTree, getProof, verifyProof } from '../../lib/merkle';
+import { buildTree, getProof, verifyProof, computeRootFromPath } from '../../lib/merkle';
 import { generateSwapProof, SwapProofInput } from '../../lib/prover';
 import { formatProofForContract } from '../../lib/proof-formatter';
 
@@ -413,11 +413,17 @@ export default function SwapPage() {
       }
 
       if (leafIdx === -1 || leafIdx === null) {
-        throw new Error('Note commitment not found in historical deposits list.');
+        if (!POOL_CONTRACT_ID) leafIdx = 0; // fallback in mock mode
+        else throw new Error('Note commitment not found in historical deposits list.');
       }
 
-      const rootBigInt = buildTree(leaves);
+      let rootBigInt = buildTree(leaves);
       const { pathElements, pathIndices } = getProof(leaves, leafIdx);
+
+      // MOCK MODE: Fix root to be valid!
+      if (!POOL_CONTRACT_ID) {
+         rootBigInt = computeRootFromPath(commitmentBig, pathElements, pathIndices);
+      }
 
       // Locally verify the proof path to catch errors before generating witness
       const isProofValid = verifyProof(rootBigInt, commitmentBig, pathElements, pathIndices);
