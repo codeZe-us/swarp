@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { useStore } from '../../store/useStore';
 import { createNote, computeNullifier } from '../../lib/note';
 import { submitDeposit, submitWithdraw, getTokenBalance } from '../../lib/contracts';
@@ -60,6 +61,18 @@ export default function SwapPage() {
   useEffect(() => {
     fetchPoolState();
   }, [fetchPoolState]);
+
+  // Parse noteId query parameter for withdrawal pre-selection
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const noteId = params.get('noteId');
+      if (noteId) {
+        setSelectedNoteId(noteId);
+        setActiveTab('withdraw');
+      }
+    }
+  }, []);
 
   // Sync recipient address with user address when connecting
   useEffect(() => {
@@ -469,10 +482,18 @@ export default function SwapPage() {
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto font-sans">
       {/* Header and Subtext */}
-      <div>
-        <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Application</span>
-        <h1 className="text-3xl font-extrabold text-white mt-1 font-display">Private swap</h1>
-        <p className="text-sm text-mutedText mt-1">Deposit one stablecoin, withdraw the other — unlinkable.</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Application</span>
+          <h1 className="text-3xl font-extrabold text-white mt-1 font-display">Private swap</h1>
+          <p className="text-sm text-mutedText mt-1">Deposit one stablecoin, withdraw the other — unlinkable.</p>
+        </div>
+        <Link
+          href="/swap/history"
+          className="px-4 py-2 border border-[rgba(94,42,140,0.4)] text-white hover:bg-[#5E2A8C]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 font-display bg-transparent text-center"
+        >
+          View History
+        </Link>
       </div>
 
       {/* Custom Tabs Group Selector */}

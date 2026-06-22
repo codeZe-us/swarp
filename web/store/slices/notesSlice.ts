@@ -10,6 +10,7 @@ export interface NotesSlice {
   markWithdrawn: (noteId: string, withdrawTxHash: string) => Promise<void>;
   loadNotes: (address: string) => Promise<void>;
   clearNotes: () => void;
+  mergeNotes: (importedNotes: Note[]) => Promise<void>;
 }
 
 const isBrowser = typeof window !== 'undefined';
@@ -95,5 +96,26 @@ export const createNotesSlice: StateCreator<
   },
   clearNotes: () => {
     set({ notes: [] });
+  },
+  mergeNotes: async (importedNotes) => {
+    const address = get().address;
+    if (!address) return;
+
+    const existingCommitments = new Set(get().notes.map((n) => n.commitment));
+    const newNotes = importedNotes.filter((n) => !existingCommitments.has(n.commitment));
+
+    if (newNotes.length === 0) return;
+
+    const updatedNotes = [...get().notes, ...newNotes];
+    set({ notes: updatedNotes });
+
+    if (isBrowser) {
+      try {
+        const ciphertext = await encryptNotes(updatedNotes, address);
+        localStorage.setItem(`swarp_notes_${address}`, ciphertext);
+      } catch (error) {
+        console.error('Failed to save encrypted notes after merging:', error);
+      }
+    }
   },
 });
