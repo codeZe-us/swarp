@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import { StoreState } from '../useStore';
+import { getPoolInfo } from '../../lib/contracts';
 
 export interface PoolSlice {
   merkleRoot: string;
@@ -66,19 +67,35 @@ export const createPoolSlice: StateCreator<
     commitments: initialCommitments,
     fetchPoolState: async () => {
       try {
+        const poolInfo = await getPoolInfo();
+        const poolState = {
+          merkleRoot: '0x' + poolInfo.currentRoot,
+          exchangeRate: { 
+            numerator: poolInfo.currentRate, 
+            denominator: poolInfo.rateDenominator 
+          },
+          usdcReserves: poolInfo.usdcReserve.toString(),
+          eurcReserves: poolInfo.eurcReserve.toString(),
+          totalDeposits: poolInfo.totalDeposits,
+        };
+        set(poolState);
+        if (isBrowser) {
+          localStorage.setItem('swarp_pool_state', JSON.stringify(poolState));
+        }
+      } catch (error) {
+        console.warn('Failed to fetch pool state from contract, using fallback mock data:', error);
+        // Fallback to mock data to keep the UI functional when contracts/RPC are not ready
         const mockState = {
           merkleRoot: '0x2d9a6c8e3f4b5a7d8c9e0f1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u',
-          exchangeRate: { numerator: 101, denominator: 100 },
-          usdcReserves: '1000000',
-          eurcReserves: '850000',
+          exchangeRate: { numerator: 9200000, denominator: 10000000 },
+          usdcReserves: '18420000000', // 18,420
+          eurcReserves: '9860000000', // 9,860
           totalDeposits: 42,
         };
         set(mockState);
         if (isBrowser) {
           localStorage.setItem('swarp_pool_state', JSON.stringify(mockState));
         }
-      } catch (error) {
-        console.error('Failed to fetch pool state:', error);
       }
     },
     fetchCommitments: async () => {

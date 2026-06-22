@@ -600,3 +600,45 @@ export async function submitWithdraw(
 
   throw new SorobanTransactionError(`Transaction status: ${getResponse.status}`, response.hash);
 }
+
+export async function getTokenBalance(
+  userAddress: string,
+  tokenAddress: string
+): Promise<bigint> {
+  if (!tokenAddress) {
+    return BigInt(0);
+  }
+
+  const dummyAccount = getDummyAccount();
+  const contract = new Contract(tokenAddress);
+  const userVal = new Address(userAddress).toScVal();
+
+  const transaction = new TransactionBuilder(dummyAccount, {
+    fee: BASE_FEE,
+    networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+  })
+    .addOperation(contract.call('balance', userVal))
+    .setTimeout(30)
+    .build();
+
+  const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
+  try {
+    const simulation = await withRetry(() => rpcServer.simulateTransaction(transaction));
+
+    if (rpc.Api.isSimulationError(simulation)) {
+      return BigInt(0);
+    }
+
+    const resultVal = simulation.result?.retval;
+    if (!resultVal) {
+      return BigInt(0);
+    }
+
+    const balance = scValToNative(resultVal);
+    return typeof balance === 'bigint' ? balance : BigInt(balance ?? 0);
+  } catch (e) {
+    console.warn('Failed to simulate token balance check, returning 0:', e);
+    return BigInt(0);
+  }
+}
+
