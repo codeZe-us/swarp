@@ -358,6 +358,17 @@ export async function submitDeposit(
   amount: bigint | string | number,
   commitment: string
 ): Promise<{ txHash: string; leafIndex: number }> {
+  if (!POOL_CONTRACT_ID) {
+    console.warn('MOCK MODE: submitDeposit');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    if (typeof window !== 'undefined') {
+      const current = BigInt(localStorage.getItem(`mock_bal_${depositor}`) || '0');
+      const subAmt = BigInt(amount);
+      localStorage.setItem(`mock_bal_${depositor}`, (current >= subAmt ? current - subAmt : 0n).toString());
+    }
+    return { txHash: 'mock-tx-' + Math.random().toString(36).substr(2, 9), leafIndex: Math.floor(Math.random() * 100) };
+  }
+
   // 1. Inputs validation
   if (!depositor || !StrKey.isValidEd25519PublicKey(depositor)) {
     throw new Error('Invalid depositor address.');
@@ -372,16 +383,7 @@ export async function submitDeposit(
   if (!commitment || !/^[0-9a-fA-F]{64}$/.test(commitment)) {
     throw new Error('Commitment must be a valid 32-byte (64 character) hex string.');
   }
-  if (!POOL_CONTRACT_ID) {
-    console.warn('MOCK MODE: submitDeposit');
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    if (typeof window !== 'undefined') {
-      const current = BigInt(localStorage.getItem(`mock_bal_${depositor}`) || '0');
-      const subAmt = BigInt(amount);
-      localStorage.setItem(`mock_bal_${depositor}`, (current >= subAmt ? current - subAmt : 0n).toString());
-    }
-    return { txHash: 'mock-tx-' + Math.random().toString(36).substr(2, 9), leafIndex: Math.floor(Math.random() * 100) };
-  }
+
 
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
 
@@ -487,6 +489,17 @@ export async function submitWithdraw(
   merkleRoot: string,
   withdrawalAmount: bigint | string | number
 ): Promise<{ txHash: string }> {
+  if (!POOL_CONTRACT_ID) {
+    console.warn('MOCK MODE: submitWithdraw');
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    if (typeof window !== 'undefined') {
+      const current = BigInt(localStorage.getItem(`mock_bal_${recipient}`) || '0');
+      const addAmt = BigInt(withdrawalAmount);
+      localStorage.setItem(`mock_bal_${recipient}`, (current + addAmt).toString());
+    }
+    return { txHash: 'mock-tx-' + Math.random().toString(36).substr(2, 9) };
+  }
+
   // 1. Inputs validation
   if (!recipient || !StrKey.isValidEd25519PublicKey(recipient)) {
     throw new Error('Invalid recipient address.');
@@ -507,11 +520,7 @@ export async function submitWithdraw(
   if (amountBig <= BigInt(0)) {
     throw new Error('Withdrawal amount must be positive.');
   }
-  if (!POOL_CONTRACT_ID) {
-    console.warn('MOCK MODE: submitWithdraw');
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    return { txHash: 'mock-tx-' + Math.random().toString(36).substr(2, 9) };
-  }
+
 
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
 

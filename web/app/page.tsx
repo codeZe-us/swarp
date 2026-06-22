@@ -160,52 +160,63 @@ export default function Home() {
 
   // Dynamic portfolio history chart calculation
   const chartPoints = useMemo(() => {
-    // Return standard coordinates for beautiful curve if no history is available
-    if (!isConnected || transactions.length === 0) {
+    if (!isConnected) {
       return 'M 0,100 C 150,90 300,75 450,85 600,30';
     }
 
-    // Map tx timestamps to graph coordinates
-    // For demo/hackathon layout: create a line that represents cumulative value additions
+    if (sortedTransactions.length === 0) {
+      if (totalValue > 0) {
+        return `M 0,100 C 200,90 400,60 600,40`;
+      }
+      return 'M 0,100 L 600,100';
+    }
+
+    if (sortedTransactions.length === 1) {
+      const tx = sortedTransactions[0];
+      const amt = parseFloat(tx.amount);
+      const change = tx.asset === 'USDC' ? amt : amt / decimalRate;
+      const startPort = tx.type === 'withdrawal' ? totalValue + change : totalValue - change;
+      
+      const minV = Math.min(startPort, totalValue) * 0.9;
+      const maxV = Math.max(startPort, totalValue) * 1.1;
+      const r = maxV - minV || 1;
+      
+      const y1 = 100 - ((startPort - minV) / r) * 80;
+      const y2 = 100 - ((totalValue - minV) / r) * 80;
+      return `M 0,${y1} L 600,${y2}`;
+    }
+
     const pointsCount = Math.min(10, sortedTransactions.length);
-    if (pointsCount < 2) {
-      return 'M 0,100 C 150,90 300,75 450,85 600,30';
-    }
-
-    // Normalizing coordinates for 600x120 SVG box
-    const txsToUse = [...sortedTransactions.slice(0, pointsCount)].reverse();
+    const txsToUse = sortedTransactions.slice(0, pointsCount);
     let currentPort = totalValue;
-    const pathPoints: { x: number; y: number }[] = [];
-
-    // Calculate simulated checkpoints backwards
+    
+    // Calculate backwards (newest to oldest)
     const checkpoints = txsToUse.map((tx, idx) => {
-      const x = (idx / (pointsCount - 1)) * 600;
+      const x = 600 - (idx / (pointsCount - 1)) * 600;
+      const state = { x, val: currentPort };
+      
       const amt = parseFloat(tx.amount);
       const isWithdrawal = tx.type === 'withdrawal';
       const change = tx.asset === 'USDC' ? amt : amt / decimalRate;
       
-      // Withdrawals reduce pool state balance, deposits increase it
-      if (isWithdrawal) {
-        currentPort -= change;
-      } else {
-        currentPort += change;
-      }
+      if (isWithdrawal) currentPort += change;
+      else currentPort -= change;
 
-      // Keep inside bounds
-      return { x, val: currentPort };
+      return state;
     });
 
-    const minVal = Math.min(...checkpoints.map((c) => c.val), totalValue) * 0.9;
-    const maxVal = Math.max(...checkpoints.map((c) => c.val), totalValue) * 1.1;
+    checkpoints.reverse(); // left to right
+
+    const minVal = Math.min(...checkpoints.map((c) => c.val)) * 0.9;
+    const maxVal = Math.max(...checkpoints.map((c) => c.val)) * 1.1;
     const range = maxVal - minVal || 1;
 
-    // Map values to y (100 to 20 range)
     const pointsStr = checkpoints
       .map((c) => {
         const y = 100 - ((c.val - minVal) / range) * 80;
         return `${c.x},${y}`;
       })
-      .join(' ');
+      .join(' L ');
 
     return `M 0,100 L ${pointsStr}`;
   }, [isConnected, transactions, sortedTransactions, totalValue, decimalRate]);
