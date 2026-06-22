@@ -16,18 +16,18 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
-  const baseStyle = "inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primaryAccent/50 disabled:opacity-50 disabled:cursor-not-allowed select-none";
+  const baseStyle = "inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primaryAccent/50 disabled:opacity-50 disabled:cursor-not-allowed select-none font-display";
   
   let variantStyle = "";
   switch (variant) {
     case 'primary':
-      variantStyle = "bg-primaryAccent hover:bg-primaryHover text-white shadow-md shadow-purple-900/10";
+      variantStyle = "bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white shadow-[0_0_28px_rgba(123,55,168,0.3)] border-none rounded-[12px]";
       break;
     case 'secondary':
-      variantStyle = "border border-borderSubtle hover:border-mutedText hover:bg-cardSurface/30 text-white bg-transparent";
+      variantStyle = "border border-[rgba(94,42,140,0.4)] hover:bg-[#5E2A8C]/10 text-white bg-transparent rounded-[9px]";
       break;
     case 'ghost':
-      variantStyle = "text-mutedText hover:text-white hover:bg-cardSurface";
+      variantStyle = "text-mutedText hover:text-white hover:bg-cardSurface rounded-[9px]";
       break;
   }
 

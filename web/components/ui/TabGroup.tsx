@@ -20,7 +20,7 @@ export const TabGroup: React.FC<TabGroupProps> = ({
 }) => {
   return (
     <div 
-      className={`flex items-center gap-1.5 bg-darkBackground border border-borderSubtle p-1 rounded-lg ${className}`}
+      className={`flex items-center gap-1.5 bg-darkBackground border border-borderSubtle p-1 rounded-[12px] ${className}`}
       role="tablist"
     >
       {tabs.map((tab) => {
@@ -31,7 +31,7 @@ export const TabGroup: React.FC<TabGroupProps> = ({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(tab.value)}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primaryAccent/50 ${
+            className={`px-3 py-1.5 rounded-[9px] text-xs font-semibold uppercase tracking-wider transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primaryAccent/50 font-display ${
               active
                 ? 'bg-primaryAccent text-white shadow shadow-purple-950/20 font-bold'
                 : 'text-mutedText hover:text-white'

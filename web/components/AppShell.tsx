@@ -79,25 +79,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <aside className="w-64 bg-darkBackground border-r border-borderSubtle flex flex-col justify-between p-6">
           <div className="flex flex-col gap-8">
             {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-primaryAccent to-purple-400 flex items-center justify-center shadow-lg shadow-purple-900/20">
+            <div className="flex items-center gap-3 font-display">
+              <div className="w-8 h-8 rounded-[9px] bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] flex items-center justify-center shadow-[0_0_20px_rgba(123,55,168,0.2)]">
                 <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <span className="font-bold text-xl tracking-tight text-white">Swarp</span>
+              <span className="font-extrabold text-xl tracking-tight text-white">Swarp</span>
             </div>
 
             {/* Menu */}
-            <nav className="flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-mutedText/60 tracking-wider uppercase mb-2">Menu</span>
+            <nav className="flex flex-col gap-2 font-display">
+              <span className="text-[10px] font-bold text-mutedText/60 tracking-wider uppercase mb-2 font-sans">Menu</span>
               {navItems.map((item) => {
                 const active = pathname === item.href;
                 return (
                   <Link 
                     key={item.name} 
                     href={item.href}
-                    className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition duration-200 group ${
+                    className={`flex items-center justify-between px-3 py-2.5 rounded-[9px] text-sm font-medium transition duration-200 group ${
                       active 
                         ? 'bg-primaryAccent/10 text-white border border-primaryAccent/20' 
                         : 'text-mutedText hover:bg-cardSurface hover:text-white border border-transparent'
@@ -119,11 +119,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Connection Status Profile Card */}
-          <div className="bg-cardSurface border border-borderSubtle rounded-xl p-4 flex flex-col gap-3 mt-auto">
+          <div className="bg-cardSurface border border-borderSubtle rounded-[12px] p-4 flex flex-col gap-3 mt-auto">
             {isConnected && address ? (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-mutedText uppercase font-bold tracking-wider">Wallet</span>
+                  <span className="text-[10px] text-mutedText uppercase font-bold tracking-wider font-display">Wallet</span>
                   <Badge variant="active">Testnet</Badge>
                 </div>
                 <div className="flex items-center justify-between gap-2">
@@ -148,7 +148,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   onClick={connect}
                   disabled={isConnecting}
-                  className="w-full py-2 bg-primaryAccent hover:bg-primaryAccent/80 text-white rounded-lg text-xs font-semibold transition duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-2 bg-primaryAccent hover:bg-primaryHover text-white rounded-[9px] text-xs font-semibold transition duration-200 flex items-center justify-center gap-2 disabled:opacity-50 font-display"
                 >
                   {isConnecting ? (
                     <>
