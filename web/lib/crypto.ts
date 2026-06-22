@@ -1,4 +1,4 @@
-import { Note } from '../store/types';
+import { Note, Recipient } from '../store/types';
 
 /**
  * Generates a cryptographically random 252-bit BigInt using window.crypto.getRandomValues.
@@ -115,5 +115,69 @@ export async function decryptNotes(encrypted: string, walletPublicKey: string): 
   } catch (err) {
     console.error('Notes decryption failed:', err);
     throw new Error('Failed to decrypt notes');
+  }
+}
+
+/**
+ * Encrypts a list of Recipients using PBKDF2 key derivation and AES-256-GCM.
+ */
+export async function encryptRecipients(recipients: Recipient[], walletPublicKey: string): Promise<string> {
+  try {
+    const plaintext = JSON.stringify(recipients);
+    const key = await deriveKey(walletPublicKey);
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const encoder = new TextEncoder();
+    const encodedPlaintext = encoder.encode(plaintext);
+
+    const ciphertext = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encodedPlaintext
+    );
+
+    // Combine IV and Ciphertext: [12-bytes IV][ciphertext...]
+    const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(ciphertext), iv.length);
+
+    let binary = '';
+    const len = combined.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(combined[i]);
+    }
+    return btoa(binary);
+  } catch (err) {
+    console.error('Recipients encryption failed:', err);
+    throw new Error('Failed to encrypt recipients');
+  }
+}
+
+/**
+ * Decrypts a list of Recipients using PBKDF2 key derivation and AES-256-GCM.
+ */
+export async function decryptRecipients(encrypted: string, walletPublicKey: string): Promise<Recipient[]> {
+  try {
+    const key = await deriveKey(walletPublicKey);
+    const binary = atob(encrypted);
+    const combined = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      combined[i] = binary.charCodeAt(i);
+    }
+
+    const iv = combined.slice(0, 12);
+    const ciphertext = combined.slice(12);
+
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      ciphertext
+    );
+
+    const decoder = new TextDecoder();
+    const plaintext = decoder.decode(decrypted);
+    return JSON.parse(plaintext) as Recipient[];
+  } catch (err) {
+    console.error('Recipients decryption failed:', err);
+    throw new Error('Failed to decrypt recipients');
   }
 }

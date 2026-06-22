@@ -19,3 +19,12 @@ export interface Transaction {
   timestamp: number;
   privacy: 'public' | 'private';
 }
+
+export interface Recipient {
+  id: string;
+  name: string;
+  department: string;
+  address: string;
+  amount: string;
+  asset: 'USDC' | 'EURC';
+}
