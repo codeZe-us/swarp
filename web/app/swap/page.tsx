@@ -541,7 +541,7 @@ export default function SwapPage() {
                     placeholder="0"
                     value={amountIn}
                     onChange={(e) => handleAmountChange(e.target.value)}
-                    className="bg-transparent border-none outline-none text-white text-3xl font-extrabold w-full p-0 placeholder-mutedText/30 focus:ring-0"
+                    className="bg-transparent border-none outline-none text-white text-3xl font-bold font-mono w-full p-0 placeholder-mutedText/30 focus:ring-0"
                   />
                   
                   {/* Asset In Selector Dropdown */}
@@ -635,7 +635,7 @@ export default function SwapPage() {
                   <span>after proof</span>
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                  <div className="text-[#C084FC] text-3xl font-extrabold select-all">
+                  <div className="text-[#C084FC] text-3xl font-bold font-mono select-all">
                     {formattedCalculatedOut || '0.00'}
                   </div>
                   <div className="flex items-center gap-2 bg-[#0B0B0C]/40 border border-[#1D1D1F]/60 px-3 py-1.5 rounded-full text-white text-sm font-bold select-none cursor-not-allowed">
@@ -674,12 +674,12 @@ export default function SwapPage() {
               <button
                 onClick={handleDeposit}
                 disabled={depositTxStatus === 'loading' || (isConnected && !depositValidation.isValid)}
-                className={`w-full py-3.5 rounded-xl font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
+                className={`w-full py-3.5 rounded-full font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
                   depositTxStatus === 'loading'
                     ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-wait'
                     : isConnected && !depositValidation.isValid
                     ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-not-allowed'
-                    : 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white active:scale-[0.99] shadow-md shadow-purple-950/20'
+                    : 'bg-[#5C1DAB] hover:bg-[#4C188F] text-white active:scale-[0.99] shadow-md shadow-purple-950/20'
                 }`}
               >
                 {depositTxStatus === 'loading' ? (
@@ -841,10 +841,10 @@ export default function SwapPage() {
                   <button
                     onClick={handleWithdraw}
                     disabled={!selectedNoteId || !recipientAddress || withdrawStatus === 'loading'}
-                    className={`w-full py-3.5 rounded-xl font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
+                    className={`w-full py-3.5 rounded-full font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
                       !selectedNoteId || !recipientAddress
                         ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-not-allowed'
-                        : 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white active:scale-[0.99]'
+                        : 'bg-[#5C1DAB] hover:bg-[#4C188F] text-white active:scale-[0.99]'
                     }`}
                   >
                     Withdraw
@@ -987,14 +987,14 @@ export default function SwapPage() {
                           setWithdrawStatus('idle');
                           setWithdrawStep(0);
                         }}
-                        className="flex-1 py-3 bg-[#1D1D1F] border border-[#333336] text-white hover:bg-[#333336] font-bold rounded-xl text-xs uppercase tracking-wider transition duration-150"
+                        className="flex-1 py-3 bg-[#1D1D1F] border border-[#333336] text-white hover:bg-[#333336] font-bold rounded-full text-xs uppercase tracking-wider transition duration-150"
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
                         onClick={handleWithdraw}
-                        className="flex-1 py-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl text-xs uppercase tracking-wider transition duration-150"
+                        className="flex-1 py-3 bg-[#5C1DAB] hover:bg-[#4C188F] text-white font-bold rounded-full text-xs uppercase tracking-wider transition duration-150"
                       >
                         Retry Step
                       </button>
