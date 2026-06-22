@@ -37,6 +37,7 @@ export const createWalletSlice: StateCreator<
       await get().loadNotes(address);
       get().loadTransactions(address);
       await get().loadPayroll(address);
+      await get().loadTeam(address);
     } catch (err: any) {
       const errorMsg = err?.message || 'Failed to connect wallet';
       set({ status: 'error', error: errorMsg });
@@ -53,6 +54,7 @@ export const createWalletSlice: StateCreator<
     get().clearNotes();
     get().clearTransactions();
     get().clearPayroll();
+    get().clearTeam();
   },
   setNetwork: (network) => {
     set({ network });
@@ -87,6 +89,7 @@ export const createWalletSlice: StateCreator<
         await get().loadNotes(address);
         get().loadTransactions(address);
         await get().loadPayroll(address);
+        await get().loadTeam(address);
       } else {
         localStorage.removeItem('walletId');
       }

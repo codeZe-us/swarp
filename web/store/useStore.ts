@@ -5,8 +5,9 @@ import { createNotesSlice, NotesSlice } from './slices/notesSlice';
 import { createSwapSlice, SwapSlice } from './slices/swapSlice';
 import { createTransactionSlice, TransactionSlice } from './slices/transactionSlice';
 import { createPayrollSlice, PayrollSlice } from './slices/payrollSlice';
+import { createTeamSlice, TeamSlice } from './slices/teamSlice';
 
-export type StoreState = WalletSlice & PoolSlice & NotesSlice & SwapSlice & TransactionSlice & PayrollSlice;
+export type StoreState = WalletSlice & PoolSlice & NotesSlice & SwapSlice & TransactionSlice & PayrollSlice & TeamSlice;
 
 export const useStore = create<StoreState>()((...a) => ({
   ...createWalletSlice(...a),
@@ -15,5 +16,6 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createSwapSlice(...a),
   ...createTransactionSlice(...a),
   ...createPayrollSlice(...a),
+  ...createTeamSlice(...a),
 }));
-export type { WalletSlice, PoolSlice, NotesSlice, SwapSlice, TransactionSlice, PayrollSlice };
+export type { WalletSlice, PoolSlice, NotesSlice, SwapSlice, TransactionSlice, PayrollSlice, TeamSlice };

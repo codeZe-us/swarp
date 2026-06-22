@@ -28,3 +28,11 @@ export interface Recipient {
   amount: string;
   asset: 'USDC' | 'EURC';
 }
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  address: string;
+  role: 'Owner' | 'Admin' | 'Member';
+  status: 'Active' | 'Pending';
+}
