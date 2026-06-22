@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
 
     config.module.rules.push({
       test: /\.wasm$/,
-      type: "webassembly/async",
+      type: "asset/resource",
     });
 
     return config;

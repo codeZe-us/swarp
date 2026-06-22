@@ -2,36 +2,53 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useStore } from '../../store/useStore';
-import { createNote } from '../../lib/note';
-import { submitDeposit, getTokenBalance } from '../../lib/contracts';
+import { createNote, computeNullifier } from '../../lib/note';
+import { submitDeposit, submitWithdraw, getTokenBalance } from '../../lib/contracts';
 import { USDC_SAC_ID, EURC_SAC_ID } from '../../lib/constants';
 import { Badge } from '../../components/ui/Badge';
+import { reconstructCommitments } from '../../lib/events';
+import { buildTree, getProof, verifyProof } from '../../lib/merkle';
+import { generateSwapProof, SwapProofInput } from '../../lib/prover';
+import { formatProofForContract } from '../../lib/proof-formatter';
 
 export default function SwapPage() {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit');
   
-  // Wallet state from Zustand store
+  // Zustand store mappings
   const address = useStore((state) => state.address);
   const status = useStore((state) => state.status);
   const connect = useStore((state) => state.connect);
   const addNote = useStore((state) => state.addNote);
+  const updateNote = useStore((state) => state.updateNote);
+  const markWithdrawn = useStore((state) => state.markWithdrawn);
   const addTransaction = useStore((state) => state.addTransaction);
   const exchangeRate = useStore((state) => state.exchangeRate);
   const fetchPoolState = useStore((state) => state.fetchPoolState);
+  const notes = useStore((state) => state.notes);
   
   const isConnected = status === 'connected';
 
-  // Input states
+  // Input states (Deposit)
   const [assetIn, setAssetIn] = useState<'USDC' | 'EURC'>('USDC');
   const [amountIn, setAmountIn] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Transaction execution states
-  const [txStatus, setTxStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [txError, setTxError] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [leafIndex, setLeafIndex] = useState<number | null>(null);
+  // Transaction execution states (Deposit)
+  const [depositTxStatus, setDepositTxStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [depositTxError, setDepositTxError] = useState<string | null>(null);
+  const [depositTxHash, setDepositTxHash] = useState<string | null>(null);
+  const [depositLeafIndex, setDepositLeafIndex] = useState<number | null>(null);
+
+  // Withdraw flow states
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [recipientAddress, setRecipientAddress] = useState<string>('');
+  const [withdrawStep, setWithdrawStep] = useState<number>(0); // 0: idle, 1: fetching, 2: building, 3: proving, 4: submitting, 5: success
+  const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [workerStage, setWorkerStage] = useState<'loading' | 'computing' | 'proving' | null>(null);
+  const [provingSeconds, setProvingSeconds] = useState<number>(0);
+  const [withdrawTxHash, setWithdrawTxHash] = useState<string | null>(null);
 
   // Balances state (defaulting to mock values)
   const [balances, setBalances] = useState<{ USDC: number; EURC: number }>({
@@ -39,17 +56,23 @@ export default function SwapPage() {
     EURC: 9860.00,
   });
 
-  // Load pool state on mount
+  // Fetch pool state on mount
   useEffect(() => {
     fetchPoolState();
   }, [fetchPoolState]);
+
+  // Sync recipient address with user address when connecting
+  useEffect(() => {
+    if (isConnected && address && !recipientAddress) {
+      setRecipientAddress(address);
+    }
+  }, [isConnected, address, recipientAddress]);
 
   // Fetch actual balances if connected and contracts are configured
   useEffect(() => {
     if (isConnected && address) {
       const fetchRealBalances = async () => {
         try {
-          // If contract addresses are set, fetch real balances
           if (USDC_SAC_ID && EURC_SAC_ID) {
             const usdcBal = await getTokenBalance(address, USDC_SAC_ID);
             const eurcBal = await getTokenBalance(address, EURC_SAC_ID);
@@ -65,7 +88,6 @@ export default function SwapPage() {
       };
       fetchRealBalances();
     } else {
-      // Reset to default mock values when disconnected
       setBalances({
         USDC: 18420.00,
         EURC: 9860.00,
@@ -84,7 +106,12 @@ export default function SwapPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Determine assetOut based on assetIn
+  // Filter notes that are withdrawable (deposited)
+  const withdrawableNotes = useMemo(() => {
+    return notes.filter((n) => n.status === 'deposited');
+  }, [notes]);
+
+  // Determine assetOut based on assetIn for Deposit
   const assetOut = assetIn === 'USDC' ? 'EURC' : 'USDC';
 
   // Calculate exchange rate
@@ -92,14 +119,12 @@ export default function SwapPage() {
   const rateDen = exchangeRate?.denominator || 10000000;
   const decimalRate = rateNum / rateDen;
 
-  // Compute calculated withdrawal amount in real-time
+  // Compute calculated withdrawal amount in real-time for Deposit
   const calculatedOut = useMemo(() => {
     if (!amountIn || isNaN(parseFloat(amountIn))) return '';
     const val = parseFloat(amountIn);
     const rate = assetIn === 'USDC' ? decimalRate : 1 / decimalRate;
     const out = val * rate;
-    
-    // Format output to avoid floating point precision issues (max 7 decimals)
     return Number(out.toFixed(7)).toString();
   }, [amountIn, assetIn, decimalRate]);
 
@@ -107,22 +132,17 @@ export default function SwapPage() {
   const handleAmountChange = (val: string) => {
     if (val === '' || /^\d*\.?\d{0,7}$/.test(val)) {
       setAmountIn(val);
-      // Reset success status if user types a new amount
-      if (txStatus === 'success') {
-        setTxStatus('idle');
-        setTxHash(null);
-        setLeafIndex(null);
+      if (depositTxStatus === 'success') {
+        setDepositTxStatus('idle');
+        setDepositTxHash(null);
+        setDepositLeafIndex(null);
       }
     }
   };
 
   // Flip assets and amounts on swap icon click
   const handleFlipAssets = () => {
-    const previousAssetIn = assetIn;
-    const previousAmountIn = amountIn;
-    
     setAssetIn(assetOut);
-    
     if (calculatedOut) {
       setAmountIn(calculatedOut);
     } else {
@@ -136,8 +156,8 @@ export default function SwapPage() {
     setAmountIn(maxBalance.toString());
   };
 
-  // Client-side validations
-  const validation = useMemo(() => {
+  // Client-side validations for Deposit
+  const depositValidation = useMemo(() => {
     if (!amountIn) {
       return { isValid: false, message: 'Enter an amount' };
     }
@@ -151,7 +171,6 @@ export default function SwapPage() {
       return { isValid: false, message: 'Insufficient balance' };
     }
 
-    // Stellar raw amount fits in signed 64-bit integer limit: 922337203685.4775807
     const baseUnits = Math.round(val * 10_000_000);
     const maxI64 = BigInt('9223372036854775807');
     if (BigInt(baseUnits) > maxI64) {
@@ -168,12 +187,12 @@ export default function SwapPage() {
       return;
     }
 
-    if (!validation.isValid || !address) return;
+    if (!depositValidation.isValid || !address) return;
 
-    setTxStatus('loading');
-    setTxError(null);
-    setTxHash(null);
-    setLeafIndex(null);
+    setDepositTxStatus('loading');
+    setDepositTxError(null);
+    setDepositTxHash(null);
+    setDepositLeafIndex(null);
 
     try {
       const val = parseFloat(amountIn);
@@ -185,10 +204,8 @@ export default function SwapPage() {
         throw new Error(`Token contract for ${assetIn} is not configured in the environment.`);
       }
 
-      // 1. Generate internal cryptographic note parameters
       const note = createNote(amountBigInt, assetId);
 
-      // 2. Submit transaction to Soroban
       const result = await submitDeposit(
         address,
         tokenAddress,
@@ -196,7 +213,6 @@ export default function SwapPage() {
         note.commitment
       );
 
-      // 3. Update note with leaf index and transaction details
       const confirmedNote = {
         ...note,
         leafIndex: result.leafIndex,
@@ -204,10 +220,8 @@ export default function SwapPage() {
         status: 'deposited' as const,
       };
 
-      // 4. Save note in encrypted local storage via Zustand slice
       await addNote(confirmedNote);
 
-      // 5. Add to transaction history
       addTransaction({
         type: 'deposit',
         amount: amountIn,
@@ -217,15 +231,14 @@ export default function SwapPage() {
         privacy: 'public',
       });
 
-      // 6. Set success state
-      setLeafIndex(result.leafIndex);
-      setTxHash(result.txHash);
-      setTxStatus('success');
+      setDepositLeafIndex(result.leafIndex);
+      setDepositTxHash(result.txHash);
+      setDepositTxStatus('success');
       setAmountIn('');
     } catch (error: any) {
       console.error('Deposit flow failed:', error);
-      setTxError(error?.message || 'Transaction submission failed. Please try again.');
-      setTxStatus('error');
+      setDepositTxError(error?.message || 'Transaction submission failed. Please try again.');
+      setDepositTxStatus('error');
     }
   };
 
@@ -235,13 +248,223 @@ export default function SwapPage() {
     const num = parseFloat(calculatedOut);
     if (isNaN(num)) return '';
     
-    // If output has more than 2 decimal places, show them, otherwise show 2 decimals
     const parts = calculatedOut.split('.');
     if (parts.length === 2 && parts[1].length > 2) {
       return num.toFixed(parts[1].length);
     }
     return num.toFixed(2);
   }, [calculatedOut]);
+
+  // Estimate remaining time based on worker stage
+  const workerProgressMessage = useMemo(() => {
+    if (!workerStage) return '';
+    switch (workerStage) {
+      case 'loading':
+        return `Initializing prover backend... (est. ${Math.max(1, 5 - provingSeconds)}s remaining)`;
+      case 'computing':
+        return `Solving circuit constraints... (est. ${Math.max(1, 3 - provingSeconds)}s remaining)`;
+      case 'proving':
+        return `Generating cryptographic proof... (est. ${Math.max(1, 12 - provingSeconds)}s remaining)`;
+      default:
+        return '';
+    }
+  }, [workerStage, provingSeconds]);
+
+  // Setup prover timer count-up
+  useEffect(() => {
+    let timer: any = null;
+    if (withdrawStatus === 'loading' && withdrawStep === 3) {
+      timer = setInterval(() => {
+        setProvingSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setProvingSeconds(0);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [withdrawStatus, withdrawStep]);
+
+  // Withdraw transaction execution flow
+  const handleWithdraw = async () => {
+    if (!isConnected) {
+      connect();
+      return;
+    }
+
+    const note = notes.find((n) => n.id === selectedNoteId);
+    if (!note || !address || !recipientAddress) return;
+
+    setWithdrawStatus('loading');
+    setWithdrawError(null);
+    setWithdrawTxHash(null);
+    setWorkerStage(null);
+
+    // Track active memory secret for zeroing out on completion
+    let activeSecret: bigint | null = BigInt(note.secret);
+
+    try {
+      // -------------------------------------------------------------
+      // Pre-flight check: Verify Pool Reserves in Output Asset
+      // -------------------------------------------------------------
+      const depositAmountBig = BigInt(note.amount);
+      const isUSDCIn = note.asset === 'USDC';
+      
+      // Calculate exact output withdrawal amount matching contract math
+      let withdrawAmountBig: bigint;
+      if (isUSDCIn) {
+        withdrawAmountBig = (depositAmountBig * BigInt(rateNum)) / BigInt(rateDen);
+      } else {
+        withdrawAmountBig = (depositAmountBig * BigInt(rateDen)) / BigInt(rateNum);
+      }
+
+      // Read reserves from Zanzibar pool state
+      const usdcReservesBig = BigInt(useStore.getState().usdcReserves || '0');
+      const eurcReservesBig = BigInt(useStore.getState().eurcReserves || '0');
+      const reserveAvailable = isUSDCIn ? eurcReservesBig : usdcReservesBig;
+
+      if (reserveAvailable < withdrawAmountBig) {
+        throw new Error(
+          `Insufficient pool reserves in ${isUSDCIn ? 'EURC' : 'USDC'} to satisfy this withdrawal. ` +
+          `Required: ${(Number(withdrawAmountBig) / 10_000_000).toFixed(2)}, ` +
+          `Available: ${(Number(reserveAvailable) / 10_000_000).toFixed(2)}.`
+        );
+      }
+
+      const outputAssetAddress = isUSDCIn ? EURC_SAC_ID : USDC_SAC_ID;
+      if (!outputAssetAddress) {
+        throw new Error(`Token contract for output asset is not configured in the environment.`);
+      }
+
+      // -------------------------------------------------------------
+      // Step 1: Fetching pool state
+      // -------------------------------------------------------------
+      setWithdrawStep(1);
+      // Fetch latest roots and leaves from contract
+      await fetchPoolState();
+      const currentRoot = useStore.getState().merkleRoot;
+      if (!currentRoot || currentRoot === '0') {
+        throw new Error('Could not fetch active Merkle root from chain.');
+      }
+
+      // -------------------------------------------------------------
+      // Step 2: Building Merkle proof
+      // -------------------------------------------------------------
+      setWithdrawStep(2);
+      // Reconstruct leaf array from historical commitment events
+      const leaves = await reconstructCommitments();
+      
+      const commitmentBig = BigInt(note.commitment);
+      let leafIdx = note.leafIndex;
+      if (leafIdx === null) {
+        leafIdx = leaves.findIndex((l) => l === commitmentBig);
+      }
+
+      if (leafIdx === -1 || leafIdx === null) {
+        throw new Error('Note commitment not found in historical deposits list.');
+      }
+
+      const rootBigInt = buildTree(leaves);
+      const { pathElements, pathIndices } = getProof(leaves, leafIdx);
+
+      // Locally verify the proof path to catch errors before generating witness
+      const isProofValid = verifyProof(rootBigInt, commitmentBig, pathElements, pathIndices);
+      if (!isProofValid) {
+        throw new Error('Local Merkle proof verification failed. Sibling tree elements did not hash to root.');
+      }
+
+      // -------------------------------------------------------------
+      // Step 3: Generating ZK proof
+      // -------------------------------------------------------------
+      setWithdrawStep(3);
+      const nullifierBig = computeNullifier(commitmentBig, activeSecret);
+
+      const toHex32 = (val: bigint) => '0x' + val.toString(16).padStart(64, '0');
+
+      const witnessInput: SwapProofInput = {
+        deposit_amount: note.amount,
+        withdrawal_amount: withdrawAmountBig.toString(),
+        secret: toHex32(activeSecret),
+        asset_in: isUSDCIn ? '0' : '1',
+        asset_out: isUSDCIn ? '1' : '0',
+        path_elements: pathElements.map((el) => toHex32(el)),
+        path_indices: pathIndices,
+        exchange_rate: rateNum.toString(),
+        rate_denominator: rateDen.toString(),
+        nullifier_hash: toHex32(nullifierBig),
+        asset_out_public: isUSDCIn ? '1' : '0',
+        merkle_root: toHex32(rootBigInt),
+      };
+
+      // Trigger Web Worker UltraHonk prover
+      const proofResult = await generateSwapProof(witnessInput, (stage) => {
+        setWorkerStage(stage);
+        setProvingSeconds(0);
+      });
+
+      // -------------------------------------------------------------
+      // Step 4: Submitting to Stellar
+      // -------------------------------------------------------------
+      setWithdrawStep(4);
+      setWorkerStage(null);
+
+      // Slice prepended public inputs and format for verifier contract
+      const { proofHex } = formatProofForContract(proofResult.proof, proofResult.publicInputs);
+
+      // Submit transaction via contracts.ts
+      const result = await submitWithdraw(
+        recipientAddress,
+        outputAssetAddress,
+        proofHex,
+        nullifierBig.toString(16).padStart(64, '0'),
+        rootBigInt.toString(16).padStart(64, '0'),
+        withdrawAmountBig.toString()
+      );
+
+      // -------------------------------------------------------------
+      // Step 5: Success & State updates
+      // -------------------------------------------------------------
+      setWithdrawStep(5);
+
+      // Zero out active secret in local memory immediately
+      activeSecret = null;
+
+      // Update Note to zero out secret and mark status as withdrawn
+      await updateNote(note.id, { secret: '0' });
+      await markWithdrawn(note.id, result.txHash);
+
+      // Log transaction history
+      addTransaction({
+        type: 'withdrawal',
+        amount: (Number(withdrawAmountBig) / 10_000_000).toString(),
+        asset: isUSDCIn ? 'EURC' : 'USDC',
+        txHash: result.txHash,
+        timestamp: Date.now(),
+        privacy: 'private',
+      });
+
+      setWithdrawTxHash(result.txHash);
+      setWithdrawStatus('success');
+      setSelectedNoteId(null);
+    } catch (error: any) {
+      console.error('Withdraw flow failed:', error);
+      
+      let failMessage = error?.message || 'Withdrawal transaction failed.';
+      
+      // Enforce edge case error messaging
+      if (failMessage.includes('Contract, #6') || failMessage.includes('InvalidMerkleRoot')) {
+        failMessage = 'The Merkle root expired because another transaction was confirmed. Please try again.';
+      } else if (failMessage.includes('Contract, #5') || failMessage.includes('NullifierSpent')) {
+        failMessage = 'This deposit note has already been withdrawn (nullifier spent).';
+      }
+
+      setWithdrawError(failMessage);
+      setWithdrawStatus('error');
+    } finally {
+      // Safeguard: make sure memory references to secrets are wiped
+      activeSecret = null;
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
@@ -450,16 +673,16 @@ export default function SwapPage() {
             <div className="mt-5">
               <button
                 onClick={handleDeposit}
-                disabled={txStatus === 'loading' || (isConnected && !validation.isValid)}
+                disabled={depositTxStatus === 'loading' || (isConnected && !depositValidation.isValid)}
                 className={`w-full py-3.5 rounded-xl font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
-                  txStatus === 'loading'
+                  depositTxStatus === 'loading'
                     ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-wait'
-                    : isConnected && !validation.isValid
+                    : isConnected && !depositValidation.isValid
                     ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-not-allowed'
                     : 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white active:scale-[0.99] shadow-md shadow-purple-950/20'
                 }`}
               >
-                {txStatus === 'loading' ? (
+                {depositTxStatus === 'loading' ? (
                   <>
                     <svg className="animate-spin h-4 w-4 text-purple-400" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -470,9 +693,9 @@ export default function SwapPage() {
                 ) : !isConnected ? (
                   'Connect wallet to deposit'
                 ) : (
-                  validation.message === 'Deposit' && amountIn
+                  depositValidation.message === 'Deposit' && amountIn
                     ? `Deposit ${amountIn} ${assetIn}`
-                    : validation.message
+                    : depositValidation.message
                 )}
               </button>
             </div>
@@ -484,7 +707,7 @@ export default function SwapPage() {
           </div>
 
           {/* Tx State Alerts */}
-          {txStatus === 'success' && txHash && (
+          {depositTxStatus === 'success' && depositTxHash && (
             <div className="w-full max-w-[500px] bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex flex-col gap-2.5">
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -496,18 +719,18 @@ export default function SwapPage() {
                 <div>
                   <span className="text-mutedText">Transaction Hash:</span>{' '}
                   <a
-                    href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+                    href={`https://stellar.expert/explorer/testnet/tx/${depositTxHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline hover:text-white font-bold text-emerald-400"
                   >
-                    {txHash.slice(0, 12)}...{txHash.slice(-12)}
+                    {depositTxHash.slice(0, 12)}...{depositTxHash.slice(-12)}
                   </a>
                 </div>
-                {leafIndex !== null && (
+                {depositLeafIndex !== null && (
                   <div>
                     <span className="text-mutedText">Leaf Index:</span>{' '}
-                    <span className="font-bold text-white">{leafIndex}</span>
+                    <span className="font-bold text-white">{depositLeafIndex}</span>
                   </div>
                 )}
                 <div className="mt-2 bg-[#000000]/40 border border-amber-500/20 p-3 rounded-lg text-amber-300 font-semibold text-[11px]">
@@ -517,114 +740,276 @@ export default function SwapPage() {
             </div>
           )}
 
-          {txStatus === 'error' && txError && (
+          {depositTxStatus === 'error' && depositTxError && (
             <div className="w-full max-w-[500px] bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
               <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <div className="text-xs font-semibold text-red-400 leading-relaxed">
-                {txError}
+                {depositTxError}
               </div>
             </div>
           )}
         </div>
       ) : (
-        /* High-fidelity Withdraw placeholder showing active notes */
-        <WithdrawTabPlaceholder balances={balances} />
-      )}
-    </div>
-  );
-}
-
-// Inner helper component for the Withdraw tab to keep active notes list functional
-function WithdrawTabPlaceholder({ balances }: { balances: { USDC: number; EURC: number } }) {
-  const notes = useStore((state) => state.notes);
-  const activeNotes = useMemo(() => notes.filter(n => n.status === 'deposited'), [notes]);
-  const [recipient, setRecipient] = useState('');
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-
-  const selectedNote = useMemo(() => {
-    return activeNotes.find(n => n.id === selectedNoteId);
-  }, [activeNotes, selectedNoteId]);
-
-  return (
-    <div className="flex flex-col gap-6 items-center w-full">
-      <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-2xl p-6">
-        
-        {/* Header row inside Card */}
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-md font-bold text-white">Withdraw from pool</h3>
-          <Badge variant="private">
-            <span className="mr-1">❖</span> SHIELDED
-          </Badge>
-        </div>
-
-        {/* Notes selection list */}
-        <div className="flex flex-col gap-3">
-          <label className="text-xs font-bold text-mutedText uppercase tracking-wider">
-            Select Active Shielded Note
-          </label>
-          {activeNotes.length === 0 ? (
-            <div className="bg-[#000000] border border-[#1D1D1F] rounded-xl p-4 text-center text-xs text-mutedText font-medium">
-              No active shielded deposits found for this wallet. Create a deposit first.
+        /* Replaced Withdraw Tab with full ZK implementation */
+        <div className="flex flex-col gap-6 items-center w-full">
+          <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-2xl p-6">
+            
+            {/* Header row inside Card */}
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-md font-bold text-white">Withdraw from pool</h3>
+              <Badge variant="private">
+                <span className="mr-1">❖</span> SHIELDED
+              </Badge>
             </div>
-          ) : (
-            <div className="flex flex-col gap-2 max-h-36 overflow-y-auto pr-1">
-              {activeNotes.map((note) => (
-                <button
-                  key={note.id}
-                  onClick={() => setSelectedNoteId(note.id === selectedNoteId ? null : note.id)}
-                  className={`flex items-center justify-between p-3 rounded-xl border text-left transition duration-150 ${
-                    selectedNoteId === note.id
-                      ? 'bg-primaryAccent/10 border-primaryAccent text-white'
-                      : 'bg-[#000000] border-[#1D1D1F] text-mutedText hover:border-mutedText/50 hover:text-white'
-                  }`}
-                >
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs font-bold text-white">
-                      {(Number(note.amount) / 10_000_000).toLocaleString('en-US')} {note.asset} Note
-                    </span>
-                    <span className="text-[10px] text-mutedText">
-                      Commitment: {note.commitment.slice(0, 6)}...{note.commitment.slice(-6)}
-                    </span>
+
+            {/* Notes selection list */}
+            {withdrawStep === 0 ? (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
+                  <label className="text-xs font-bold text-mutedText uppercase tracking-wider">
+                    Select Active Shielded Note
+                  </label>
+                  {withdrawableNotes.length === 0 ? (
+                    <div className="bg-[#000000] border border-[#1D1D1F] rounded-xl p-6 text-center text-xs text-mutedText font-semibold flex flex-col items-center justify-center gap-2 min-h-[120px]">
+                      <svg className="w-8 h-8 text-mutedText/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0V9a2 2 0 00-2-2H6a2 2 0 00-2 2v4m16 4H4" />
+                      </svg>
+                      <span>No pending swaps. Make a deposit first.</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+                      {withdrawableNotes.map((note) => {
+                        const isSelected = selectedNoteId === note.id;
+                        const depAmount = Number(note.amount) / 10_000_000;
+                        const withRate = note.asset === 'USDC' ? decimalRate : 1 / decimalRate;
+                        const withAmount = depAmount * withRate;
+                        const withAsset = note.asset === 'USDC' ? 'EURC' : 'USDC';
+
+                        return (
+                          <button
+                            key={note.id}
+                            type="button"
+                            onClick={() => setSelectedNoteId(isSelected ? null : note.id)}
+                            className={`flex items-center justify-between p-4 rounded-xl border text-left transition duration-150 ${
+                              isSelected
+                                ? 'bg-[#7C3AED]/10 border-[#7C3AED] text-white'
+                                : 'bg-[#000000] border-[#1D1D1F] text-mutedText hover:border-mutedText/50 hover:text-white'
+                            }`}
+                          >
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                <span>{depAmount.toLocaleString('en-US', { maximumFractionDigits: 7 })} {note.asset}</span>
+                                <svg className="w-3.5 h-3.5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                                <span className="text-[#C084FC]">{withAmount.toLocaleString('en-US', { maximumFractionDigits: 7 })} {withAsset}</span>
+                              </span>
+                              <span className="text-[10px] text-mutedText font-semibold mt-1">
+                                Commitment: {note.commitment.slice(0, 8)}...{note.commitment.slice(-8)}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-mutedText font-bold">
+                              {new Date(note.createdAt).toLocaleDateString()}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recipient Stellar Address */}
+                {selectedNoteId && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-mutedText uppercase tracking-wider">
+                      Recipient Stellar Address
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. G..."
+                      value={recipientAddress}
+                      onChange={(e) => setRecipientAddress(e.target.value)}
+                      className="bg-[#000000] border border-[#1D1D1F] rounded-xl p-3.5 text-xs text-white focus:border-[#7C3AED] focus:ring-0 placeholder-mutedText/30 w-full outline-none font-mono"
+                    />
                   </div>
-                  <span className="text-[10px] text-mutedText font-semibold">
-                    {new Date(note.createdAt).toLocaleDateString()}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+                )}
 
-          {/* Manual input for custom notes */}
-          <div className="flex flex-col gap-1.5 mt-2">
-            <label className="text-xs font-bold text-mutedText uppercase tracking-wider">
-              Recipient Stellar Address
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. G..."
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              className="bg-[#000000] border border-[#1D1D1F] rounded-xl p-3.5 text-xs text-white focus:border-[#7C3AED] focus:ring-0 placeholder-mutedText/30 w-full outline-none font-mono"
-            />
+                {/* Withdraw Submit CTA */}
+                <div className="mt-2">
+                  <button
+                    onClick={handleWithdraw}
+                    disabled={!selectedNoteId || !recipientAddress || withdrawStatus === 'loading'}
+                    className={`w-full py-3.5 rounded-xl font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
+                      !selectedNoteId || !recipientAddress
+                        ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-not-allowed'
+                        : 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white active:scale-[0.99]'
+                    }`}
+                  >
+                    Withdraw
+                  </button>
+                </div>
+
+                {/* Error Box */}
+                {withdrawStatus === 'error' && withdrawError && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
+                    <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div className="text-xs font-semibold text-red-400 leading-relaxed">
+                      {withdrawError}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Execution Multi-step Progress Screen */
+              <div className="flex flex-col gap-6 py-2">
+                <div className="flex flex-col gap-4">
+                  {[
+                    { id: 1, label: "Fetching pool state..." },
+                    { id: 2, label: "Building Merkle proof..." },
+                    { id: 3, label: "Generating ZK proof..." },
+                    { id: 4, label: "Submitting to Stellar..." },
+                    { id: 5, label: "Swap complete!" }
+                  ].map((step) => {
+                    const isActive = withdrawStep === step.id && withdrawStatus === 'loading';
+                    const isCompleted = withdrawStep > step.id || (step.id === 5 && withdrawStep === 5 && withdrawStatus === 'success');
+                    const isFailed = withdrawStep === step.id && withdrawStatus === 'error';
+                    
+                    return (
+                      <div key={step.id} className="flex items-center justify-between p-3.5 rounded-xl border border-[#1D1D1F] bg-[#000000]/60">
+                        <div className="flex items-center gap-3">
+                          {/* Step visual badge */}
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition duration-200 ${
+                            isCompleted
+                              ? 'bg-emerald-500 text-white'
+                              : isFailed
+                              ? 'bg-red-500 text-white'
+                              : isActive
+                              ? 'bg-[#7C3AED] text-white animate-pulse'
+                              : 'bg-[#1D1D1F] text-mutedText border border-[#333336]'
+                          }`}>
+                            {isCompleted ? (
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : isFailed ? (
+                              <span>✕</span>
+                            ) : (
+                              <span>{step.id}</span>
+                            )}
+                          </div>
+                          
+                          <div className="flex flex-col">
+                            <span className={`text-xs font-bold transition duration-150 ${
+                              isActive ? 'text-white font-extrabold' : isCompleted ? 'text-slate-300' : 'text-mutedText'
+                            }`}>
+                              {step.label}
+                            </span>
+                            {/* Prover details for step 3 */}
+                            {step.id === 3 && isActive && (
+                              <span className="text-[10px] text-purple-400 font-bold mt-1.5 animate-pulse">
+                                {workerProgressMessage || 'Preparing prover (Aztec Barretenberg)...'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right side loader/check visual */}
+                        <div>
+                          {isActive && (
+                            <svg className="animate-spin h-4 w-4 text-[#7C3AED]" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Final transaction hash result / action rows */}
+                {withdrawStatus === 'success' && withdrawTxHash && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex flex-col gap-3 mt-2">
+                    <div className="text-xs text-slate-300 flex flex-col gap-1.5 font-medium leading-relaxed">
+                      <div className="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Withdrawal Completed
+                      </div>
+                      <div className="mt-1">
+                        <span className="text-mutedText">Transaction Hash:</span>{' '}
+                        <a
+                          href={`https://stellar.expert/explorer/testnet/tx/${withdrawTxHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline hover:text-white font-bold text-emerald-400"
+                        >
+                          {withdrawTxHash.slice(0, 12)}...{withdrawTxHash.slice(-12)}
+                        </a>
+                      </div>
+                      <p className="text-[10px] text-mutedText mt-1.5">
+                        The note secret has been successfully zeroed out in memory and stored state. Note spent.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWithdrawStatus('idle');
+                        setWithdrawStep(0);
+                        setWithdrawTxHash(null);
+                      }}
+                      className="w-full mt-2 py-2 bg-emerald-500/20 border border-emerald-500/30 hover:bg-emerald-500/30 text-emerald-400 font-bold rounded-xl text-xs uppercase tracking-wider transition duration-150"
+                    >
+                      Done
+                    </button>
+                  </div>
+                )}
+
+                {withdrawStatus === 'error' && (
+                  <div className="flex flex-col gap-3 mt-2">
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
+                      <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div className="text-xs font-semibold text-red-400 leading-relaxed">
+                        {withdrawError || 'Prover or submission failed.'}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWithdrawStatus('idle');
+                          setWithdrawStep(0);
+                        }}
+                        className="flex-1 py-3 bg-[#1D1D1F] border border-[#333336] text-white hover:bg-[#333336] font-bold rounded-xl text-xs uppercase tracking-wider transition duration-150"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleWithdraw}
+                        className="flex-1 py-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold rounded-xl text-xs uppercase tracking-wider transition duration-150"
+                      >
+                        Retry Step
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <p className="text-[10px] text-mutedText/60 text-center mt-4 leading-relaxed font-semibold max-w-sm mx-auto">
+              Zero-knowledge proof generation and validation are run locally in the browser before submitting to Soroban.
+            </p>
           </div>
-
-          {/* CTA withdraw */}
-          <div className="mt-4">
-            <button
-              disabled={true}
-              className="w-full py-3.5 rounded-xl font-bold text-sm tracking-wide bg-[#1D1D1F] text-mutedText border border-[#333336] uppercase opacity-75 cursor-not-allowed flex items-center justify-center gap-1.5"
-            >
-              <span>Withdrawal Available on Mainnet</span>
-            </button>
-          </div>
-
-          <p className="text-[10px] text-mutedText/60 text-center mt-3 leading-relaxed font-semibold max-w-sm mx-auto">
-            Zero-knowledge proof generation and validation are run locally in the browser before submitting to Soroban.
-          </p>
         </div>
-      </div>
+      )}
     </div>
   );
 }
