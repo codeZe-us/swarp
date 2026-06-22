@@ -9,6 +9,8 @@ export interface TeamSlice {
   inviteMember: (name: string, memberAddress: string, role: 'Admin' | 'Member') => Promise<void>;
   updateSignersRequired: (count: number) => Promise<void>;
   clearTeam: () => void;
+  removeMember: (id: string) => Promise<void>;
+  activateMember: (id: string) => Promise<void>;
 }
 
 const isBrowser = typeof window !== 'undefined';
@@ -60,8 +62,15 @@ export const createTeamSlice: StateCreator<
         {
           id: 'sofia-id',
           name: 'Sofia Rossi',
-          address: 'GC7K7UY47ZTYXKM55W347A22Z567KM47Z5X73KXMX7KMK2A4K3Z7K4XM',
+          address: 'GCR6MLL2HF5RV5NKJSNEMV7MQDKONZ27RYHHMULKF34ICW2QA6QL6FLL',
           role: 'Member',
+          status: 'Pending',
+        },
+        {
+          id: 'gc2s-id',
+          name: 'GC2S Admin',
+          address: 'GC2S532SGRZ7HVDYMXCULDHLXZL3UQIE4CBKNC2JBAJV7HMTC5CUHNLG',
+          role: 'Admin',
           status: 'Pending',
         },
       ];
@@ -93,6 +102,30 @@ export const createTeamSlice: StateCreator<
           address: address,
           role: 'Owner',
           status: 'Active',
+        });
+      }
+
+      // Ensure GCR6MLL2HF5RV5NKJSNEMV7MQDKONZ27RYHHMULKF34ICW2QA6QL6FLL is present
+      const hasGCR6 = parsed.some((m) => m.address === 'GCR6MLL2HF5RV5NKJSNEMV7MQDKONZ27RYHHMULKF34ICW2QA6QL6FLL');
+      if (!hasGCR6) {
+        parsed.push({
+          id: 'sofia-id',
+          name: 'Sofia Rossi',
+          address: 'GCR6MLL2HF5RV5NKJSNEMV7MQDKONZ27RYHHMULKF34ICW2QA6QL6FLL',
+          role: 'Member',
+          status: 'Pending',
+        });
+      }
+
+      // Ensure GC2S532SGRZ7HVDYMXCULDHLXZL3UQIE4CBKNC2JBAJV7HMTC5CUHNLG is present
+      const hasGC2S = parsed.some((m) => m.address === 'GC2S532SGRZ7HVDYMXCULDHLXZL3UQIE4CBKNC2JBAJV7HMTC5CUHNLG');
+      if (!hasGC2S) {
+        parsed.push({
+          id: 'gc2s-id',
+          name: 'GC2S Admin',
+          address: 'GC2S532SGRZ7HVDYMXCULDHLXZL3UQIE4CBKNC2JBAJV7HMTC5CUHNLG',
+          role: 'Admin',
+          status: 'Pending',
         });
       }
 
@@ -134,5 +167,33 @@ export const createTeamSlice: StateCreator<
   },
   clearTeam: () => {
     set({ teamMembers: [], signersRequired: 2 });
+  },
+  removeMember: async (id) => {
+    const address = get().address;
+    if (!address) return;
+
+    // Filter out the deleted member, but never let them delete the owner row
+    const updated = get().teamMembers.filter((m) => m.id !== id || m.role === 'Owner');
+    set({ teamMembers: updated });
+
+    if (isBrowser) {
+      localStorage.setItem(`swarp_team_${address}`, JSON.stringify(updated));
+    }
+  },
+  activateMember: async (id) => {
+    const address = get().address;
+    if (!address) return;
+
+    const updated = get().teamMembers.map((m) => {
+      if (m.id === id) {
+        return { ...m, status: 'Active' as const };
+      }
+      return m;
+    });
+    set({ teamMembers: updated });
+
+    if (isBrowser) {
+      localStorage.setItem(`swarp_team_${address}`, JSON.stringify(updated));
+    }
   },
 });

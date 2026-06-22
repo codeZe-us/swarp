@@ -17,6 +17,8 @@ export default function TeamPage() {
   const signersRequired = useStore((state) => state.signersRequired);
   const inviteMember = useStore((state) => state.inviteMember);
   const updateSignersRequired = useStore((state) => state.updateSignersRequired);
+  const removeMember = useStore((state) => state.removeMember);
+  const activateMember = useStore((state) => state.activateMember);
 
   const isConnected = status === 'connected';
 
@@ -190,7 +192,8 @@ export default function TeamPage() {
                   <th className="pb-3 pr-4">Member</th>
                   <th className="pb-3 pr-4">Wallet</th>
                   <th className="pb-3 pr-4">Role</th>
-                  <th className="pb-3 text-right">Status</th>
+                  <th className="pb-3 pr-4">Status</th>
+                  <th className="pb-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1D1D1F]">
@@ -236,7 +239,7 @@ export default function TeamPage() {
                     </td>
 
                     {/* Status Badge */}
-                    <td className="py-4 text-right">
+                    <td className="py-4 pr-4">
                       {member.status === 'Active' ? (
                         <div className="inline-flex items-center gap-1.5 bg-[#5E2A8C]/10 border border-[#5E2A8C]/20 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-brandLightPurple font-display select-none">
                           <span className="w-1.5 h-1.5 rounded-full bg-brandLightPurple" />
@@ -248,6 +251,30 @@ export default function TeamPage() {
                           Pending
                         </div>
                       )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {member.status === 'Pending' && (
+                          <button
+                            type="button"
+                            onClick={() => activateMember(member.id)}
+                            className="px-2 py-1 text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 rounded-[6px] font-display transition duration-150 uppercase tracking-wider cursor-pointer"
+                          >
+                            Activate
+                          </button>
+                        )}
+                        {member.role !== 'Owner' && (
+                          <button
+                            type="button"
+                            onClick={() => removeMember(member.id)}
+                            className="px-2 py-1 text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-[6px] font-display transition duration-150 uppercase tracking-wider cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </td>
 
                   </tr>
