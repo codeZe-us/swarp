@@ -480,8 +480,43 @@ export async function submitDeposit(
     throw new SorobanTransactionError(`Transaction failed with status: ${txStatus?.status}`, response.hash, txStatus);
   }
 
-  // We can extract leafIndex from events if needed, but returning generic here
-  return { txHash: response.hash, leafIndex: 0 };
+  // Extract leafIndex from deposit event emitted by the contract
+  let leafIndex = 0;
+  try {
+    // txStatus.resultMetaXdr contains the transaction result metadata including contract events
+    const resultMeta = txStatus?.resultMetaXdr;
+    if (resultMeta) {
+      // The deposit event contains { commitment, leaf_index, token }
+      // Parse events from transaction meta to get the leaf_index
+      const events = (txStatus as any)?.events ?? [];
+      for (const evt of events) {
+        try {
+          const native = scValToNative(evt.value ?? evt);
+          if (native && typeof native === 'object' && 'leaf_index' in native) {
+            leafIndex = typeof native.leaf_index === 'bigint'
+              ? Number(native.leaf_index)
+              : Number(native.leaf_index ?? 0);
+            break;
+          }
+        } catch (_) {
+          // skip unparseable events
+        }
+      }
+    }
+    // If not found in events, try to get the leaf count from chain minus 1
+    if (leafIndex === 0) {
+      try {
+        leafIndex = await getLeafCount() - 1;
+        if (leafIndex < 0) leafIndex = 0;
+      } catch (_) {
+        leafIndex = 0;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not extract leafIndex from deposit result, using 0', e);
+    leafIndex = 0;
+  }
+  return { txHash: response.hash, leafIndex };
 }
 
 export async function submitPayment(

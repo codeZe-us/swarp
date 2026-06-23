@@ -415,14 +415,26 @@ export default function SwapPage() {
       const leaves = await reconstructCommitments();
       
       const commitmentBig = BigInt(note.commitment);
-      let leafIdx = note.leafIndex;
-      if (leafIdx === null) {
-        leafIdx = leaves.findIndex((l) => l === commitmentBig);
-      }
-
-      if (leafIdx === -1 || leafIdx === null) {
-        if (!config?.POOL_CONTRACT_ID) leafIdx = 0; // fallback in mock mode
-        else throw new Error('Note commitment not found in historical deposits list.');
+      // Always look up commitment in event-reconstructed leaves — the stored
+      // leafIndex may have been incorrectly set to 0 for all deposits.
+      let leafIdx: number = leaves.findIndex((l) => l === commitmentBig);
+      if (leafIdx === -1) {
+        // Fallback: trust the stored leafIndex only if findIndex failed
+        // (e.g., events window is pruned and the old deposit is no longer queryable)
+        if (note.leafIndex !== null && note.leafIndex !== undefined) {
+          leafIdx = note.leafIndex;
+          console.warn(
+            `Commitment not found in on-chain events (possibly pruned). ` +
+            `Falling back to stored leafIndex=${leafIdx}. Proof may fail if index is wrong.`
+          );
+        } else if (!config?.POOL_CONTRACT_ID) {
+          leafIdx = 0; // mock mode fallback
+        } else {
+          throw new Error(
+            'Note commitment not found in historical deposit events. ' +
+            'Events may be pruned or the deposit was never confirmed on-chain.'
+          );
+        }
       }
 
       let rootBigInt = buildTree(leaves);
