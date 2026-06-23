@@ -455,10 +455,20 @@ export default function SwapPage() {
       };
 
       // Trigger Web Worker UltraHonk prover
-      const proofResult = await generateSwapProof(witnessInput, (stage) => {
-        setWorkerStage(stage);
-        setProvingSeconds(0);
-      });
+      let proofResult;
+      if (!POOL_CONTRACT_ID) {
+        // MOCK MODE: Simulate prover time and return dummy proof
+        setWorkerStage('computing');
+        await new Promise((r) => setTimeout(r, 1000));
+        setWorkerStage('proving');
+        await new Promise((r) => setTimeout(r, 4500));
+        proofResult = { proof: new Uint8Array(14592), publicInputs: [] };
+      } else {
+        proofResult = await generateSwapProof(witnessInput, (stage) => {
+          setWorkerStage(stage);
+          setProvingSeconds(0);
+        });
+      }
 
       // -------------------------------------------------------------
       // Step 4: Submitting to Stellar
