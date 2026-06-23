@@ -14,12 +14,18 @@ export default function NotesPage() {
   const usedNotes = useMemo(() => notes.filter(n => n.status === 'withdrawn'), [notes]);
 
   return (
-    <div className="max-w-[1200px] mx-auto pt-8 pb-12 animate-fade-in px-4">
-      <div className="mb-10">
-        <h1 className="text-[32px] font-bold text-white mb-2">Notes</h1>
-        <p className="text-gray-400 text-sm">
-          Shielded notes discovered from on-chain route events · {availableNotes.length} available
-        </p>
+    <div className="max-w-[1000px] mx-auto pt-8 pb-12 animate-fade-in px-4">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-10">
+        <div>
+          <h1 className="text-[32px] font-bold text-white font-display mb-1">Notes</h1>
+          <p className="text-sm text-gray-400">
+            Shielded notes discovered from on-chain route events · {availableNotes.length} available
+          </p>
+        </div>
+        <div className="text-gray-500 font-mono text-[13px] self-end pb-1">
+          {notes.length} total notes
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
@@ -28,18 +34,18 @@ export default function NotesPage() {
         <div className="space-y-6">
           
           {/* Stats Row */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-[#141419] border border-white/5 rounded-xl p-5">
-              <div className="text-gray-500 text-[10px] font-bold tracking-wider uppercase mb-2">Total Notes</div>
-              <div className="text-white text-3xl font-extrabold">{notes.length}</div>
+          <div className="bg-[#141419] border border-white/5 rounded-xl flex overflow-hidden">
+            <div className="p-6 flex-1 border-r border-white/5">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">TOTAL NOTES</span>
+              <div className="text-[32px] font-bold text-white leading-none">{notes.length}</div>
             </div>
-            <div className="bg-[#141419] border border-white/5 rounded-xl p-5">
-              <div className="text-emerald-500 text-[10px] font-bold tracking-wider uppercase mb-2">Available</div>
-              <div className="text-emerald-400 text-3xl font-extrabold">{availableNotes.length}</div>
+            <div className="p-6 flex-1 border-r border-white/5">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">AVAILABLE</span>
+              <div className="text-[32px] font-bold text-[#34D399] leading-none">{availableNotes.length}</div>
             </div>
-            <div className="bg-[#141419] border border-white/5 rounded-xl p-5">
-              <div className="text-gray-500 text-[10px] font-bold tracking-wider uppercase mb-2">Used</div>
-              <div className="text-white text-3xl font-extrabold">{usedNotes.length}</div>
+            <div className="p-6 flex-1">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">USED</span>
+              <div className="text-[32px] font-bold text-gray-500 leading-none">{usedNotes.length}</div>
             </div>
           </div>
 
@@ -52,54 +58,54 @@ export default function NotesPage() {
             ) : (
               availableNotes.map((note) => {
                 const assetDef = getAssetByCode(note.asset);
-                const borderColor = assetDef?.code === 'EURC' ? 'border-[#1A365D]' : 
-                                  assetDef?.code === 'USDC' ? 'border-[#2775CA]' : 
-                                  assetDef?.code === 'YLDS' ? 'border-[#D69E2E]' : 'border-[#E53E3E]';
-                                  
+                const hexColors: Record<string, string> = {
+                  USDC: '#FFFFFF',
+                  EURC: '#7C3AED',
+                  MGUSD: '#A874F5',
+                  YLDS: '#06B6D4'
+                };
+                const color = hexColors[note.asset] || '#6B7280';
+                
                 return (
-                  <div key={note.id} className="bg-[#141419] border border-white/5 rounded-xl flex overflow-hidden">
-                    {/* Left Border color bar */}
-                    <div className={`w-1.5 flex-shrink-0 ${borderColor.replace('border-', 'bg-')}`}></div>
-                    
-                    <div className="flex-1 p-6 flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-white font-bold text-sm bg-white/5 px-2 py-1 rounded">{note.asset}</span>
-                          <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold bg-emerald-400/10 px-2 py-1 rounded">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-                            available
-                          </div>
-                        </div>
-                        <div className="text-white text-5xl font-extrabold tracking-tight mb-4">
-                          {formatCurrency(Number(note.amount) / 10000000, note.asset)}
-                        </div>
-                        
-                        <div className="flex items-center gap-4 text-xs font-mono text-gray-500">
-                          <a 
-                            href={`https://stellar.expert/explorer/testnet/tx/${note.depositTxHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 hover:text-white transition-colors"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                            </svg>
-                            {note.depositTxHash ? `${note.depositTxHash.slice(0, 16)}...` : 'pending'}
-                          </a>
+                  <div key={note.id} className="bg-[#141419] border border-white/5 rounded-xl p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-[3px] h-8 rounded-full" style={{ backgroundColor: color }}></div>
+                        <span className="text-[13px] font-bold text-gray-300 border border-white/10 bg-[#2A2A35]/30 px-3 py-1 rounded">
+                          {note.asset}
+                        </span>
+                        <div className="flex items-center gap-1.5 text-[#34D399] text-[13px] font-bold border border-[#059669]/30 bg-[#064E3B]/20 px-3 py-1 rounded">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#34D399]"></div>
+                          available
                         </div>
                       </div>
+                      <Link 
+                        href={`/swap?noteId=${note.id}`}
+                        className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold py-2 px-5 rounded-lg text-[13px] transition-all"
+                      >
+                        Withdraw
+                      </Link>
+                    </div>
 
-                      <div className="flex flex-col items-end gap-6 justify-between h-full">
-                        <div className="text-gray-500 text-xs font-medium">
-                          {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </div>
-                        <Link 
-                          href={`/swap?noteId=${note.id}`}
-                          className="bg-gradient-to-r from-[#6b21a8] to-[#4c1d95] hover:from-[#7e22ce] hover:to-[#5b21b6] text-white font-bold py-2.5 px-6 rounded-lg text-sm transition-all"
-                        >
-                          Withdraw
-                        </Link>
-                      </div>
+                    <div className="text-white text-[32px] font-bold mb-6 tracking-tight pl-4">
+                      {formatCurrency(Number(note.amount) / 10000000, note.asset)}
+                    </div>
+                    
+                    <div className="border-t border-white/5 pt-4 flex items-center justify-between text-[13px] font-mono text-gray-500 px-1">
+                      <a 
+                        href={`https://stellar.expert/explorer/testnet/tx/${note.depositTxHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 hover:text-white transition-colors"
+                      >
+                        TX {note.depositTxHash ? `${note.depositTxHash.slice(0, 8)}...${note.depositTxHash.slice(-6)}` : 'pending'}
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                      <span className="font-sans">
+                        {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
                     </div>
                   </div>
                 );
@@ -110,30 +116,28 @@ export default function NotesPage() {
 
         {/* Right Sidebar */}
         <div className="space-y-6">
-          <div className="bg-[#141419] border border-white/5 rounded-xl overflow-hidden">
-            <div className="p-5 border-b border-white/5">
-              <h3 className="text-white font-bold text-sm">How notes are found</h3>
-            </div>
+          <div className="bg-[#141419] border border-white/5 rounded-xl p-6">
+            <h3 className="text-white font-bold text-[15px] mb-8">How notes are found</h3>
             
-            <div className="p-5 space-y-6 text-sm">
+            <div className="space-y-6">
               <div>
-                <h4 className="text-white font-bold mb-2">1. ROUTE EVENTS</h4>
-                <p className="text-gray-400 leading-relaxed">
-                  Your browser scans the Soroban testnet for route events matching your viewing key. When a match is found, the note is added here automatically.
+                <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3">ROUTE EVENTS</h4>
+                <p className="text-gray-300 text-[13px] leading-relaxed">
+                  Pool emits encrypted payloads on each shield and transfer.
                 </p>
               </div>
-              
+              <div className="w-full h-px bg-white/5"></div>
               <div>
-                <h4 className="text-white font-bold mb-2">2. VIEWING KEY</h4>
-                <p className="text-gray-400 leading-relaxed">
-                  Only you have the viewing key to decrypt the note value and secret. The network only sees a commitment hash.
+                <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3">VIEWING KEY</h4>
+                <p className="text-gray-300 text-[13px] leading-relaxed">
+                  Your browser decrypts events matching your viewing public key.
                 </p>
               </div>
-
+              <div className="w-full h-px bg-white/5"></div>
               <div>
-                <h4 className="text-white font-bold mb-2">3. USED STATUS</h4>
-                <p className="text-gray-400 leading-relaxed">
-                  When a note is withdrawn, its nullifier is recorded on-chain, rendering it invalid for future use. Your local client checks this status.
+                <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3">USED STATUS</h4>
+                <p className="text-gray-300 text-[13px] leading-relaxed">
+                  Nullifiers on-chain mark notes that have been consumed.
                 </p>
               </div>
             </div>

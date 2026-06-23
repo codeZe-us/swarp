@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { getTokenBalance } from '../../lib/contracts';
 import { formatCurrency } from '../../lib/utils';
+import { addTrustline } from '../../lib/stellar';
 
 export default function FaucetPage() {
   const address = useStore((state) => state.address);
@@ -51,7 +52,7 @@ export default function FaucetPage() {
   }, [status, address, config]);
 
   const handleMintAsset = async () => {
-    if (!address) {
+    if (!address || !config) {
       setMintError('Please connect your wallet first.');
       return;
     }
@@ -64,7 +65,7 @@ export default function FaucetPage() {
     setMintError(null);
     setMintSuccess(null);
 
-    try {
+    const performMint = async () => {
       const res = await fetch('/api/faucet/mint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,10 +75,34 @@ export default function FaucetPage() {
       if (!res.ok) {
         throw new Error(data.error || `Failed to mint ${activeAsset}`);
       }
+      return data;
+    };
+
+    try {
+      const data = await performMint();
       setMintSuccess(`Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`);
       await fetchBalances();
     } catch (err: any) {
-      setMintError(err.message || `Failed to mint ${activeAsset}`);
+      if (err.message?.includes('op_no_trust')) {
+        try {
+          setMintError(`Trustline required for ${activeAsset}. Please approve the transaction in your wallet...`);
+          const issuerKey = `${activeAsset}_ISSUER_ADDRESS` as keyof typeof config;
+          const issuerAddress = config[issuerKey];
+          if (!issuerAddress) throw new Error(`Issuer address not configured for ${activeAsset}`);
+          
+          await addTrustline(activeAsset, issuerAddress as string);
+          
+          setMintError(`Trustline added! Retrying mint...`);
+          const data = await performMint();
+          setMintSuccess(`Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`);
+          setMintError(null);
+          await fetchBalances();
+        } catch (trustErr: any) {
+          setMintError(trustErr.message === 'The user closed the modal.' ? 'Trustline creation was rejected.' : `Failed to add trustline: ${trustErr.message}`);
+        }
+      } else {
+        setMintError(err.message || `Failed to mint ${activeAsset}`);
+      }
     } finally {
       setIsMinting(false);
     }

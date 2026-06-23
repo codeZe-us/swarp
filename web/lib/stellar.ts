@@ -2,7 +2,7 @@ import { StellarWalletsKit } from '@creit.tech/stellar-wallets-kit/sdk';
 import { defaultModules } from '@creit.tech/stellar-wallets-kit/modules/utils';
 import { Networks } from '@creit.tech/stellar-wallets-kit';
 import { isConnected } from '@stellar/freighter-api';
-import { StrKey } from '@stellar/stellar-sdk';
+import { StrKey, Asset, TransactionBuilder, Operation, BASE_FEE, Horizon } from '@stellar/stellar-sdk';
 import { useStore } from '../store/useStore';
 
 const isBrowser = typeof window !== 'undefined';
@@ -121,4 +121,35 @@ export async function signTransaction(xdr: string, accountToSign?: string): Prom
   }
 
   return result.signedTxXdr;
+}
+
+export async function addTrustline(assetCode: string, issuerAddress: string): Promise<string> {
+  const address = await getPublicKey();
+  const config = useStore.getState().config;
+  if (!config) throw new Error('Config not loaded');
+
+  const horizon = new Horizon.Server(config.STELLAR_HORIZON_URL);
+  const account = await horizon.loadAccount(address);
+  const asset = new Asset(assetCode, issuerAddress);
+
+  const tx = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: config.STELLAR_NETWORK_PASSPHRASE,
+  })
+    .addOperation(Operation.changeTrust({ asset }))
+    .setTimeout(60)
+    .build();
+
+  const xdr = tx.toXDR();
+  const signedXdr = await signTransaction(xdr);
+
+  // Submit the signed transaction back to Horizon
+  const txToSubmit = TransactionBuilder.fromXDR(signedXdr, config.STELLAR_NETWORK_PASSPHRASE) as any;
+  const txRecord = await horizon.submitTransaction(txToSubmit);
+
+  if (!txRecord.successful) {
+    throw new Error('Failed to submit trustline transaction');
+  }
+
+  return txRecord.hash;
 }
