@@ -16,7 +16,8 @@ import {
   SOROBAN_RPC_URL,
   STELLAR_NETWORK_PASSPHRASE,
   USDC_SAC_ID,
-  EURC_SAC_ID
+  EURC_SAC_ID,
+  STELLAR_HORIZON_URL
 } from './constants';
 import { signTransaction as walletSignTransaction } from './stellar';
 
@@ -69,9 +70,9 @@ export function parseSorobanError(error: any): string {
     : error?.message || error?.error || JSON.stringify(error);
 
   // ZendSwap specific ContractError mapping (defined in contracts/zendswap-pool/src/lib.rs)
-  if (errorStr.includes('Contract, #1') || errorStr.includes('Error(Contract, #1)')) {
-    return 'The ZendSwap pool is not initialized.';
-  }
+  // if (errorStr.includes('Contract, #1') || errorStr.includes('Error(Contract, #1)')) {
+  //   return 'The ZendSwap pool is not initialized.';
+  // }
   if (errorStr.includes('Contract, #2') || errorStr.includes('Error(Contract, #2)')) {
     return 'The ZendSwap pool is already initialized.';
   }
@@ -817,6 +818,10 @@ export async function fundTestnetUSDC(recipientAddress: string, amount: string =
   }
 
   if (rpc.Api.isSimulationError(simulation)) {
+    const errStr = typeof simulation.error === 'string' ? simulation.error : JSON.stringify(simulation.error);
+    if (errStr.includes('#13') || errStr.includes('Contract, #13')) {
+      throw new Error('TRUSTLINE_MISSING');
+    }
     throw new SorobanSimulationError(parseSorobanError(simulation.error), simulation.error);
   }
 
@@ -845,3 +850,36 @@ export async function fundTestnetUSDC(recipientAddress: string, amount: string =
   return response.hash;
 }
 
+export async function establishTrustline(userAddress: string, assetCode: string, issuerAddress: string): Promise<string> {
+  const { signTransaction } = await import('./stellar');
+  const { Horizon, TransactionBuilder, Asset } = await import('@stellar/stellar-sdk');
+
+  const horizon = new Horizon.Server(STELLAR_HORIZON_URL);
+  let userAccount;
+  try {
+    userAccount = await horizon.loadAccount(userAddress);
+  } catch (e) {
+    throw new Error('Your Testnet account is not funded with XLM. Please use the Stellar Laboratory Friendbot first.');
+  }
+
+  const asset = new Asset(assetCode, issuerAddress);
+
+  const transaction = new TransactionBuilder(userAccount, {
+    fee: BASE_FEE,
+    networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+  })
+    .addOperation(Horizon.Operation.changeTrust({
+      asset: asset,
+    }))
+    .setTimeout(30)
+    .build();
+
+  const signedXdr = await signTransaction(transaction.toXDR());
+  const signedTx = TransactionBuilder.fromXDR(signedXdr, STELLAR_NETWORK_PASSPHRASE);
+  
+  const response = await horizon.submitTransaction(signedTx as any);
+  if (!response.successful) {
+    throw new Error('Failed to establish trustline');
+  }
+  return response.hash;
+}

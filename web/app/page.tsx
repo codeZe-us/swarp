@@ -6,7 +6,7 @@ import { useStore } from '../store/useStore';
 import { Badge } from '../components/ui/Badge';
 import { TransactionDetailModal } from '../components/ui/TransactionDetailModal';
 
-import { getTokenBalance, fundTestnetUSDC } from '../lib/contracts';
+import { getTokenBalance, fundTestnetUSDC, establishTrustline } from '../lib/contracts';
 import { USDC_SAC_ID, EURC_SAC_ID } from '../lib/constants';
 
 export default function Home() {
@@ -51,7 +51,27 @@ export default function Home() {
         setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
       }
     } catch (e: any) {
-      setFundError(e.message || 'Failed to fund testnet account');
+      if (e.message === 'TRUSTLINE_MISSING') {
+        try {
+          setFundError('Trustline missing. Please sign the transaction in Freighter to add USDC to your wallet!');
+          const issuerAddress = process.env.NEXT_PUBLIC_USDC_ISSUER_ADDRESS || 'GCUSVTVSWAHQMDO2KQC5H2TC6RCB7UNRQ5YD3XCPTNSCYWIQYMPN6VVX';
+          await establishTrustline(address, 'USDC', issuerAddress);
+          
+          setFundError('Trustline established! Funding your wallet now...');
+          const txHash = await fundTestnetUSDC(address, '200');
+          setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
+          setFundError(null);
+          
+          if (USDC_SAC_ID) {
+            const balance = await getTokenBalance(address, USDC_SAC_ID);
+            setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
+          }
+        } catch (trustlineErr: any) {
+          setFundError(trustlineErr.message || 'Failed to establish trustline');
+        }
+      } else {
+        setFundError(e.message || 'Failed to fund testnet account');
+      }
     } finally {
       setIsFunding(false);
     }

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useStore } from '../../store/useStore';
 import { createNote, computeNullifier } from '../../lib/note';
-import { submitDeposit, submitWithdraw, getTokenBalance, fundTestnetUSDC } from '../../lib/contracts';
+import { submitDeposit, submitWithdraw, getTokenBalance, fundTestnetUSDC, establishTrustline } from '../../lib/contracts';
 import { USDC_SAC_ID, EURC_SAC_ID, POOL_CONTRACT_ID } from '../../lib/constants';
 import { Badge } from '../../components/ui/Badge';
 import { reconstructCommitments } from '../../lib/events';
@@ -166,22 +166,34 @@ export default function SwapPage() {
       const txHash = await fundTestnetUSDC(address, '200');
       setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
       
-      // Update balances
       if (!USDC_SAC_ID) {
-        // MOCK MODE: Artificially increment balance
-        setBalances((prev) => ({
-          ...prev,
-          USDC: prev.USDC + 200,
-        }));
+        setBalances((prev) => ({ ...prev, USDC: prev.USDC + 200 }));
       } else {
         const balance = await getTokenBalance(address, USDC_SAC_ID);
-        setBalances((prev) => ({
-          ...prev,
-          USDC: Number(balance) / 10_000_000,
-        }));
+        setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
       }
     } catch (e: any) {
-      setFundError(e.message || 'Failed to fund testnet account');
+      if (e.message === 'TRUSTLINE_MISSING') {
+        try {
+          setFundError('Trustline missing. Please sign the transaction in Freighter to add USDC to your wallet!');
+          const issuerAddress = process.env.NEXT_PUBLIC_USDC_ISSUER_ADDRESS || 'GCUSVTVSWAHQMDO2KQC5H2TC6RCB7UNRQ5YD3XCPTNSCYWIQYMPN6VVX';
+          await establishTrustline(address, 'USDC', issuerAddress);
+          
+          setFundError('Trustline established! Funding your wallet now...');
+          const txHash = await fundTestnetUSDC(address, '200');
+          setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
+          setFundError(null);
+          
+          if (USDC_SAC_ID) {
+            const balance = await getTokenBalance(address, USDC_SAC_ID);
+            setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
+          }
+        } catch (trustlineErr: any) {
+          setFundError(trustlineErr.message || 'Failed to establish trustline');
+        }
+      } else {
+        setFundError(e.message || 'Failed to fund testnet account');
+      }
     } finally {
       setIsFunding(false);
     }
