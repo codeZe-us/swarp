@@ -148,7 +148,7 @@ export default function Home() {
     return sortedTransactions.filter((tx) => {
       if (filter === 'all') return true;
       if (filter === 'swaps') return tx.type === 'withdrawal' || tx.type === 'deposit';
-      if (filter === 'payroll') return false; // Payroll has empty state for now
+      if (filter === 'payroll') return tx.privacy === 'private';
       return true;
     });
   }, [sortedTransactions, filter]);

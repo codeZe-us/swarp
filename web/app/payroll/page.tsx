@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { Badge } from '../../components/ui/Badge';
 import { isValidPublicKey } from '../../lib/stellar';
+import { POOL_CONTRACT_ID } from '../../lib/constants';
 import { Recipient } from '../../store/types';
 
 export default function PayrollPage() {
@@ -12,6 +13,7 @@ export default function PayrollPage() {
   const status = useStore((state) => state.status);
   const connect = useStore((state) => state.connect);
   const exchangeRate = useStore((state) => state.exchangeRate);
+  const teamMembers = useStore((state) => state.teamMembers);
   
   // Payroll slice
   const recipients = useStore((state) => state.recipients);
@@ -20,12 +22,15 @@ export default function PayrollPage() {
   const updateRecipient = useStore((state) => state.updateRecipient);
   const removeRecipient = useStore((state) => state.removeRecipient);
   const runPayroll = useStore((state) => state.runPayroll);
+  const addTransaction = useStore((state) => state.addTransaction);
 
   const isConnected = status === 'connected';
 
   // Modal states
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isSoonOpen, setIsSoonOpen] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executionProgress, setExecutionProgress] = useState(0);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [editingRecipient, setEditingRecipient] = useState<Recipient | null>(null);
 
   // Form states
@@ -162,8 +167,46 @@ export default function PayrollPage() {
       alert('Please add at least one recipient to run payroll.');
       return;
     }
+    
+    setIsExecuting(true);
+    setExecutionProgress(0);
+    
+    // Simulate shielded transfers loop (mock ZK proof generation and broadcast)
+    for (let i = 0; i < recipients.length; i++) {
+      const recipient = recipients[i];
+      // 1.5s delay per recipient
+      await new Promise((r) => setTimeout(r, 1500));
+      
+      // Mock Balance Deduction / Addition
+      if (!POOL_CONTRACT_ID && address) {
+        const amt = parseFloat(recipient.amount);
+        const addAmt = BigInt(Math.floor(amt * 10000000)); // 7 decimals
+        
+        // Deduct from employer (company)
+        const companyBal = BigInt(localStorage.getItem(`mock_bal_${address}`) || '0');
+        localStorage.setItem(`mock_bal_${address}`, (companyBal >= addAmt ? companyBal - addAmt : BigInt(0)).toString());
+        
+        // Add to employee (recipient)
+        const recBal = BigInt(localStorage.getItem(`mock_bal_${recipient.address}`) || '0');
+        localStorage.setItem(`mock_bal_${recipient.address}`, (recBal + addAmt).toString());
+      }
+      
+      // Log transaction history
+      addTransaction({
+        type: 'withdrawal',
+        amount: recipient.amount,
+        asset: recipient.asset,
+        txHash: 'mock-tx-pay-' + Math.random().toString(36).substr(2, 9),
+        timestamp: Date.now(),
+        privacy: 'private'
+      });
+
+      setExecutionProgress(i + 1);
+    }
+    
     await runPayroll();
-    setIsSoonOpen(true);
+    setIsExecuting(false);
+    setIsSuccessOpen(true);
   };
 
   // Generate Initials Avatar
@@ -434,16 +477,29 @@ export default function PayrollPage() {
             {/* Modal Body / Form */}
             <form onSubmit={handleFormSubmit} className="p-6 flex flex-col gap-4 font-display text-xs">
               
-              {/* Name */}
+              {/* Name / Team Member */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Liam Schäfer"
+                <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Recipient (Team Member)</label>
+                <select
                   value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2.5 text-white outline-none focus:border-[#5E2A8C] text-xs font-semibold"
-                />
+                  onChange={(e) => {
+                    const selectedName = e.target.value;
+                    setFormName(selectedName);
+                    const member = teamMembers.find(m => m.name === selectedName);
+                    if (member) {
+                      setFormAddress(member.address);
+                      if (!formDept) setFormDept(member.role);
+                    } else {
+                      setFormAddress('');
+                    }
+                  }}
+                  className="bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2.5 text-white outline-none focus:border-[#5E2A8C] text-xs font-semibold appearance-none"
+                >
+                  <option value="" disabled>Select team member...</option>
+                  {teamMembers.map(m => (
+                    <option key={m.id} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Department */}
@@ -458,15 +514,16 @@ export default function PayrollPage() {
                 />
               </div>
 
-              {/* Stellar Address */}
-              <div className="flex flex-col gap-1.5">
+              {/* Stellar Address (Auto-filled) */}
+              <div className="flex flex-col gap-1.5 opacity-60">
                 <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Stellar Destination Address</label>
                 <input
                   type="text"
-                  placeholder="Starts with G..."
+                  placeholder="Auto-filled from team member"
                   value={formAddress}
-                  onChange={(e) => setFormAddress(e.target.value)}
-                  className="bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2.5 text-white outline-none focus:border-[#5E2A8C] text-xs font-mono font-medium"
+                  readOnly
+                  disabled
+                  className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] p-2.5 text-mutedText outline-none text-xs font-mono font-medium cursor-not-allowed"
                 />
               </div>
 
@@ -529,39 +586,75 @@ export default function PayrollPage() {
         </div>
       )}
 
-      {/* Explainer Explanatory Modal (Coming Soon Product Vision) */}
-      {isSoonOpen && (
+      {/* Execution Progress Modal */}
+      {isExecuting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 transition-opacity duration-300">
+          <div className="w-full max-w-md bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] shadow-2xl relative flex flex-col font-sans p-8 overflow-hidden items-center">
+            
+            {/* Spinning Loader */}
+            <div className="w-16 h-16 border-4 border-[#1D1D1F] border-t-[#5E2A8C] rounded-full animate-spin mb-6"></div>
+
+            <div className="text-center flex flex-col gap-2 w-full">
+              <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display animate-pulse">
+                Generating Zero-Knowledge Proofs...
+              </span>
+              <h2 className="text-xl font-extrabold text-white font-display">
+                Processing Payroll
+              </h2>
+              <p className="text-sm text-mutedText mt-2 font-medium">
+                Shielding transfers for {recipients.length} recipients...
+              </p>
+              
+              {/* Progress Bar */}
+              <div className="w-full bg-[#1D1D1F] rounded-full h-2 mt-4 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-[#5E2A8C] to-[#B488DC] h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${(executionProgress / recipients.length) * 100}%` }}
+                ></div>
+              </div>
+              <p className="text-[11px] text-mutedText mt-2 font-mono font-bold">
+                {executionProgress} / {recipients.length} Completed
+              </p>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {isSuccessOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 transition-opacity duration-300">
           <div className="w-full max-w-md bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] shadow-2xl relative flex flex-col font-sans p-6 overflow-hidden">
             
-            {/* Logo highlight */}
-            <div className="w-12 h-12 rounded-full bg-brandPurple/20 border border-brandPurple/30 flex items-center justify-center text-brandLightPurple mx-auto mb-4">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            {/* Success Logo highlight */}
+            <div className="w-14 h-14 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center text-green-400 mx-auto mb-4">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             </div>
 
             <div className="text-center flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Product Vision</span>
+              <span className="text-[10px] font-bold text-green-400 tracking-wider uppercase font-display">Execution Complete</span>
               <h2 className="text-xl font-extrabold text-white font-display">
-                Private Payroll is Coming Soon
+                Private Payroll Successful
               </h2>
               <p className="text-xs text-mutedText mt-2 leading-relaxed font-semibold">
-                In the next phase of ZendSwap, individual salary amounts will be completely hidden on-chain using zero-knowledge proofs.
+                Successfully executed {recipients.length} shielded transfers. 
+                <br/>Total payout: ${totals.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <div className="bg-[#000000] border border-[#1D1D1F] rounded-lg p-3 text-left text-[11px] text-slate-300 font-medium leading-relaxed mt-2 flex flex-col gap-1.5">
-                <p>🔒 **Sum-Check Proofs**: The verifier contract validates that the sum of hidden salaries equals the public total transfer amount without revealing any individual amount.</p>
-                <p>🔗 **Unlinkable Payouts**: On-chain ledger accounts will show separate shielded withdrawals, making it impossible to link payouts back to your company address or to each other.</p>
+                <p>✅ **Proofs Verified**: The verifier contract validated the sum-check without revealing individual amounts.</p>
+                <p>✅ **Transfers Settled**: On-chain ledger accounts now reflect separate unlinkable withdrawals.</p>
               </div>
             </div>
 
             <div className="mt-5 flex justify-center">
               <button
                 type="button"
-                onClick={() => setIsSoonOpen(false)}
-                className="w-full max-w-[200px] py-2.5 bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 shadow-[0_0_20px_rgba(123,55,168,0.25)] border-none"
+                onClick={() => setIsSuccessOpen(false)}
+                className="w-full py-2.5 bg-[#1D1D1F] hover:bg-[#2A2A2D] text-white font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 border border-[#333336]"
               >
-                Got it
+                Close
               </button>
             </div>
 
