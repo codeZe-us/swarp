@@ -160,33 +160,42 @@ export default function Home() {
         
         {/* Row 1: Portfolio Value & Balances */}
         <div className="bg-[#141419] border border-white/5 rounded-xl flex flex-col md:flex-row overflow-hidden">
-          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5">
+          <div className="p-6 md:p-8 flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">PORTFOLIO VALUE</span>
-            <div className="flex flex-col gap-3">
-              <h2 className="text-[32px] font-bold text-white tracking-tight leading-none">
-                ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </h2>
-              <div>
-                <span className="inline-flex bg-[#3B1C5F]/30 text-[#A874F5] px-2 py-0.5 rounded text-[11px] font-bold border border-[#A874F5]/10">
-                  +12.4% 30d
+            <div className="flex flex-col items-start gap-4">
+              <div className="flex items-baseline">
+                <h2 className="text-[42px] font-extrabold text-white tracking-tight leading-none">
+                  ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split('.')[0]}
+                </h2>
+                <span className="text-[22px] font-bold text-gray-400 ml-0.5">
+                  .{totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split('.')[1]}
                 </span>
               </div>
+              <span className="inline-flex bg-[#3B1C5F]/40 text-[#A874F5] px-2.5 py-1 rounded-[6px] text-[11px] font-bold border border-[#A874F5]/10">
+                +12.4% 30d
+              </span>
             </div>
           </div>
-          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5">
+          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">USDC</span>
-            <div className="text-[22px] font-bold text-white mb-2 leading-none">{balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-            <div className="text-[13px] text-gray-500">≈ ${balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            <div>
+              <div className="text-[28px] font-extrabold text-white mb-1 leading-none">{balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div className="text-[13px] text-gray-500">≈ ${balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            </div>
           </div>
-          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5">
+          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">EURC</span>
-            <div className="text-[22px] font-bold text-white mb-2 leading-none">{balances.EURC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-            <div className="text-[13px] text-gray-500">≈ ${eurcUsdVal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            <div>
+              <div className="text-[28px] font-extrabold text-white mb-1 leading-none">{balances.EURC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div className="text-[13px] text-gray-500">≈ ${eurcUsdVal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            </div>
           </div>
-          <div className="p-6 md:p-8 flex-1">
+          <div className="p-6 md:p-8 flex-1 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED NOTES</span>
-            <div className="text-[22px] font-bold text-white mb-2 leading-none">{activeNotes.length}</div>
-            <div className="text-[13px] text-gray-500">pending withdrawal</div>
+            <div>
+              <div className="text-[28px] font-extrabold text-white mb-1 leading-none">{activeNotes.length}</div>
+              <div className="text-[13px] text-gray-500">pending withdrawal</div>
+            </div>
           </div>
         </div>
 
@@ -278,10 +287,10 @@ export default function Home() {
                 <button
                   key={t}
                   onClick={() => setFilter(t)}
-                  className={`px-4 py-2 rounded-lg text-[13px] font-bold capitalize transition-colors ${
+                  className={`px-4 py-1.5 rounded-lg text-[13px] font-bold capitalize transition-colors ${
                     filter === t 
-                      ? 'bg-[#3B1C5F]/30 text-[#A874F5] border border-[#A874F5]/20' 
-                      : 'bg-transparent border border-white/5 text-gray-400 hover:text-white hover:border-white/20'
+                      ? 'bg-transparent text-white border border-white/10' 
+                      : 'bg-transparent border border-transparent text-gray-500 hover:text-white'
                   }`}
                 >
                   {t}
@@ -290,34 +299,41 @@ export default function Home() {
             </div>
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-1">
             {filteredTransactions.slice(0, 5).map((tx) => {
               const isDeposit = tx.type === 'deposit';
               const isPrivate = tx.privacy === 'private';
+              
+              let iconColor = isDeposit ? 'text-[#3B82F6] bg-[#1E3A8A]/20' : 'text-[#A874F5] bg-[#3B1C5F]/20';
+              let title = isDeposit ? 'Deposit to pool' : tx.type === 'withdrawal' ? `Swap ${tx.asset}` : 'June payroll';
+              if (tx.type === 'withdrawal' && isPrivate) {
+                title = `Swap USDC → EURC`;
+              }
+              
               return (
                 <div key={tx.txHash} 
                      onClick={() => { setSelectedTxHash(tx.txHash); setIsDetailOpen(true); }}
-                     className="flex items-center justify-between group cursor-pointer p-3 -mx-3 rounded-lg hover:bg-white/5 transition-colors"
+                     className="flex items-center justify-between group cursor-pointer p-4 -mx-4 rounded-xl hover:bg-white/5 transition-colors border-b border-transparent hover:border-white/5"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-[#2A2A35] flex items-center justify-center text-gray-400">
+                  <div className="flex items-center gap-5">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${iconColor}`}>
                       {isDeposit ? (
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                         </svg>
                       ) : tx.type === 'withdrawal' ? (
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        <svg className="w-4 h-4 transform rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                         </svg>
                       ) : (
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                         </svg>
                       )}
                     </div>
                     <div>
-                      <div className="text-[15px] font-bold text-white mb-0.5 group-hover:text-purple-400 transition-colors">
-                        {isDeposit ? 'Deposit to pool' : tx.type === 'withdrawal' ? `Swap ${tx.asset}` : 'June payroll'}
+                      <div className="text-[15px] font-bold text-white mb-0.5 group-hover:text-[#A874F5] transition-colors">
+                        {title}
                       </div>
                       <div className="text-[13px] text-gray-500">
                         {isDeposit ? `${tx.asset} commitment` : isPrivate ? 'shielded' : '4 recipients · private'}
@@ -325,9 +341,9 @@ export default function Home() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-8">
-                    <div className={`text-[11px] font-bold px-3 py-1 rounded-md uppercase tracking-wider ${
-                      isPrivate ? 'bg-[#3B1C5F]/30 text-[#A874F5] border border-[#A874F5]/10' : 'bg-white/5 text-gray-400 border border-white/5'
+                  <div className="flex items-center gap-10">
+                    <div className={`text-[10px] font-bold px-2 py-1 rounded-[4px] uppercase tracking-widest ${
+                      isPrivate ? 'bg-[#3B1C5F]/30 text-[#A874F5] border border-[#A874F5]/10' : 'bg-transparent text-gray-500 border border-white/10'
                     }`}>
                       {tx.privacy}
                     </div>
@@ -335,9 +351,10 @@ export default function Home() {
                       <div className="text-[15px] font-bold text-white mb-0.5">
                         {isDeposit ? 
                           formatCurrency(tx.amount, tx.asset) : 
-                          isPrivate && tx.type === 'withdrawal' ? `${tx.amount} ${tx.asset}` : 
+                          isPrivate && tx.type === 'withdrawal' ? `${tx.amount} ` : 
                           formatCurrency(tx.amount, tx.asset)
                         }
+                        {isPrivate && tx.type === 'withdrawal' && <span className="text-[#A874F5]">{tx.asset}</span>}
                       </div>
                       <div className="text-[13px] text-gray-500">
                         {new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
