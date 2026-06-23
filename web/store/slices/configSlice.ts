@@ -9,7 +9,13 @@ export interface PoolConfig {
   VERIFIER_CONTRACT_ID: string;
   USDC_SAC_ID: string;
   EURC_SAC_ID: string;
+  MGUSD_SAC_ID: string;
+  YLDS_SAC_ID: string;
+  XLM_SAC_ID: string;
   USDC_ISSUER_ADDRESS: string;
+  EURC_ISSUER_ADDRESS: string;
+  MGUSD_ISSUER_ADDRESS: string;
+  YLDS_ISSUER_ADDRESS: string;
 }
 
 export interface ConfigSlice {

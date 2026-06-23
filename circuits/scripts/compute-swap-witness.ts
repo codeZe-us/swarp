@@ -28,16 +28,16 @@ import { poseidon2Hash } from '@zkpassport/poseidon2';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const DEPOSIT_AMOUNT    = 500n;
-const EXCHANGE_RATE     = 9200000n;
-const RATE_DENOMINATOR  = 10000000n;
+const DEPOSIT_AMOUNT    = BigInt(process.argv[2] || '500');
+const EXCHANGE_RATE     = BigInt(process.argv[3] || '9200000');
+const RATE_DENOMINATOR  = BigInt(process.argv[4] || '10000000');
 const WITHDRAWAL_AMOUNT = DEPOSIT_AMOUNT * EXCHANGE_RATE / RATE_DENOMINATOR;
 
-const ASSET_IN   = 0n;
-const ASSET_OUT  = 1n;
+const ASSET_IN   = BigInt(process.argv[5] || '0');
+const ASSET_OUT  = BigInt(process.argv[6] || '1');
 
 const SECRET = BigInt(
-  '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+  process.argv[7] || '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
 );
 
 const TREE_DEPTH = 20;

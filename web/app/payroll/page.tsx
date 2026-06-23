@@ -39,7 +39,7 @@ export default function PayrollPage() {
   const [formDept, setFormDept] = useState('');
   const [formAddress, setFormAddress] = useState('');
   const [formAmount, setFormAmount] = useState('');
-  const [formAsset, setFormAsset] = useState<'USDC' | 'EURC'>('USDC');
+  const [formAsset, setFormAsset] = useState<string>('USDC');
   const [formError, setFormError] = useState<string | null>(null);
 
   // Exchange rate helpers

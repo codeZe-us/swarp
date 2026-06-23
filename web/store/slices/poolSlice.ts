@@ -1,12 +1,11 @@
 import { StateCreator } from 'zustand';
 import { StoreState } from '../useStore';
-import { getPoolInfo } from '../../lib/contracts';
+import { getPoolInfo, getReserves } from '../../lib/contracts';
 
 export interface PoolSlice {
   merkleRoot: string;
   exchangeRate: { numerator: number; denominator: number };
-  usdcReserves: string;
-  eurcReserves: string;
+  reserves: string[];
   totalDeposits: number;
   commitments: string[];
   fetchPoolState: () => Promise<void>;
@@ -18,8 +17,7 @@ const isBrowser = typeof window !== 'undefined';
 const initialPoolState = {
   merkleRoot: '0',
   exchangeRate: { numerator: 1, denominator: 1 },
-  usdcReserves: '0',
-  eurcReserves: '0',
+  reserves: ['0', '0', '0', '0', '0'],
   totalDeposits: 0,
 };
 
@@ -34,21 +32,26 @@ export const createPoolSlice: StateCreator<
   return {
     merkleRoot: initialPoolState.merkleRoot,
     exchangeRate: initialPoolState.exchangeRate,
-    usdcReserves: initialPoolState.usdcReserves,
-    eurcReserves: initialPoolState.eurcReserves,
+    reserves: initialPoolState.reserves,
     totalDeposits: initialPoolState.totalDeposits,
     commitments: initialCommitments,
     fetchPoolState: async () => {
       try {
         const poolInfo = await getPoolInfo();
+        let reservesArray: bigint[] = [];
+        try {
+          reservesArray = await getReserves();
+        } catch (e) {
+          console.warn('Failed to fetch get_reserves()', e);
+        }
+        
         const poolState = {
           merkleRoot: poolInfo.currentRoot, // plain 64-char hex, no 0x prefix
           exchangeRate: { 
             numerator: poolInfo.currentRate, 
             denominator: poolInfo.rateDenominator 
           },
-          usdcReserves: poolInfo.usdcReserve.toString(),
-          eurcReserves: poolInfo.eurcReserve.toString(),
+          reserves: reservesArray.length > 0 ? reservesArray.map(r => r.toString()) : ['0', '0', '0', '0', '0'],
           totalDeposits: poolInfo.totalDeposits,
         };
         set(poolState);

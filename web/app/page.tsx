@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useStore } from '../store/useStore';
 import { Badge } from '../components/ui/Badge';
 import { TransactionDetailModal } from '../components/ui/TransactionDetailModal';
-
-import { getTokenBalance, fundTestnetUSDC, fundTestnetEURC, establishTrustline } from '../lib/contracts';
+import { getTokenBalance } from '../lib/contracts';
+import { formatCurrency } from '../lib/utils';
+import { getAssetByCode } from '../lib/assets';
 
 export default function Home() {
   const [filter, setFilter] = useState<'all' | 'swaps' | 'payroll'>('all');
@@ -26,74 +27,8 @@ export default function Home() {
   const isConnected = status === 'connected';
 
   // Balances state
-  const [balances, setBalances] = useState({ USDC: 0, EURC: 0 });
+  const [balances, setBalances] = useState({ USDC: 0, EURC: 0, MGUSD: 0, YLDS: 0 });
   const [isLoading, setIsLoading] = useState(false);
-
-  // Funding state
-  const [isFunding, setIsFunding] = useState(false);
-  const [fundSuccess, setFundSuccess] = useState<string | null>(null);
-  const [fundError, setFundError] = useState<string | null>(null);
-
-  const handleFundTestnet = async () => {
-    if (!address) return;
-    setIsFunding(true);
-    setFundError(null);
-    setFundSuccess(null);
-    try {
-      const txHash = await fundTestnetUSDC(address, '200');
-      try {
-        await new Promise(r => setTimeout(r, 6000)); // Wait for ledger to close to update sequence number
-        await fundTestnetEURC(address, '200');
-      } catch (eurcErr) {
-        console.warn('Failed to fund EURC:', eurcErr);
-      }
-      setFundSuccess(`Funded 200 USDC & 200 EURC! Tx: ${txHash.slice(0, 8)}...`);
-      setFundError(null);
-      
-      if (config?.USDC_SAC_ID) {
-        const balance = await getTokenBalance(address, config.USDC_SAC_ID);
-        const eurcBalance = await getTokenBalance(address, config.EURC_SAC_ID || '');
-        setBalances({ 
-          USDC: Number(balance) / 10_000_000,
-          EURC: Number(eurcBalance) / 10_000_000
-        });
-      }
-    } catch (e: any) {
-      if (e.message === 'TRUSTLINE_MISSING' || e.message.includes('op_no_trust')) {
-        try {
-          setFundError('Trustline missing. Please sign the transaction in Freighter to add USDC to your wallet!');
-          const usdcIssuer = config?.USDC_ISSUER_ADDRESS || 'GCUSVTVSWAHQMDO2KQC5H2TC6RCB7UNRQ5YD3XCPTNSCYWIQYMPN6VVX';
-          await establishTrustline(address, 'USDC', usdcIssuer);
-          
-          setFundError('Trustline established! Funding your wallet now...');
-          const txHash = await fundTestnetUSDC(address, '200');
-          try {
-            await new Promise(r => setTimeout(r, 6000)); // Wait for ledger to close to update sequence number
-            await fundTestnetEURC(address, '200');
-          } catch (eurcErr) {
-            console.warn('Failed to fund EURC:', eurcErr);
-          }
-          setFundSuccess(`Funded 200 USDC & 200 EURC! Tx: ${txHash.slice(0, 8)}...`);
-          setFundError(null);
-          
-          if (config?.USDC_SAC_ID) {
-            const balance = await getTokenBalance(address, config.USDC_SAC_ID);
-            const eurcBalance = await getTokenBalance(address, config.EURC_SAC_ID || '');
-            setBalances({ 
-              USDC: Number(balance) / 10_000_000,
-              EURC: Number(eurcBalance) / 10_000_000
-            });
-          }
-        } catch (trustlineErr: any) {
-          setFundError(trustlineErr.message || 'Failed to establish trustline');
-        }
-      } else {
-        setFundError(e.message || 'Failed to fund testnet account');
-      }
-    } finally {
-      setIsFunding(false);
-    }
-  };
 
   // Fetch balances and pool state on connection
   useEffect(() => {
@@ -101,290 +36,231 @@ export default function Home() {
       setIsLoading(true);
       const loadDashboardData = async () => {
         try {
-          // Fetch pool state
           await fetchPoolState();
 
-          // Fetch balances from on-chain
-          // In mock mode, getTokenBalance handles undefined SAC IDs
           const usdcBal = await getTokenBalance(address, config?.USDC_SAC_ID || '');
           const eurcBal = await getTokenBalance(address, config?.EURC_SAC_ID || '');
+          const mgusdBal = await getTokenBalance(address, config?.MGUSD_SAC_ID || '');
+          const yldsBal = await getTokenBalance(address, config?.YLDS_SAC_ID || '');
+          
           setBalances({
             USDC: Number(usdcBal) / 10_000_000,
             EURC: Number(eurcBal) / 10_000_000,
+            MGUSD: Number(mgusdBal) / 10_000_000,
+            YLDS: Number(yldsBal) / 10_000_000,
           });
         } catch (e) {
-          console.warn('Failed to load live data, using fallbacks:', e);
+          console.warn('Failed to load live data:', e);
         } finally {
           setIsLoading(false);
         }
       };
 
       loadDashboardData();
-
-      // Set 30-second interval refresh
-      const interval = setInterval(() => {
-        loadDashboardData();
-      }, 30000);
-
+      const interval = setInterval(loadDashboardData, 30000);
       return () => clearInterval(interval);
     } else {
       setIsLoading(false);
-      setBalances({ USDC: 0, EURC: 0 });
+      setBalances({ USDC: 0, EURC: 0, MGUSD: 0, YLDS: 0 });
     }
-  }, [isConnected, address, fetchPoolState]);
+  }, [isConnected, address, fetchPoolState, config]);
 
-  // Exchange rate helpers
   const rateNum = exchangeRate?.numerator || 9200000;
   const rateDen = exchangeRate?.denominator || 10000000;
   const decimalRate = rateNum / rateDen;
 
-  // Portfolio total calculated value in USD
-  const eurcUsdVal = useMemo(() => {
-    return balances.EURC / decimalRate;
-  }, [balances.EURC, decimalRate]);
+  const eurcUsdVal = balances.EURC / decimalRate;
+  const totalValue = balances.USDC + eurcUsdVal + balances.MGUSD + balances.YLDS;
 
-  const totalValue = useMemo(() => {
-    return balances.USDC + eurcUsdVal;
-  }, [balances.USDC, eurcUsdVal]);
+  const activeNotes = useMemo(() => notes.filter((n) => n.status === 'deposited'), [notes]);
+  
+  // Calculate shielded pool totals
+  const shieldedPoolValue = useMemo(() => {
+    return activeNotes.reduce((sum, note) => {
+      const val = Number(note.amount) / 10_000_000;
+      if (note.asset === 'EURC') return sum + val / decimalRate;
+      return sum + val; // treating MGUSD, USDC, YLDS as 1:1 for display pool value
+    }, 0);
+  }, [activeNotes, decimalRate]);
 
-  // Swapped this month calculation (sum of withdrawals in current calendar month)
-  const swappedThisMonth = useMemo(() => {
-    if (!isConnected || transactions.length === 0) return 0;
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
+  const poolBreakdown = useMemo(() => {
+    const assets: Record<string, { total: number, count: number }> = {};
+    activeNotes.forEach(note => {
+      const val = Number(note.amount) / 10_000_000;
+      if (!assets[note.asset]) assets[note.asset] = { total: 0, count: 0 };
+      assets[note.asset].total += val;
+      assets[note.asset].count += 1;
+    });
+    return Object.entries(assets).map(([asset, data]) => {
+      const valInUsd = asset === 'EURC' ? data.total / decimalRate : data.total;
+      const pct = shieldedPoolValue > 0 ? (valInUsd / shieldedPoolValue) * 100 : 0;
+      return { asset, total: data.total, count: data.count, pct };
+    }).sort((a, b) => b.pct - a.pct);
+  }, [activeNotes, shieldedPoolValue, decimalRate]);
 
-    return transactions
-      .filter((tx) => {
-        if (tx.type !== 'withdrawal') return false;
-        const txDate = new Date(tx.timestamp);
-        return txDate.getFullYear() === currentYear && txDate.getMonth() === currentMonth;
-      })
-      .reduce((sum, tx) => {
-        const val = parseFloat(tx.amount);
-        if (tx.asset === 'USDC') {
-          return sum + val;
-        } else {
-          return sum + val / decimalRate;
-        }
-      }, 0);
-  }, [transactions, isConnected, decimalRate]);
-
-  // Count active unwithdrawn shielded notes
-  const activeShieldedNotesCount = useMemo(() => {
-    return notes.filter((n) => n.status === 'deposited').length;
-  }, [notes]);
-
-  // Reconstruct dynamic list of transactions
-  // Sort transactions by timestamp (newest first)
   const sortedTransactions = useMemo(() => {
     return [...transactions].sort((a, b) => b.timestamp - a.timestamp);
   }, [transactions]);
 
-  // Filter transactions
   const filteredTransactions = useMemo(() => {
     return sortedTransactions.filter((tx) => {
       if (filter === 'all') return true;
       if (filter === 'swaps') return tx.type === 'withdrawal' || tx.type === 'deposit';
-      if (filter === 'payroll') return tx.privacy === 'private';
+      if (filter === 'payroll') return tx.privacy === 'private' && tx.type !== 'deposit' && tx.type !== 'withdrawal';
       return true;
     });
   }, [sortedTransactions, filter]);
 
-  // Find the currently selected transaction for the modal
-  const activeTransaction = useMemo(() => {
-    return transactions.find((t) => t.txHash === selectedTxHash) || null;
-  }, [transactions, selectedTxHash]);
-
-  // Dynamic portfolio history chart calculation
+  // Chart Points
   const chartPoints = useMemo(() => {
-    if (!isConnected) {
-      return 'M 0,100 C 150,90 300,75 450,85 600,30';
+    if (!isConnected || sortedTransactions.length === 0) {
+      return totalValue > 0 ? `M 0,100 C 200,90 400,60 600,40` : 'M 0,100 L 600,100';
     }
-
-    if (sortedTransactions.length === 0) {
-      if (totalValue > 0) {
-        return `M 0,100 C 200,90 400,60 600,40`;
-      }
-      return 'M 0,100 L 600,100';
-    }
-
-    if (sortedTransactions.length === 1) {
-      const tx = sortedTransactions[0];
-      const amt = parseFloat(tx.amount);
-      const change = tx.asset === 'USDC' ? amt : amt / decimalRate;
-      const startPort = tx.type === 'withdrawal' ? totalValue + change : totalValue - change;
-      
-      const minV = Math.min(startPort, totalValue) * 0.9;
-      const maxV = Math.max(startPort, totalValue) * 1.1;
-      const r = maxV - minV || 1;
-      
-      const y1 = 100 - ((startPort - minV) / r) * 80;
-      const y2 = 100 - ((totalValue - minV) / r) * 80;
-      return `M 0,${y1} L 600,${y2}`;
-    }
-
-    const pointsCount = Math.min(10, sortedTransactions.length);
-    const txsToUse = sortedTransactions.slice(0, pointsCount);
+    const txsToUse = sortedTransactions.slice(0, 10);
     let currentPort = totalValue;
-    
-    // Calculate backwards (newest to oldest)
     const checkpoints = txsToUse.map((tx, idx) => {
-      const x = 600 - (idx / (pointsCount - 1)) * 600;
+      const x = 600 - (idx / (Math.max(txsToUse.length - 1, 1))) * 600;
       const state = { x, val: currentPort };
-      
       const amt = parseFloat(tx.amount);
-      const isWithdrawal = tx.type === 'withdrawal';
-      const change = tx.asset === 'USDC' ? amt : amt / decimalRate;
-      
-      if (isWithdrawal) currentPort += change;
+      const change = tx.asset === 'EURC' ? amt / decimalRate : amt;
+      if (tx.type === 'withdrawal') currentPort += change;
       else currentPort -= change;
-
       return state;
     });
-
-    checkpoints.reverse(); // left to right
-
+    checkpoints.reverse();
     const minVal = Math.min(...checkpoints.map((c) => c.val)) * 0.9;
     const maxVal = Math.max(...checkpoints.map((c) => c.val)) * 1.1;
     const range = maxVal - minVal || 1;
-
-    const pointsStr = checkpoints
-      .map((c) => {
-        const y = 100 - ((c.val - minVal) / range) * 80;
-        return `${c.x},${y}`;
-      })
-      .join(' L ');
-
+    const pointsStr = checkpoints.map((c) => `${c.x},${100 - ((c.val - minVal) / range) * 80}`).join(' L ');
     return `M 0,100 L ${pointsStr}`;
-  }, [isConnected, transactions, sortedTransactions, totalValue, decimalRate]);
+  }, [isConnected, sortedTransactions, totalValue, decimalRate]);
+
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <div className="flex flex-col gap-8 max-w-6xl mx-auto font-sans">
+    <div className="flex flex-col gap-8 max-w-6xl mx-auto font-sans animate-fade-in pb-12">
       
       {/* Top Header Row */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Dashboard</span>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white mt-1 font-display">Welcome back</h1>
-          <p className="text-sm text-mutedText mt-1">Here&apos;s what&apos;s moving across your shielded accounts.</p>
+          <h1 className="text-[32px] font-bold text-white font-display mb-1">Dashboard</h1>
+          <p className="text-sm text-gray-400">{today}</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative group">
-            <button
-              disabled
-              className="px-4 py-2 border border-borderSubtle bg-[#000000] text-mutedText/50 cursor-not-allowed rounded-[9px] text-sm font-semibold transition duration-200 font-display flex items-center gap-1.5"
-            >
-              Run payroll
-              <span className="text-[8px] bg-borderSubtle px-1.5 py-0.5 rounded font-extrabold tracking-widest text-mutedText/75">
-                SOON
-              </span>
-            </button>
-            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover:block bg-[#0B0B0C] border border-[#1D1D1F] text-slate-300 text-[10px] font-bold py-1 px-2.5 rounded shadow-lg whitespace-nowrap z-50">
-              Private batch payroll coming soon
-            </div>
-          </div>
-          {isConnected && (
-            <div className="flex flex-col items-center gap-2">
-              <button
-                onClick={handleFundTestnet}
-                disabled={isFunding}
-                className="px-4 py-2 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 font-display bg-transparent text-center disabled:opacity-50"
-              >
-                {isFunding ? 'Funding...' : 'Fund USDC'}
-              </button>
-              {fundError && (
-                <div className="text-red-400 text-[10px] font-bold max-w-[200px] text-center">
-                  {fundError}
-                </div>
-              )}
-            </div>
-          )}
-          <Link
-            href="/swap"
-            className="px-4 py-2 bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 rounded-[9px] text-sm font-semibold transition duration-200 text-white shadow-[0_0_20px_rgba(123,55,168,0.25)] font-display border-none"
-          >
+          <Link href="/payroll" className="bg-transparent border border-white/10 hover:bg-white/5 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
+            Run payroll
+          </Link>
+          <Link href="/swap" className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-[0_0_15px_rgba(124,58,237,0.3)] hover:shadow-[0_0_20px_rgba(124,58,237,0.5)]">
             New swap
           </Link>
         </div>
       </div>
 
-      {/* Grid Layout: Main Charts & Balances */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="flex flex-col gap-6">
         
-        {/* Portfolio Value Card (2/3 width) */}
-        <div className="lg:col-span-2 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6 flex flex-col justify-between h-[320px]">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-mutedText font-display">Portfolio value</span>
-              {isConnected && (
-                <div className="flex items-center gap-1 bg-[#5E2A8C]/10 border border-[#5E2A8C]/20 px-2.5 py-0.5 rounded-full text-xs font-semibold text-[#B488DC]">
-                  <svg className="w-3 h-3 text-[#B488DC]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                  </svg>
-                  <span className="font-mono">12.4%</span>
-                </div>
-              )}
-            </div>
-            
-            {isLoading ? (
-              <div className="h-10 w-44 bg-[#1D1D1F]/50 animate-pulse rounded-lg mt-2" />
-            ) : (
-              <h2 className="text-4xl font-extrabold text-white mt-2 font-mono">
-                ${Math.floor(totalValue).toLocaleString() || '0'}
-                <span className="text-2xl text-mutedText/70 font-mono">
-                  .{(totalValue % 1).toFixed(2).slice(2)}
-                </span>
+        {/* Row 1: Portfolio Value & Balances */}
+        <div className="bg-[#141419] border border-white/5 rounded-xl flex flex-col md:flex-row overflow-hidden">
+          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">PORTFOLIO VALUE</span>
+            <div className="flex flex-col gap-3">
+              <h2 className="text-[32px] font-bold text-white tracking-tight leading-none">
+                ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h2>
-            )}
+              <div>
+                <span className="inline-flex bg-[#3B1C5F]/30 text-[#A874F5] px-2 py-0.5 rounded text-[11px] font-bold border border-[#A874F5]/10">
+                  +12.4% 30d
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">USDC</span>
+            <div className="text-[22px] font-bold text-white mb-2 leading-none">{balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+            <div className="text-[13px] text-gray-500">≈ ${balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          </div>
+          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">EURC</span>
+            <div className="text-[22px] font-bold text-white mb-2 leading-none">{balances.EURC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+            <div className="text-[13px] text-gray-500">≈ ${eurcUsdVal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+          </div>
+          <div className="p-6 md:p-8 flex-1">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED NOTES</span>
+            <div className="text-[22px] font-bold text-white mb-2 leading-none">{activeNotes.length}</div>
+            <div className="text-[13px] text-gray-500">pending withdrawal</div>
+          </div>
+        </div>
+
+        {/* Row 2: Shielded Pool */}
+        <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
+          <div className="flex items-start justify-between mb-8">
+            <div>
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED POOL</span>
+              <div className="text-[32px] font-bold text-white leading-none">
+                ${shieldedPoolValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div className="border border-white/10 bg-transparent text-gray-300 px-4 py-2 rounded-lg text-sm font-bold">
+              {activeNotes.length} notes
+            </div>
           </div>
 
-          {/* SVG Line Chart */}
-          <div className="h-32 w-full mt-4 relative">
-            <svg viewBox="0 0 600 120" className="w-full h-full preserve-3d">
+          <div className="space-y-6 pt-2">
+            {poolBreakdown.length === 0 && (
+              <div className="text-center text-sm text-gray-500 py-4">No assets in shielded pool</div>
+            )}
+            {poolBreakdown.map((item) => {
+              const def = getAssetByCode(item.asset);
+              
+              const hexColors: Record<string, string> = {
+                USDC: '#FFFFFF',
+                EURC: '#7C3AED',
+                MGUSD: '#A874F5',
+                YLDS: '#06B6D4'
+              };
+              
+              const color = hexColors[item.asset] || '#6B7280';
+              
+              return (
+                <div key={item.asset} className="flex items-center gap-6">
+                  <div className="flex-shrink-0 w-[3px] h-10 rounded-full" style={{ backgroundColor: color }} />
+                  <div className="w-32 flex-shrink-0">
+                    <div className="text-white font-bold text-[15px]">{item.asset}</div>
+                    <div className="text-[13px] text-gray-500 mt-0.5">{def?.name}</div>
+                  </div>
+                  <div className="flex-1 flex items-center pr-4">
+                    <div className="w-full bg-white/5 rounded-full h-[3px] overflow-hidden">
+                      <div className="h-full rounded-full" style={{ backgroundColor: color, width: `${Math.max(item.pct, 1)}%` }}></div>
+                    </div>
+                  </div>
+                  <div className="w-28 text-right flex-shrink-0">
+                    <div className="text-white font-bold text-[15px]">{formatCurrency(item.total, item.asset)}</div>
+                    <div className="text-[13px] text-gray-500 mt-0.5">{item.count} note{item.count !== 1 ? 's' : ''} · {item.pct.toFixed(0)}%</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Row 3: Portfolio Chart */}
+        <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-[15px] font-bold text-white">Portfolio</h3>
+            <span className="text-[13px] font-mono text-gray-500">Mar - Jun 2025</span>
+          </div>
+          <div className="h-[180px] w-full relative">
+            <svg viewBox="0 0 600 120" className="w-full h-full preserve-3d" preserveAspectRatio="none">
               <defs>
-                <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#5E2A8C" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#4A1F70" stopOpacity="0.0" />
+                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.2" />
+                  <stop offset="100%" stopColor="#7C3AED" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
-              
-              {/* Gradient Area */}
-              {isConnected && transactions.length > 0 ? (
-                <path 
-                  d={`${chartPoints} L 600,120 L 0,120 Z`} 
-                  fill="url(#chartGradient)" 
-                />
-              ) : (
-                <path 
-                  d="M 0,100 C 150,90 300,75 450,85 600,30 L 600,120 L 0,120 Z" 
-                  fill="url(#chartGradient)" 
-                />
-              )}
-
-              {/* Line */}
-              {isConnected && transactions.length > 0 ? (
-                <path 
-                  d={chartPoints} 
-                  fill="none" 
-                  stroke="#B488DC" 
-                  strokeWidth="3.5" 
-                  strokeLinecap="round"
-                />
-              ) : (
-                <path 
-                  d="M 0,100 C 150,90 300,75 450,85 600,30" 
-                  fill="none" 
-                  stroke="#B488DC" 
-                  strokeWidth="3.5" 
-                  strokeLinecap="round"
-                />
-              )}
-
-              {/* Dot Point */}
-              <circle cx="600" cy="30" r="4" fill="#ffffff" stroke="#5E2A8C" strokeWidth="2.5" />
+              <path d={`${chartPoints} L 600,120 L 0,120 Z`} fill="url(#chartGrad)" />
+              <path d={chartPoints} fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="600" cy="30" r="3" fill="#7C3AED" />
             </svg>
-            <div className="flex justify-between items-center text-[10px] font-bold text-mutedText/50 px-1 mt-2 font-mono">
+            <div className="absolute bottom-0 left-0 w-full flex justify-between text-[11px] font-mono text-gray-500 px-2 pb-[-8px]">
               <span>Mar</span>
               <span>Apr</span>
               <span>May</span>
@@ -393,216 +269,96 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Side Balance Cards */}
-        <div className="flex flex-col gap-6 lg:col-span-1">
-          
-          {/* USDC Balance Card */}
-          <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6 flex flex-col justify-between h-[148px]">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-mutedText font-display">USDC balance</span>
-              <div className="w-8 h-8 rounded-full bg-[#2775CA]/10 flex items-center justify-center border border-[#2775CA]/20">
-                <svg className="w-4 h-4 text-[#2775CA]" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.25 14.25v1.5h-2.5v-1.5c-2-.3-3.25-1.5-3.25-3.25h1.75c0 .85.75 1.5 1.5 1.5s1.5-.65 1.5-1.5c0-.85-.5-1.25-1.75-1.75-1.75-.7-3-.15-3-3.25s1.25-2.85 3.25-3.15v-1.65h2.5v1.65c1.8.35 2.75 1.45 2.75 3.1h-1.75c0-.95-.8-1.45-1.5-1.45s-1.5.5-1.5 1.35c0 .75.45 1.15 1.75 1.6 1.7.6 3 1.25 3 3.25 0 2.05-1.35 2.85-3.25 3.15z" />
-                </svg>
-              </div>
+        {/* Row 4: Transactions */}
+        <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-[15px] font-bold text-white">Transactions</h3>
+            <div className="flex items-center gap-2">
+              {(['all', 'swaps', 'payroll'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setFilter(t)}
+                  className={`px-4 py-2 rounded-lg text-[13px] font-bold capitalize transition-colors ${
+                    filter === t 
+                      ? 'bg-[#3B1C5F]/30 text-[#A874F5] border border-[#A874F5]/20' 
+                      : 'bg-transparent border border-white/5 text-gray-400 hover:text-white hover:border-white/20'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
             </div>
+          </div>
+          
+          <div className="space-y-2">
+            {filteredTransactions.slice(0, 5).map((tx) => {
+              const isDeposit = tx.type === 'deposit';
+              const isPrivate = tx.privacy === 'private';
+              return (
+                <div key={tx.txHash} 
+                     onClick={() => { setSelectedTxHash(tx.txHash); setIsDetailOpen(true); }}
+                     className="flex items-center justify-between group cursor-pointer p-3 -mx-3 rounded-lg hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#2A2A35] flex items-center justify-center text-gray-400">
+                      {isDeposit ? (
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                        </svg>
+                      ) : tx.type === 'withdrawal' ? (
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-[15px] font-bold text-white mb-0.5 group-hover:text-purple-400 transition-colors">
+                        {isDeposit ? 'Deposit to pool' : tx.type === 'withdrawal' ? `Swap ${tx.asset}` : 'June payroll'}
+                      </div>
+                      <div className="text-[13px] text-gray-500">
+                        {isDeposit ? `${tx.asset} commitment` : isPrivate ? 'shielded' : '4 recipients · private'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-8">
+                    <div className={`text-[11px] font-bold px-3 py-1 rounded-md uppercase tracking-wider ${
+                      isPrivate ? 'bg-[#3B1C5F]/30 text-[#A874F5] border border-[#A874F5]/10' : 'bg-white/5 text-gray-400 border border-white/5'
+                    }`}>
+                      {tx.privacy}
+                    </div>
+                    <div className="text-right min-w-[120px]">
+                      <div className="text-[15px] font-bold text-white mb-0.5">
+                        {isDeposit ? 
+                          formatCurrency(tx.amount, tx.asset) : 
+                          isPrivate && tx.type === 'withdrawal' ? `${tx.amount} ${tx.asset}` : 
+                          formatCurrency(tx.amount, tx.asset)
+                        }
+                      </div>
+                      <div className="text-[13px] text-gray-500">
+                        {new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
             
-            {isLoading ? (
-              <div className="h-8 w-32 bg-[#1D1D1F]/50 animate-pulse rounded-lg mt-2" />
-            ) : (
-              <div>
-                <h3 className="text-2xl font-extrabold text-white font-mono">
-                  {balances.USDC.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </h3>
-                <p className="text-xs text-mutedText mt-1 font-mono">≈ ${balances.USDC.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-              </div>
+            {filteredTransactions.length === 0 && (
+              <div className="text-center text-sm text-gray-500 py-8">No transactions</div>
             )}
           </div>
-
-          {/* EURC Balance Card */}
-          <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6 flex flex-col justify-between h-[148px]">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-mutedText font-display">EURC balance</span>
-              <div className="w-8 h-8 rounded-full bg-[#5E2A8C]/10 flex items-center justify-center border border-[#5E2A8C]/20">
-                <span className="text-[#B488DC] font-bold text-xs">€</span>
-              </div>
-            </div>
-
-            {isLoading ? (
-              <div className="h-8 w-32 bg-[#1D1D1F]/50 animate-pulse rounded-lg mt-2" />
-            ) : (
-              <div>
-                <h3 className="text-2xl font-extrabold text-white font-mono">
-                  {balances.EURC.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </h3>
-                <p className="text-xs text-mutedText mt-1 font-mono">≈ ${eurcUsdVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-              </div>
-            )}
-          </div>
-
         </div>
       </div>
 
-      {/* Row Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Swapped this Month Stat */}
-        <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-5 flex flex-col gap-1.5">
-          <span className="text-xs text-mutedText font-display font-semibold">Swapped this month</span>
-          {isLoading ? (
-            <div className="h-7 w-20 bg-[#1D1D1F]/50 animate-pulse rounded mt-0.5" />
-          ) : (
-            <span className="text-xl font-bold text-white font-mono">
-              ${swappedThisMonth.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-            </span>
-          )}
-        </div>
-
-        {/* Payroll Paid (30d) Stat */}
-        <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-5 flex flex-col gap-1.5">
-          <span className="text-xs text-mutedText font-display font-semibold">Payroll paid (30d)</span>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xl font-bold text-white font-mono">$0</span>
-            <span className="text-[8px] bg-borderSubtle text-mutedText px-1.5 py-0.5 rounded font-extrabold tracking-widest uppercase">
-              soon
-            </span>
-          </div>
-        </div>
-
-        {/* Active Notes count */}
-        <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-5 flex flex-col gap-1.5">
-          <span className="text-xs text-mutedText font-display font-semibold">Active notes</span>
-          {isLoading ? (
-            <div className="h-7 w-20 bg-[#1D1D1F]/50 animate-pulse rounded mt-0.5" />
-          ) : (
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xl font-bold text-white font-mono">
-                {activeShieldedNotesCount}
-              </span>
-              {activeShieldedNotesCount > 0 && (
-                <Badge variant="private">
-                  shielded
-                </Badge>
-              )}
-            </div>
-          )}
-        </div>
-
-      </div>
-
-      {/* Disconnect Alert Overlay banner */}
-      {!isConnected && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-white font-display">Wallet Connection Required</h3>
-            <p className="text-xs text-mutedText mt-1 max-w-sm">Connect your Stellar wallet to view portfolio metrics, private notes, and transaction logs.</p>
-          </div>
-          <button
-            onClick={connect}
-            className="px-5 py-2 bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 font-display border-none"
-          >
-            Connect Wallet
-          </button>
-        </div>
-      )}
-
-      {/* Transactions Table Section */}
-      <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-white font-display">Transactions</h2>
-          <div className="flex items-center gap-1.5 bg-[#000000] border border-[#1D1D1F] p-1 rounded-[12px]">
-            {(['all', 'swaps', 'payroll'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setFilter(t)}
-                className={`px-3 py-1.5 rounded-[9px] text-xs font-semibold uppercase tracking-wider transition duration-150 font-display ${
-                  filter === t
-                    ? 'bg-primaryAccent text-white shadow shadow-purple-950/20 font-bold'
-                    : 'text-mutedText hover:text-white'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Transactions List */}
-        <div className="flex flex-col divide-y divide-[#1D1D1F]">
-          {filteredTransactions.map((tx) => {
-            const isDeposit = tx.type === 'deposit';
-            return (
-              <div
-                key={tx.txHash}
-                onClick={() => {
-                  setSelectedTxHash(tx.txHash);
-                  setIsDetailOpen(true);
-                }}
-                className="py-4 flex items-center justify-between first:pt-0 last:pb-0 group hover:bg-[#1D1D1F]/30 px-3 rounded-[9px] transition duration-150 cursor-pointer"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-[9px] bg-[#000000] border border-[#1D1D1F] flex items-center justify-center group-hover:border-[#B488DC] transition duration-150">
-                    {isDeposit ? (
-                      <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 13l-7 7-7-7m14-6l-7 7-7-7" />
-                      </svg>
-                    ) : (
-                      <svg className="w-5 h-5 text-[#B488DC]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                      </svg>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-white group-hover:text-[#B488DC] transition duration-150">
-                      {isDeposit ? `Deposit to pool` : `Swap withdrawal completed`}
-                    </h4>
-                    <p className="text-[10px] text-mutedText mt-0.5 font-mono">
-                      {isDeposit ? 'USDC commitment' : 'shielded'} · {tx.txHash.slice(0, 8)}...{tx.txHash.slice(-8)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-6">
-                  <Badge variant={tx.privacy === 'private' ? 'private' : 'public'}>
-                    {tx.privacy}
-                  </Badge>
-                  <div className="text-right min-w-[110px]">
-                    <span className="text-sm font-bold text-white block font-mono">
-                      {parseFloat(tx.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {tx.asset}
-                    </span>
-                    <span className="text-[10px] text-mutedText block mt-0.5 font-mono">
-                      {new Date(tx.timestamp).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          
-          {filteredTransactions.length === 0 && (
-            <div className="py-12 text-center text-xs text-mutedText font-semibold flex flex-col items-center justify-center gap-2">
-              <svg className="w-8 h-8 text-mutedText/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <span>No transactions recorded.</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Transaction Details Modal */}
       <TransactionDetailModal
         isOpen={isDetailOpen}
-        onClose={() => {
-          setIsDetailOpen(false);
-          setSelectedTxHash(null);
-        }}
-        transaction={activeTransaction}
+        onClose={() => { setIsDetailOpen(false); setSelectedTxHash(null); }}
+        transaction={transactions.find(t => t.txHash === selectedTxHash) || null}
         notes={notes}
         exchangeRate={{ numerator: rateNum, denominator: rateDen }}
       />

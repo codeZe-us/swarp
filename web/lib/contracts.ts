@@ -208,7 +208,7 @@ export async function getMerkleRoot(): Promise<string> {
   return Buffer.from(rootBytes).toString('hex');
 }
 
-export async function getRate(): Promise<{ numerator: number; denominator: number }> {
+export async function getRate(assetInId: number, assetOutId: number): Promise<{ numerator: number; denominator: number }> {
   const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   const dummyAccount = getDummyAccount();
@@ -218,7 +218,13 @@ export async function getRate(): Promise<{ numerator: number; denominator: numbe
     fee: BASE_FEE,
     networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
   })
-    .addOperation(contract.call('get_rate'))
+    .addOperation(
+      contract.call(
+        'get_rate',
+        nativeToScVal(assetInId, { type: 'u64' }),
+        nativeToScVal(assetOutId, { type: 'u64' })
+      )
+    )
     .setTimeout(30)
     .build();
 
@@ -300,7 +306,7 @@ export async function getLeafCount(): Promise<number> {
   return typeof count === 'bigint' ? Number(count) : Number(count);
 }
 
-export async function getReserves(): Promise<{ usdc: bigint; eurc: bigint }> {
+export async function getReserves(): Promise<bigint[]> {
   const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   const dummyAccount = getDummyAccount();
@@ -327,10 +333,10 @@ export async function getReserves(): Promise<{ usdc: bigint; eurc: bigint }> {
   }
 
   const reservesVal = scValToNative(resultVal);
-  return {
-    usdc: typeof reservesVal[0] === 'bigint' ? reservesVal[0] : BigInt(reservesVal[0] ?? 0),
-    eurc: typeof reservesVal[1] === 'bigint' ? reservesVal[1] : BigInt(reservesVal[1] ?? 0),
-  };
+  if (!Array.isArray(reservesVal)) {
+    return [];
+  }
+  return reservesVal.map((r: any) => typeof r === 'bigint' ? r : BigInt(r ?? 0));
 }
 
 /**
@@ -339,7 +345,7 @@ export async function getReserves(): Promise<{ usdc: bigint; eurc: bigint }> {
 
 export async function submitDeposit(
   depositor: string,
-  token: string,
+  assetId: number,
   amount: bigint | string | number,
   commitment: string
 ): Promise<{ txHash: string; leafIndex: number }> {
@@ -349,8 +355,8 @@ export async function submitDeposit(
   if (!depositor || !StrKey.isValidEd25519PublicKey(depositor)) {
     throw new Error('Invalid depositor address.');
   }
-  if (!token || !StrKey.isValidContract(token)) {
-    throw new Error('Invalid token address.');
+  if (assetId < 0 || assetId > 4) {
+    throw new Error('Invalid asset ID.');
   }
   const amountBig = BigInt(amount);
   if (amountBig <= BigInt(0)) {
@@ -374,7 +380,7 @@ export async function submitDeposit(
   // 3. Build base transaction
   const contract = new Contract(POOL_CONTRACT_ID);
   const depositorVal = new Address(depositor).toScVal();
-  const tokenVal = new Address(token).toScVal();
+  const assetIdVal = nativeToScVal(assetId, { type: 'u64' });
   const amountVal = nativeToScVal(amountBig, { type: 'i128' });
   const commitmentBytes = Buffer.from(commitment, 'hex');
   const commitmentVal = xdr.ScVal.scvBytes(commitmentBytes);
@@ -383,7 +389,7 @@ export async function submitDeposit(
     fee: BASE_FEE,
     networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
   })
-    .addOperation(contract.call('deposit', depositorVal, tokenVal, amountVal, commitmentVal))
+    .addOperation(contract.call('deposit', depositorVal, assetIdVal, amountVal, commitmentVal))
     .setTimeout(30) // timeout: 30 seconds
     .build();
 
@@ -593,7 +599,8 @@ export async function submitPayment(
 
 export async function submitWithdraw(
   recipient: string,
-  assetOut: string,
+  assetInId: number,
+  assetOutId: number,
   proof: string,
   nullifier: string,
   merkleRoot: string,
@@ -605,8 +612,8 @@ export async function submitWithdraw(
   if (!recipient || !StrKey.isValidEd25519PublicKey(recipient)) {
     throw new Error('Invalid recipient address.');
   }
-  if (!assetOut || !StrKey.isValidContract(assetOut)) {
-    throw new Error('Invalid assetOut address.');
+  if (assetOutId < 0 || assetOutId > 4 || assetInId < 0 || assetInId > 4) {
+    throw new Error('Invalid asset ID.');
   }
   if (!proof || proof.length === 0) {
     throw new Error('Proof cannot be empty.');
@@ -636,7 +643,8 @@ export async function submitWithdraw(
   // 3. Build Transaction
   const contract = new Contract(POOL_CONTRACT_ID);
   const recipientVal = new Address(recipient).toScVal();
-  const assetOutVal = new Address(assetOut).toScVal();
+  const assetInIdVal = nativeToScVal(assetInId, { type: 'u64' });
+  const assetOutIdVal = nativeToScVal(assetOutId, { type: 'u64' });
   const proofBytes = Buffer.from(proof, 'hex');
   const proofVal = nativeToScVal(proofBytes);
   const nullifierVal = xdr.ScVal.scvBytes(Buffer.from(nullifier, 'hex'));
@@ -651,7 +659,8 @@ export async function submitWithdraw(
       contract.call(
         'withdraw',
         recipientVal,
-        assetOutVal,
+        assetInIdVal,
+        assetOutIdVal,
         proofVal,
         nullifierVal,
         merkleRootVal,
@@ -809,13 +818,18 @@ export async function getTokenBalance(
 /**
  * Hackathon Faucet / Fund logic
  */
-export async function fundTestnetUSDC(recipientAddress: string, amount: string = '200') {
-  const { USDC_SAC_ID, USDC_ISSUER_ADDRESS, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE, STELLAR_HORIZON_URL } = getConfig();
-  const issuerSecret = process.env.NEXT_PUBLIC_USDC_ISSUER_SECRET;
-  const issuerAddress = USDC_ISSUER_ADDRESS;
+export async function fundTestnetAsset(recipientAddress: string, assetCode: string, amount: string = '200') {
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE, STELLAR_HORIZON_URL } = getConfig();
+  
+  // Resolve issuer secret and address dynamically based on assetCode
+  const envSecretKey = `NEXT_PUBLIC_${assetCode.toUpperCase()}_ISSUER_SECRET`;
+  const envAddressKey = `NEXT_PUBLIC_${assetCode.toUpperCase()}_ISSUER_ADDRESS`;
+  
+  const issuerSecret = process.env[envSecretKey];
+  const issuerAddress = process.env[envAddressKey];
 
   if (!issuerSecret || !issuerAddress) {
-    throw new Error('USDC Issuer Secret or Address not found in environment');
+    throw new Error(`Issuer Secret or Address not found in environment for ${assetCode}`);
   }
 
   const issuerKeypair = typeof StrKey.isValidEd25519SecretSeed === 'function' && StrKey.isValidEd25519SecretSeed(issuerSecret)
@@ -831,10 +845,8 @@ export async function fundTestnetUSDC(recipientAddress: string, amount: string =
     throw new Error('Could not load issuer account from testnet. Is the issuer funded?');
   }
 
-  // USDC requires 7 decimals of precision
-  const asset = new (await import('@stellar/stellar-sdk')).Asset('USDC', issuerAddress);
+  const asset = new (await import('@stellar/stellar-sdk')).Asset(assetCode, issuerAddress);
 
-  // Convert 200 to string for classic payment
   const transaction = new (await import('@stellar/stellar-sdk')).TransactionBuilder(issuerAccount, {
     fee: (await import('@stellar/stellar-sdk')).BASE_FEE,
     networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
@@ -849,7 +861,7 @@ export async function fundTestnetUSDC(recipientAddress: string, amount: string =
 
   transaction.sign(issuerKeypair);
 
-  const horizon = new (await import('@stellar/stellar-sdk')).Horizon.Server(STELLAR_HORIZON_URL);
+  const horizon = new (await import('@stellar/stellar-sdk')).Horizon.Server(STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org');
   
   try {
     const response = await horizon.submitTransaction(transaction as any);
@@ -865,92 +877,6 @@ export async function fundTestnetUSDC(recipientAddress: string, amount: string =
   }
 }
 
-export async function fundTestnetEURC(recipientAddress: string, amount: string = '200') {
-  const { EURC_SAC_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
-  const adminSecret = process.env.NEXT_PUBLIC_USDC_ISSUER_SECRET;
-
-  if (!adminSecret || !EURC_SAC_ID) {
-    throw new Error('USDC Issuer Secret or EURC_SAC_ID not found in environment');
-  }
-
-  const adminKp = typeof StrKey.isValidEd25519SecretSeed === 'function' && StrKey.isValidEd25519SecretSeed(adminSecret)
-    ? (await import('@stellar/stellar-sdk')).Keypair.fromSecret(adminSecret)
-    : (await import('@stellar/stellar-sdk')).Keypair.fromSecret(adminSecret);
-
-  const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
-
-  let adminAccount;
-  try {
-    adminAccount = await withRetry(() => rpcServer.getAccount(adminKp.publicKey()));
-  } catch (e) {
-    throw new Error('Could not load admin account from testnet. Is the issuer funded?');
-  }
-
-  const { Contract, TransactionBuilder, BASE_FEE, Address, nativeToScVal } = await import('@stellar/stellar-sdk');
-  const contract = new Contract(EURC_SAC_ID);
-  
-  // EURC has 7 decimals, so 200 = 2000000000
-  const amountBigInt = BigInt(Math.floor(parseFloat(amount) * 10_000_000));
-  const amountVal = nativeToScVal(amountBigInt, { type: 'i128' });
-  const recipientVal = new Address(recipientAddress).toScVal();
-
-  const transaction = new TransactionBuilder(adminAccount, {
-    fee: BASE_FEE,
-    networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
-  })
-    .addOperation(contract.call('mint', recipientVal, amountVal))
-    .setTimeout(30)
-    .build();
-
-  transaction.sign(adminKp);
-
-  try {
-    const sim = await rpcServer.simulateTransaction(transaction);
-    if (rpc.Api.isSimulationError(sim)) {
-      throw new Error(`Simulation failed: ${sim.error}`);
-    }
-    const assembled = rpc.assembleTransaction(transaction, sim).build();
-    assembled.sign(adminKp);
-    
-    const response = await rpcServer.sendTransaction(assembled);
-    if (response.status === 'ERROR') {
-      throw new Error('Fund EURC transaction failed to submit');
-    }
-    
-    // Poll for success
-    for (let i = 0; i < 10; i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      try {
-        const st = await rpcServer.getTransaction(response.hash);
-        if (st.status === 'SUCCESS') return response.hash;
-        if (st.status === 'FAILED') throw new Error('Transaction failed on network');
-      } catch (e: any) {
-        if (e.message && e.message.includes('Bad union switch: 4')) {
-          const rawResponse = await fetch(SOROBAN_RPC_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: 1,
-              method: 'getTransaction',
-              params: { hash: response.hash }
-            })
-          });
-          const rawData = await rawResponse.json();
-          if (rawData.result && rawData.result.status === 'SUCCESS') {
-            return response.hash;
-          }
-        } else {
-          throw e;
-        }
-      }
-    }
-    
-    return response.hash;
-  } catch (err: any) {
-    throw new Error(err.message || 'Failed to submit EURC mint transaction');
-  }
-}
 
 export async function establishTrustline(userAddress: string, assetCode: string, issuerAddress: string): Promise<string> {
   const { signTransaction } = await import('./stellar');
