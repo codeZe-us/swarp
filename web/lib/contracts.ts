@@ -488,7 +488,8 @@ export async function submitDeposit(
     if (resultMeta) {
       // The deposit event contains { commitment, leaf_index, token }
       // Parse events from transaction meta to get the leaf_index
-      const events = (txStatus as any)?.events ?? [];
+      const rawEvents = (txStatus as any)?.events;
+      const events = Array.isArray(rawEvents) ? rawEvents : (rawEvents ? [rawEvents] : []);
       for (const evt of events) {
         try {
           const native = scValToNative(evt.value ?? evt);
