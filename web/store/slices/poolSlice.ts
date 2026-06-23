@@ -69,7 +69,7 @@ export const createPoolSlice: StateCreator<
       try {
         const poolInfo = await getPoolInfo();
         const poolState = {
-          merkleRoot: '0x' + poolInfo.currentRoot,
+          merkleRoot: poolInfo.currentRoot, // plain 64-char hex, no 0x prefix
           exchangeRate: { 
             numerator: poolInfo.currentRate, 
             denominator: poolInfo.rateDenominator 
@@ -86,10 +86,10 @@ export const createPoolSlice: StateCreator<
         console.warn('Failed to fetch pool state from contract, using fallback mock data:', error);
         // Fallback to mock data to keep the UI functional when contracts/RPC are not ready
         const mockState = {
-          merkleRoot: '0x2d9a6c8e3f4b5a7d8c9e0f1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u',
+          merkleRoot: '2d9a6c8e3f4b5a7d8c9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c', // plain 64-char hex
           exchangeRate: { numerator: 9200000, denominator: 10000000 },
-          usdcReserves: '18420000000', // 18,420
-          eurcReserves: '9860000000', // 9,860
+          usdcReserves: '18420000000', // 18,420 USDC (7 decimals)
+          eurcReserves: '9860000000',  // 9,860 EURC (7 decimals)
           totalDeposits: 42,
         };
         set(mockState);

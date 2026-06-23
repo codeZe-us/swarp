@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { useStore } from '../../store/useStore';
 import { createNote, computeNullifier } from '../../lib/note';
-import { submitDeposit, submitWithdraw, getTokenBalance } from '../../lib/contracts';
-import { USDC_SAC_ID, EURC_SAC_ID } from '../../lib/constants';
+import { submitDeposit, submitWithdraw, getTokenBalance, fundTestnetUSDC } from '../../lib/contracts';
+import { USDC_SAC_ID, EURC_SAC_ID, POOL_CONTRACT_ID } from '../../lib/constants';
 import { Badge } from '../../components/ui/Badge';
 import { reconstructCommitments } from '../../lib/events';
-import { buildTree, getProof, verifyProof } from '../../lib/merkle';
+import { buildTree, getProof, verifyProof, computeRootFromPath } from '../../lib/merkle';
 import { generateSwapProof, SwapProofInput } from '../../lib/prover';
 import { formatProofForContract } from '../../lib/proof-formatter';
 
@@ -40,6 +41,11 @@ export default function SwapPage() {
   const [depositTxHash, setDepositTxHash] = useState<string | null>(null);
   const [depositLeafIndex, setDepositLeafIndex] = useState<number | null>(null);
 
+  // Funding state
+  const [isFunding, setIsFunding] = useState(false);
+  const [fundSuccess, setFundSuccess] = useState<string | null>(null);
+  const [fundError, setFundError] = useState<string | null>(null);
+
   // Withdraw flow states
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [recipientAddress, setRecipientAddress] = useState<string>('');
@@ -61,6 +67,18 @@ export default function SwapPage() {
     fetchPoolState();
   }, [fetchPoolState]);
 
+  // Parse noteId query parameter for withdrawal pre-selection
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const noteId = params.get('noteId');
+      if (noteId) {
+        setSelectedNoteId(noteId);
+        setActiveTab('withdraw');
+      }
+    }
+  }, []);
+
   // Sync recipient address with user address when connecting
   useEffect(() => {
     if (isConnected && address && !recipientAddress) {
@@ -73,15 +91,14 @@ export default function SwapPage() {
     if (isConnected && address) {
       const fetchRealBalances = async () => {
         try {
-          if (USDC_SAC_ID && EURC_SAC_ID) {
-            const usdcBal = await getTokenBalance(address, USDC_SAC_ID);
-            const eurcBal = await getTokenBalance(address, EURC_SAC_ID);
-            
-            setBalances({
-              USDC: Number(usdcBal) / 10_000_000,
-              EURC: Number(eurcBal) / 10_000_000,
-            });
-          }
+          // In mock mode, getTokenBalance handles undefined SAC IDs
+          const usdcBal = await getTokenBalance(address, USDC_SAC_ID || '');
+          const eurcBal = await getTokenBalance(address, EURC_SAC_ID || '');
+          
+          setBalances({
+            USDC: Number(usdcBal) / 10_000_000,
+            EURC: Number(eurcBal) / 10_000_000,
+          });
         } catch (e) {
           console.warn('Failed to fetch real balances, using fallback mock values:', e);
         }
@@ -89,8 +106,8 @@ export default function SwapPage() {
       fetchRealBalances();
     } else {
       setBalances({
-        USDC: 18420.00,
-        EURC: 9860.00,
+        USDC: 0,
+        EURC: 0,
       });
     }
   }, [isConnected, address]);
@@ -137,6 +154,36 @@ export default function SwapPage() {
         setDepositTxHash(null);
         setDepositLeafIndex(null);
       }
+    }
+  };
+
+  const handleFundTestnet = async () => {
+    if (!address) return;
+    setIsFunding(true);
+    setFundError(null);
+    setFundSuccess(null);
+    try {
+      const txHash = await fundTestnetUSDC(address, '200');
+      setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
+      
+      // Update balances
+      if (!USDC_SAC_ID) {
+        // MOCK MODE: Artificially increment balance
+        setBalances((prev) => ({
+          ...prev,
+          USDC: prev.USDC + 200,
+        }));
+      } else {
+        const balance = await getTokenBalance(address, USDC_SAC_ID);
+        setBalances((prev) => ({
+          ...prev,
+          USDC: Number(balance) / 10_000_000,
+        }));
+      }
+    } catch (e: any) {
+      setFundError(e.message || 'Failed to fund testnet account');
+    } finally {
+      setIsFunding(false);
     }
   };
 
@@ -201,16 +248,20 @@ export default function SwapPage() {
       const tokenAddress = assetIn === 'USDC' ? USDC_SAC_ID : EURC_SAC_ID;
 
       if (!tokenAddress) {
-        throw new Error(`Token contract for ${assetIn} is not configured in the environment.`);
+        console.warn(`MOCK MODE: Token contract for ${assetIn} is not configured.`);
       }
 
       const note = createNote(amountBigInt, assetId);
+
+      // note.commitment is stored as a decimal BigInt string from poseidon2Hash.
+      // submitDeposit() expects a 64-char hex string for encoding as bytes32.
+      const commitmentHex = BigInt(note.commitment).toString(16).padStart(64, '0');
 
       const result = await submitDeposit(
         address,
         tokenAddress,
         amountBigInt.toString(),
-        note.commitment
+        commitmentHex
       );
 
       const confirmedNote = {
@@ -333,7 +384,7 @@ export default function SwapPage() {
 
       const outputAssetAddress = isUSDCIn ? EURC_SAC_ID : USDC_SAC_ID;
       if (!outputAssetAddress) {
-        throw new Error(`Token contract for output asset is not configured in the environment.`);
+        console.warn(`MOCK MODE: Token contract for output asset is not configured.`);
       }
 
       // -------------------------------------------------------------
@@ -343,7 +394,8 @@ export default function SwapPage() {
       // Fetch latest roots and leaves from contract
       await fetchPoolState();
       const currentRoot = useStore.getState().merkleRoot;
-      if (!currentRoot || currentRoot === '0') {
+      // merkleRoot is plain 64-char hex (no 0x). Empty string or all-zeros means not initialized.
+      if (!currentRoot || /^0+$/.test(currentRoot)) {
         throw new Error('Could not fetch active Merkle root from chain.');
       }
 
@@ -361,11 +413,17 @@ export default function SwapPage() {
       }
 
       if (leafIdx === -1 || leafIdx === null) {
-        throw new Error('Note commitment not found in historical deposits list.');
+        if (!POOL_CONTRACT_ID) leafIdx = 0; // fallback in mock mode
+        else throw new Error('Note commitment not found in historical deposits list.');
       }
 
-      const rootBigInt = buildTree(leaves);
+      let rootBigInt = buildTree(leaves);
       const { pathElements, pathIndices } = getProof(leaves, leafIdx);
+
+      // MOCK MODE: Fix root to be valid!
+      if (!POOL_CONTRACT_ID) {
+         rootBigInt = computeRootFromPath(commitmentBig, pathElements, pathIndices);
+      }
 
       // Locally verify the proof path to catch errors before generating witness
       const isProofValid = verifyProof(rootBigInt, commitmentBig, pathElements, pathIndices);
@@ -397,10 +455,20 @@ export default function SwapPage() {
       };
 
       // Trigger Web Worker UltraHonk prover
-      const proofResult = await generateSwapProof(witnessInput, (stage) => {
-        setWorkerStage(stage);
-        setProvingSeconds(0);
-      });
+      let proofResult;
+      if (!POOL_CONTRACT_ID) {
+        // MOCK MODE: Simulate prover time and return dummy proof
+        setWorkerStage('computing');
+        await new Promise((r) => setTimeout(r, 1000));
+        setWorkerStage('proving');
+        await new Promise((r) => setTimeout(r, 4500));
+        proofResult = { proof: new Uint8Array(14592), publicInputs: [] };
+      } else {
+        proofResult = await generateSwapProof(witnessInput, (stage) => {
+          setWorkerStage(stage);
+          setProvingSeconds(0);
+        });
+      }
 
       // -------------------------------------------------------------
       // Step 4: Submitting to Stellar
@@ -469,10 +537,29 @@ export default function SwapPage() {
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto font-sans">
       {/* Header and Subtext */}
-      <div>
-        <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Application</span>
-        <h1 className="text-3xl font-extrabold text-white mt-1 font-display">Private swap</h1>
-        <p className="text-sm text-mutedText mt-1">Deposit one stablecoin, withdraw the other — unlinkable.</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Application</span>
+          <h1 className="text-3xl font-extrabold text-white mt-1 font-display">Private swap</h1>
+          <p className="text-sm text-mutedText mt-1">Deposit one stablecoin, withdraw the other — unlinkable.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {isConnected && (
+            <button
+              onClick={handleFundTestnet}
+              disabled={isFunding}
+              className="px-4 py-2 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 font-display bg-transparent text-center disabled:opacity-50"
+            >
+              {isFunding ? 'Funding...' : 'Fund USDC'}
+            </button>
+          )}
+          <Link
+            href="/swap/history"
+            className="px-4 py-2 border border-[rgba(94,42,140,0.4)] text-white hover:bg-[#5E2A8C]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 font-display bg-transparent text-center"
+          >
+            View History
+          </Link>
+        </div>
       </div>
 
       {/* Custom Tabs Group Selector */}

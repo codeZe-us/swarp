@@ -111,12 +111,11 @@ export function getProof(
 /**
  * Verifies a Merkle proof locally.
  */
-export function verifyProof(
-  root: bigint,
+export function computeRootFromPath(
   leaf: bigint,
   pathElements: bigint[],
   pathIndices: number[]
-): boolean {
+): bigint {
   let current = leaf;
   for (let level = 0; level < TREE_DEPTH; level++) {
     const sibling = pathElements[level];
@@ -133,5 +132,17 @@ export function verifyProof(
 
     current = poseidon2Hash([left, right]);
   }
-  return current === root;
+  return current;
+}
+
+/**
+ * Verifies a Merkle proof locally.
+ */
+export function verifyProof(
+  root: bigint,
+  leaf: bigint,
+  pathElements: bigint[],
+  pathIndices: number[]
+): boolean {
+  return computeRootFromPath(leaf, pathElements, pathIndices) === root;
 }
