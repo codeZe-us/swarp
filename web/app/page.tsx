@@ -138,15 +138,20 @@ export default function Home() {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <div className="flex flex-col gap-8 max-w-6xl mx-auto font-sans animate-fade-in pb-12">
+    <div className="flex flex-col gap-8 max-w-6xl mx-auto animate-fade-in pb-12">
       
-      {/* Top Header Row */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[32px] font-bold text-white font-display mb-1">Dashboard</h1>
-          <p className="text-sm text-gray-400">{today}</p>
+          <h1 className="text-3xl font-extrabold text-white font-display mt-1">{`Dashboard`}</h1>
+          <p className="text-sm text-mutedText mt-1">{today}</p>
         </div>
         <div className="flex items-center gap-3">
+          <Link 
+            href="/faucet" 
+            className="px-3 py-1.5 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[6px] text-[10px] uppercase tracking-wider transition duration-150 font-display bg-transparent"
+          >
+            Fund Testnet
+          </Link>
           <Link href="/payroll" className="bg-transparent border border-white/10 hover:bg-white/5 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
             Run payroll
           </Link>
@@ -163,11 +168,11 @@ export default function Home() {
           <div className="p-6 md:p-8 flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">PORTFOLIO VALUE</span>
             <div className="flex flex-col items-start gap-4">
-              <div className="flex items-baseline">
-                <h2 className="text-[42px] font-extrabold text-white tracking-tight leading-none">
+              <div className="flex items-baseline font-display">
+                <h2 className="text-[40px] text-white tracking-tight leading-none">
                   ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split('.')[0]}
                 </h2>
-                <span className="text-[22px] font-bold text-gray-400 ml-0.5">
+                <span className="text-[20px] text-gray-400 ml-0.5">
                   .{totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split('.')[1]}
                 </span>
               </div>
@@ -179,21 +184,21 @@ export default function Home() {
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">USDC</span>
             <div>
-              <div className="text-[28px] font-extrabold text-white mb-1 leading-none">{balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
               <div className="text-[13px] text-gray-500">≈ ${balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
             </div>
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">EURC</span>
             <div>
-              <div className="text-[28px] font-extrabold text-white mb-1 leading-none">{balances.EURC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.EURC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
               <div className="text-[13px] text-gray-500">≈ ${eurcUsdVal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
             </div>
           </div>
           <div className="p-6 md:p-8 flex-1 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED NOTES</span>
             <div>
-              <div className="text-[28px] font-extrabold text-white mb-1 leading-none">{activeNotes.length}</div>
+              <div className="text-[26px] font-display text-white mb-1 leading-none">{activeNotes.length}</div>
               <div className="text-[13px] text-gray-500">pending withdrawal</div>
             </div>
           </div>
@@ -204,7 +209,7 @@ export default function Home() {
           <div className="flex items-start justify-between mb-8">
             <div>
               <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED POOL</span>
-              <div className="text-[32px] font-bold text-white leading-none">
+              <div className="text-[32px] font-display text-white leading-none">
                 ${shieldedPoolValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
@@ -242,8 +247,8 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="w-28 text-right flex-shrink-0">
-                    <div className="text-white font-bold text-[15px]">{formatCurrency(item.total, item.asset)}</div>
-                    <div className="text-[13px] text-gray-500 mt-0.5">{item.count} note{item.count !== 1 ? 's' : ''} · {item.pct.toFixed(0)}%</div>
+                    <div className="text-white font-display text-[15px]">{formatCurrency(item.total, item.asset)}</div>
+                    <div className="text-[13px] text-gray-500 mt-0.5">{item.count} note{item.count !== 1 && 's'} &middot; {Math.round(item.pct)}%</div>
                   </div>
                 </div>
               );

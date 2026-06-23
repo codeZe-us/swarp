@@ -100,17 +100,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       )
     },
     { 
-      name: 'Proof of Reserve', 
-      href: '/proof', 
-      soon: true, 
-      icon: (active: boolean) => (
-        <svg className={`w-5 h-5 ${active ? 'text-primaryAccent' : 'text-mutedText'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      )
-    },
-    { 
-      name: 'Faucet', 
+      name: 'Fund Testnet', 
       href: '/faucet', 
       icon: (active: boolean) => (
         <svg className={`w-5 h-5 ${active ? 'text-primaryAccent' : 'text-mutedText'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">

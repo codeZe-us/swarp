@@ -92,7 +92,10 @@ export default function FaucetPage() {
           
           await addTrustline(activeAsset, issuerAddress as string);
           
-          setMintError(`Trustline added! Retrying mint...`);
+          setMintError(`Trustline added! Waiting for network sync...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          setMintError(`Retrying mint...`);
           const data = await performMint();
           setMintSuccess(`Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`);
           setMintError(null);

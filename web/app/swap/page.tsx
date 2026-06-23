@@ -267,7 +267,7 @@ export default function SwapPage() {
 
       const result = await submitDeposit(
         address,
-        tokenAddress,
+        assetId,
         amountBigInt.toString(),
         commitmentHex
       );
@@ -391,12 +391,8 @@ export default function SwapPage() {
       }
 
       const outputAssetAddress = (config as any)[`${withdrawAssetOutCode}_SAC_ID`] || '';
-      const inputAssetAddress = (config as any)[`${note.asset}_SAC_ID`] || '';
       if (!outputAssetAddress) {
         console.warn(`MOCK MODE: Token contract for output asset is not configured.`);
-      }
-      if (!inputAssetAddress) {
-        console.warn(`MOCK MODE: Token contract for input asset is not configured.`);
       }
 
       // -------------------------------------------------------------
@@ -494,8 +490,8 @@ export default function SwapPage() {
       // Submit transaction via contracts.ts
       const result = await submitWithdraw(
         recipientAddress,
-        inputAssetAddress,
-        outputAssetAddress,
+        depositAsset.id,
+        withdrawAsset.id,
         proofHex,
         nullifierBig.toString(16).padStart(64, '0'),
         rootBigInt.toString(16).padStart(64, '0'),

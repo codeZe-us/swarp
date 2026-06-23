@@ -345,7 +345,7 @@ export async function getReserves(): Promise<bigint[]> {
 
 export async function submitDeposit(
   depositor: string,
-  assetAddress: string,
+  assetId: number,
   amount: string,
   commitment: string
 ): Promise<{ txHash: string; leafIndex: number }> {
@@ -355,9 +355,8 @@ export async function submitDeposit(
   if (!depositor || !StrKey.isValidEd25519PublicKey(depositor)) {
     throw new Error('Invalid depositor address.');
   }
-  // assetAddress is the SAC contract ID (a C-address). Allow empty string in mock mode.
-  if (assetAddress && assetAddress.length > 0 && !assetAddress.startsWith('C') && !assetAddress.startsWith('G')) {
-    throw new Error('Invalid asset address.');
+  if (assetId < 0 || assetId > 4) {
+    throw new Error('Invalid asset ID.');
   }
   const amountBig = BigInt(amount);
   if (amountBig <= BigInt(0)) {
@@ -380,7 +379,7 @@ export async function submitDeposit(
   // 3. Build base transaction
   const contract = new Contract(POOL_CONTRACT_ID);
   const depositorVal = new Address(depositor).toScVal();
-  const assetIdVal = new Address(assetAddress).toScVal();
+  const assetIdVal = nativeToScVal(assetId, { type: 'u64' });
   const amountVal = nativeToScVal(amountBig, { type: 'i128' });
   const commitmentBytes = Buffer.from(commitment, 'hex');
   const commitmentVal = xdr.ScVal.scvBytes(commitmentBytes);
@@ -599,8 +598,8 @@ export async function submitPayment(
 
 export async function submitWithdraw(
   recipient: string,
-  assetInAddress: string,
-  assetOutAddress: string,
+  assetInId: number,
+  assetOutId: number,
   proof: string,
   nullifier: string,
   merkleRoot: string,
@@ -612,12 +611,11 @@ export async function submitWithdraw(
   if (!recipient || !StrKey.isValidEd25519PublicKey(recipient)) {
     throw new Error('Invalid recipient address.');
   }
-  // Allow empty strings in mock mode
-  if (assetInAddress && assetInAddress.length > 0 && !assetInAddress.startsWith('C') && !assetInAddress.startsWith('G')) {
-    throw new Error('Invalid assetIn address.');
+  if (assetInId < 0 || assetInId > 4) {
+    throw new Error('Invalid asset in ID.');
   }
-  if (assetOutAddress && assetOutAddress.length > 0 && !assetOutAddress.startsWith('C') && !assetOutAddress.startsWith('G')) {
-    throw new Error('Invalid assetOut address.');
+  if (assetOutId < 0 || assetOutId > 4) {
+    throw new Error('Invalid asset out ID.');
   }
   if (!proof || proof.length === 0) {
     throw new Error('Proof cannot be empty.');
@@ -633,7 +631,6 @@ export async function submitWithdraw(
     throw new Error('Withdrawal amount must be positive.');
   }
 
-
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
 
   // 2. Fetch recipient account details
@@ -647,8 +644,8 @@ export async function submitWithdraw(
   // 3. Build Transaction
   const contract = new Contract(POOL_CONTRACT_ID);
   const recipientVal = new Address(recipient).toScVal();
-  const assetInIdVal = new Address(assetInAddress).toScVal();
-  const assetOutIdVal = new Address(assetOutAddress).toScVal();
+  const assetInIdVal = nativeToScVal(assetInId, { type: 'u64' });
+  const assetOutIdVal = nativeToScVal(assetOutId, { type: 'u64' });
   const proofBytes = Buffer.from(proof, 'hex');
   const proofVal = nativeToScVal(proofBytes);
   const nullifierVal = xdr.ScVal.scvBytes(Buffer.from(nullifier, 'hex'));
