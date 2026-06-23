@@ -349,7 +349,7 @@ export async function submitDeposit(
   if (!depositor || !StrKey.isValidEd25519PublicKey(depositor)) {
     throw new Error('Invalid depositor address.');
   }
-  if (!token || !StrKey.isValidEd25519PublicKey(token)) {
+  if (!token || !StrKey.isValidContract(token)) {
     throw new Error('Invalid token address.');
   }
   const amountBig = BigInt(amount);
@@ -435,9 +435,38 @@ export async function submitDeposit(
   let attempts = 0;
   while (attempts < 20) {
     await new Promise(resolve => setTimeout(resolve, 2000));
-    txStatus = await rpcServer.getTransaction(response.hash);
-    if (txStatus.status !== 'NOT_FOUND') {
-      break;
+    try {
+      txStatus = await rpcServer.getTransaction(response.hash);
+      if (txStatus.status !== 'NOT_FOUND') {
+        break;
+      }
+    } catch (e: any) {
+      if (e.message && e.message.includes('Bad union switch: 4')) {
+        console.warn('stellar-sdk failed to parse getTransaction result in deposit. Fetching raw RPC...');
+        try {
+          const rawResponse = await fetch(SOROBAN_RPC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'getTransaction',
+              params: { hash: response.hash }
+            })
+          });
+          const rawData = await rawResponse.json();
+          if (rawData.result && rawData.result.status === 'SUCCESS') {
+            txStatus = rawData.result;
+            break;
+          } else {
+            console.error('Raw RPC getTransaction failed result:', JSON.stringify(rawData, null, 2));
+            throw new Error('Deposit transaction execution failed on the network. See console for raw RPC output.');
+          }
+        } catch (rawErr) {
+          throw e;
+        }
+      }
+      throw e;
     }
     attempts++;
   }
@@ -576,7 +605,7 @@ export async function submitWithdraw(
   if (!recipient || !StrKey.isValidEd25519PublicKey(recipient)) {
     throw new Error('Invalid recipient address.');
   }
-  if (!assetOut || !StrKey.isValidEd25519PublicKey(assetOut)) {
+  if (!assetOut || !StrKey.isValidContract(assetOut)) {
     throw new Error('Invalid assetOut address.');
   }
   if (!proof || proof.length === 0) {
@@ -676,12 +705,44 @@ export async function submitWithdraw(
   }
 
   // 8. Poll for transaction completion
-  let getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
+  let getResponse: any;
   let attempts = 0;
   const maxAttempts = 60; // 60 seconds polling timeout
-  while (getResponse.status === 'NOT_FOUND' && attempts < maxAttempts) {
+  while (attempts < maxAttempts) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
+    try {
+      getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
+      if (getResponse.status !== 'NOT_FOUND') {
+        break;
+      }
+    } catch (e: any) {
+      if (e.message && e.message.includes('Bad union switch: 4')) {
+        console.warn('stellar-sdk failed to parse getTransaction result in withdraw. Fetching raw RPC...');
+        try {
+          const rawResponse = await fetch(SOROBAN_RPC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'getTransaction',
+              params: { hash: response.hash }
+            })
+          });
+          const rawData = await rawResponse.json();
+          if (rawData.result && rawData.result.status === 'SUCCESS') {
+            getResponse = rawData.result;
+            break;
+          } else {
+            console.error('Raw RPC getTransaction failed result:', JSON.stringify(rawData, null, 2));
+            throw new Error('Withdraw transaction execution failed on the network. See console for details.');
+          }
+        } catch (rawErr) {
+          throw e;
+        }
+      }
+      throw e;
+    }
     attempts++;
   }
 
@@ -749,7 +810,7 @@ export async function getTokenBalance(
  * Hackathon Faucet / Fund logic
  */
 export async function fundTestnetUSDC(recipientAddress: string, amount: string = '200') {
-  const { USDC_SAC_ID, USDC_ISSUER_ADDRESS, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
+  const { USDC_SAC_ID, USDC_ISSUER_ADDRESS, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE, STELLAR_HORIZON_URL } = getConfig();
   const issuerSecret = process.env.NEXT_PUBLIC_USDC_ISSUER_SECRET;
   const issuerAddress = USDC_ISSUER_ADDRESS;
 
@@ -773,23 +834,67 @@ export async function fundTestnetUSDC(recipientAddress: string, amount: string =
   // USDC requires 7 decimals of precision
   const asset = new (await import('@stellar/stellar-sdk')).Asset('USDC', issuerAddress);
 
-  // We submit a classic Payment operation. 
-  // IMPORTANT: The recipient must already have a trustline to the asset for this to succeed via classic payment.
-  // Alternatively, since we have the Soroban token SAC, we can invoke 'mint' which bypasses the classic trustline requirement in some cases,
-  // but let's try the direct Contract mint to avoid trustline errors for new users.
+  // Convert 200 to string for classic payment
+  const transaction = new (await import('@stellar/stellar-sdk')).TransactionBuilder(issuerAccount, {
+    fee: (await import('@stellar/stellar-sdk')).BASE_FEE,
+    networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+  })
+    .addOperation((await import('@stellar/stellar-sdk')).Operation.payment({
+      destination: recipientAddress,
+      asset: asset,
+      amount: amount.toString(),
+    }))
+    .setTimeout(30)
+    .build();
+
+  transaction.sign(issuerKeypair);
+
+  const horizon = new (await import('@stellar/stellar-sdk')).Horizon.Server(STELLAR_HORIZON_URL);
   
-  if (!USDC_SAC_ID) {
-    throw new Error('USDC SAC ID not configured');
+  try {
+    const response = await horizon.submitTransaction(transaction as any);
+    if (!response.successful) {
+      throw new Error('Fund transaction failed');
+    }
+    return response.hash;
+  } catch (err: any) {
+    if (err.response && err.response.data && err.response.data.extras && err.response.data.extras.result_codes) {
+      throw new Error(`Transaction Failed: ${JSON.stringify(err.response.data.extras.result_codes)}`);
+    }
+    throw new Error(err.message || 'Failed to submit payment transaction');
+  }
+}
+
+export async function fundTestnetEURC(recipientAddress: string, amount: string = '200') {
+  const { EURC_SAC_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
+  const adminSecret = process.env.NEXT_PUBLIC_USDC_ISSUER_SECRET;
+
+  if (!adminSecret || !EURC_SAC_ID) {
+    throw new Error('USDC Issuer Secret or EURC_SAC_ID not found in environment');
   }
 
-  const contract = new Contract(USDC_SAC_ID);
-  const recipientVal = new Address(recipientAddress).toScVal();
-  
-  // Convert 200 to 200_0000000 (7 decimals)
-  const amountBig = BigInt(Number(amount) * 10_000_000);
-  const amountVal = nativeToScVal(amountBig, { type: 'i128' });
+  const adminKp = typeof StrKey.isValidEd25519SecretSeed === 'function' && StrKey.isValidEd25519SecretSeed(adminSecret)
+    ? (await import('@stellar/stellar-sdk')).Keypair.fromSecret(adminSecret)
+    : (await import('@stellar/stellar-sdk')).Keypair.fromSecret(adminSecret);
 
-  let transaction = new TransactionBuilder(issuerAccount, {
+  const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
+
+  let adminAccount;
+  try {
+    adminAccount = await withRetry(() => rpcServer.getAccount(adminKp.publicKey()));
+  } catch (e) {
+    throw new Error('Could not load admin account from testnet. Is the issuer funded?');
+  }
+
+  const { Contract, TransactionBuilder, BASE_FEE, Address, nativeToScVal } = await import('@stellar/stellar-sdk');
+  const contract = new Contract(EURC_SAC_ID);
+  
+  // EURC has 7 decimals, so 200 = 2000000000
+  const amountBigInt = BigInt(Math.floor(parseFloat(amount) * 10_000_000));
+  const amountVal = nativeToScVal(amountBigInt, { type: 'i128' });
+  const recipientVal = new Address(recipientAddress).toScVal();
+
+  const transaction = new TransactionBuilder(adminAccount, {
     fee: BASE_FEE,
     networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
   })
@@ -797,45 +902,54 @@ export async function fundTestnetUSDC(recipientAddress: string, amount: string =
     .setTimeout(30)
     .build();
 
-  // Simulate
-  let simulation;
+  transaction.sign(adminKp);
+
   try {
-    simulation = await withRetry(() => rpcServer.simulateTransaction(transaction));
-  } catch (error) {
-    throw new SorobanNetworkError('Failed to simulate mint transaction.', error);
-  }
-
-  if (rpc.Api.isSimulationError(simulation)) {
-    const errStr = typeof simulation.error === 'string' ? simulation.error : JSON.stringify(simulation.error);
-    if (errStr.includes('#13') || errStr.includes('Contract, #13')) {
-      throw new Error('TRUSTLINE_MISSING');
+    const sim = await rpcServer.simulateTransaction(transaction);
+    if (rpc.Api.isSimulationError(sim)) {
+      throw new Error(`Simulation failed: ${sim.error}`);
     }
-    throw new SorobanSimulationError(parseSorobanError(simulation.error), simulation.error);
+    const assembled = rpc.assembleTransaction(transaction, sim).build();
+    assembled.sign(adminKp);
+    
+    const response = await rpcServer.sendTransaction(assembled);
+    if (response.status === 'ERROR') {
+      throw new Error('Fund EURC transaction failed to submit');
+    }
+    
+    // Poll for success
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      try {
+        const st = await rpcServer.getTransaction(response.hash);
+        if (st.status === 'SUCCESS') return response.hash;
+        if (st.status === 'FAILED') throw new Error('Transaction failed on network');
+      } catch (e: any) {
+        if (e.message && e.message.includes('Bad union switch: 4')) {
+          const rawResponse = await fetch(SOROBAN_RPC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'getTransaction',
+              params: { hash: response.hash }
+            })
+          });
+          const rawData = await rawResponse.json();
+          if (rawData.result && rawData.result.status === 'SUCCESS') {
+            return response.hash;
+          }
+        } else {
+          throw e;
+        }
+      }
+    }
+    
+    return response.hash;
+  } catch (err: any) {
+    throw new Error(err.message || 'Failed to submit EURC mint transaction');
   }
-
-  // Assemble and Sign
-  transaction = rpc.assembleTransaction(transaction, simulation).build();
-  transaction.sign(issuerKeypair);
-
-  // Submit
-  const response = await withRetry(() => rpcServer.sendTransaction(transaction));
-  if (response.status === 'ERROR') {
-    throw new SorobanTransactionError(parseSorobanError(response.errorResult), response.hash, response.errorResult);
-  }
-
-  let getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
-  let attempts = 0;
-  while (getResponse.status === 'NOT_FOUND' && attempts < 30) {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
-    attempts++;
-  }
-
-  if (getResponse.status !== 'SUCCESS') {
-    throw new Error(`Fund transaction failed: ${getResponse.status}`);
-  }
-
-  return response.hash;
 }
 
 export async function establishTrustline(userAddress: string, assetCode: string, issuerAddress: string): Promise<string> {

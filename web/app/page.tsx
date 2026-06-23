@@ -6,7 +6,7 @@ import { useStore } from '../store/useStore';
 import { Badge } from '../components/ui/Badge';
 import { TransactionDetailModal } from '../components/ui/TransactionDetailModal';
 
-import { getTokenBalance, fundTestnetUSDC, establishTrustline } from '../lib/contracts';
+import { getTokenBalance, fundTestnetUSDC, fundTestnetEURC, establishTrustline } from '../lib/contracts';
 
 export default function Home() {
   const [filter, setFilter] = useState<'all' | 'swaps' | 'payroll'>('all');
@@ -41,29 +41,48 @@ export default function Home() {
     setFundSuccess(null);
     try {
       const txHash = await fundTestnetUSDC(address, '200');
-      setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
+      try {
+        await new Promise(r => setTimeout(r, 6000)); // Wait for ledger to close to update sequence number
+        await fundTestnetEURC(address, '200');
+      } catch (eurcErr) {
+        console.warn('Failed to fund EURC:', eurcErr);
+      }
+      setFundSuccess(`Funded 200 USDC & 200 EURC! Tx: ${txHash.slice(0, 8)}...`);
+      setFundError(null);
       
-      if (!config?.USDC_SAC_ID) {
-        setBalances((prev) => ({ ...prev, USDC: prev.USDC + 200 }));
-      } else {
+      if (config?.USDC_SAC_ID) {
         const balance = await getTokenBalance(address, config.USDC_SAC_ID);
-        setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
+        const eurcBalance = await getTokenBalance(address, config.EURC_SAC_ID || '');
+        setBalances({ 
+          USDC: Number(balance) / 10_000_000,
+          EURC: Number(eurcBalance) / 10_000_000
+        });
       }
     } catch (e: any) {
-      if (e.message === 'TRUSTLINE_MISSING') {
+      if (e.message === 'TRUSTLINE_MISSING' || e.message.includes('op_no_trust')) {
         try {
           setFundError('Trustline missing. Please sign the transaction in Freighter to add USDC to your wallet!');
-          const issuerAddress = config?.USDC_ISSUER_ADDRESS || 'GCUSVTVSWAHQMDO2KQC5H2TC6RCB7UNRQ5YD3XCPTNSCYWIQYMPN6VVX';
-          await establishTrustline(address, 'USDC', issuerAddress);
+          const usdcIssuer = config?.USDC_ISSUER_ADDRESS || 'GCUSVTVSWAHQMDO2KQC5H2TC6RCB7UNRQ5YD3XCPTNSCYWIQYMPN6VVX';
+          await establishTrustline(address, 'USDC', usdcIssuer);
           
           setFundError('Trustline established! Funding your wallet now...');
           const txHash = await fundTestnetUSDC(address, '200');
-          setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
+          try {
+            await new Promise(r => setTimeout(r, 6000)); // Wait for ledger to close to update sequence number
+            await fundTestnetEURC(address, '200');
+          } catch (eurcErr) {
+            console.warn('Failed to fund EURC:', eurcErr);
+          }
+          setFundSuccess(`Funded 200 USDC & 200 EURC! Tx: ${txHash.slice(0, 8)}...`);
           setFundError(null);
           
           if (config?.USDC_SAC_ID) {
             const balance = await getTokenBalance(address, config.USDC_SAC_ID);
-            setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
+            const eurcBalance = await getTokenBalance(address, config.EURC_SAC_ID || '');
+            setBalances({ 
+              USDC: Number(balance) / 10_000_000,
+              EURC: Number(eurcBalance) / 10_000_000
+            });
           }
         } catch (trustlineErr: any) {
           setFundError(trustlineErr.message || 'Failed to establish trustline');
