@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useStore } from '../../store/useStore';
 import { createNote, computeNullifier } from '../../lib/note';
 import { submitDeposit, submitWithdraw, getTokenBalance, fundTestnetUSDC, establishTrustline } from '../../lib/contracts';
-import { USDC_SAC_ID, EURC_SAC_ID, POOL_CONTRACT_ID } from '../../lib/constants';
 import { Badge } from '../../components/ui/Badge';
 import { reconstructCommitments } from '../../lib/events';
 import { buildTree, getProof, verifyProof, computeRootFromPath } from '../../lib/merkle';
@@ -26,6 +25,7 @@ export default function SwapPage() {
   const exchangeRate = useStore((state) => state.exchangeRate);
   const fetchPoolState = useStore((state) => state.fetchPoolState);
   const notes = useStore((state) => state.notes);
+  const config = useStore((state) => state.config);
   
   const isConnected = status === 'connected';
 
@@ -92,8 +92,8 @@ export default function SwapPage() {
       const fetchRealBalances = async () => {
         try {
           // In mock mode, getTokenBalance handles undefined SAC IDs
-          const usdcBal = await getTokenBalance(address, USDC_SAC_ID || '');
-          const eurcBal = await getTokenBalance(address, EURC_SAC_ID || '');
+          const usdcBal = await getTokenBalance(address, config?.USDC_SAC_ID || '');
+          const eurcBal = await getTokenBalance(address, config?.EURC_SAC_ID || '');
           
           setBalances({
             USDC: Number(usdcBal) / 10_000_000,
@@ -166,10 +166,10 @@ export default function SwapPage() {
       const txHash = await fundTestnetUSDC(address, '200');
       setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
       
-      if (!USDC_SAC_ID) {
+      if (!config?.USDC_SAC_ID) {
         setBalances((prev) => ({ ...prev, USDC: prev.USDC + 200 }));
       } else {
-        const balance = await getTokenBalance(address, USDC_SAC_ID);
+        const balance = await getTokenBalance(address, config.USDC_SAC_ID);
         setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
       }
     } catch (e: any) {
@@ -184,8 +184,8 @@ export default function SwapPage() {
           setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
           setFundError(null);
           
-          if (USDC_SAC_ID) {
-            const balance = await getTokenBalance(address, USDC_SAC_ID);
+          if (config?.USDC_SAC_ID) {
+            const balance = await getTokenBalance(address, config.USDC_SAC_ID);
             setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
           }
         } catch (trustlineErr: any) {
@@ -257,7 +257,7 @@ export default function SwapPage() {
       const val = parseFloat(amountIn);
       const amountBigInt = BigInt(Math.round(val * 10_000_000));
       const assetId = assetIn === 'USDC' ? 0 : 1;
-      const tokenAddress = assetIn === 'USDC' ? USDC_SAC_ID : EURC_SAC_ID;
+      const tokenAddress = assetIn === 'USDC' ? config?.USDC_SAC_ID || '' : config?.EURC_SAC_ID || '';
 
       if (!tokenAddress) {
         console.warn(`MOCK MODE: Token contract for ${assetIn} is not configured.`);
@@ -394,7 +394,7 @@ export default function SwapPage() {
         );
       }
 
-      const outputAssetAddress = isUSDCIn ? EURC_SAC_ID : USDC_SAC_ID;
+      const outputAssetAddress = isUSDCIn ? config?.EURC_SAC_ID || '' : config?.USDC_SAC_ID || '';
       if (!outputAssetAddress) {
         console.warn(`MOCK MODE: Token contract for output asset is not configured.`);
       }
@@ -425,7 +425,7 @@ export default function SwapPage() {
       }
 
       if (leafIdx === -1 || leafIdx === null) {
-        if (!POOL_CONTRACT_ID) leafIdx = 0; // fallback in mock mode
+        if (!config?.POOL_CONTRACT_ID) leafIdx = 0; // fallback in mock mode
         else throw new Error('Note commitment not found in historical deposits list.');
       }
 
@@ -433,7 +433,7 @@ export default function SwapPage() {
       const { pathElements, pathIndices } = getProof(leaves, leafIdx);
 
       // MOCK MODE: Fix root to be valid!
-      if (!POOL_CONTRACT_ID) {
+      if (!config?.POOL_CONTRACT_ID) {
          rootBigInt = computeRootFromPath(commitmentBig, pathElements, pathIndices);
       }
 
@@ -468,7 +468,7 @@ export default function SwapPage() {
 
       // Trigger Web Worker UltraHonk prover
       let proofResult;
-      if (!POOL_CONTRACT_ID) {
+      if (!config?.POOL_CONTRACT_ID) {
         // MOCK MODE: Simulate prover time and return dummy proof
         setWorkerStage('computing');
         await new Promise((r) => setTimeout(r, 1000));

@@ -1,6 +1,5 @@
 import { rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
-import { POOL_CONTRACT_ID, SOROBAN_RPC_URL } from './constants';
-import { withRetry } from './contracts';
+import { withRetry, getConfig } from './contracts';
 import { getZeroValues } from './merkle';
 
 export interface DepositEventData {
@@ -14,6 +13,7 @@ export interface DepositEventData {
  * Automatically handles historical query limits (pruning to 7-day windows in RPC nodes).
  */
 export async function fetchDepositEvents(fromLedger?: number): Promise<DepositEventData[]> {
+  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL } = getConfig();
   if (!POOL_CONTRACT_ID) {
     console.warn('MOCK MODE: fetchDepositEvents');
     return [];

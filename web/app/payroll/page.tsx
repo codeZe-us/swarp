@@ -4,7 +4,6 @@ import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { Badge } from '../../components/ui/Badge';
 import { isValidPublicKey } from '../../lib/stellar';
-import { POOL_CONTRACT_ID, USDC_SAC_ID, EURC_SAC_ID } from '../../lib/constants';
 import { submitPayment } from '../../lib/contracts';
 import { Recipient } from '../../store/types';
 
@@ -15,6 +14,7 @@ export default function PayrollPage() {
   const connect = useStore((state) => state.connect);
   const exchangeRate = useStore((state) => state.exchangeRate);
   const teamMembers = useStore((state) => state.teamMembers);
+  const config = useStore((state) => state.config);
   
   // Payroll slice
   const recipients = useStore((state) => state.recipients);
@@ -175,7 +175,7 @@ export default function PayrollPage() {
     // Execute actual transfers loop
     for (let i = 0; i < recipients.length; i++) {
       const recipient = recipients[i];
-      const tokenContractId = recipient.asset === 'USDC' ? USDC_SAC_ID : EURC_SAC_ID;
+      const tokenContractId = recipient.asset === 'USDC' ? config?.USDC_SAC_ID || '' : config?.EURC_SAC_ID || '';
       
       try {
         const amt = parseFloat(recipient.amount);

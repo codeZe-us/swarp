@@ -11,14 +11,15 @@ import {
   Transaction,
   xdr,
 } from '@stellar/stellar-sdk';
-import {
-  POOL_CONTRACT_ID,
-  SOROBAN_RPC_URL,
-  STELLAR_NETWORK_PASSPHRASE,
-  USDC_SAC_ID,
-  EURC_SAC_ID,
-  STELLAR_HORIZON_URL
-} from './constants';
+import { useStore } from '../store/useStore';
+
+export function getConfig() {
+  const config = useStore.getState().config;
+  if (!config) {
+    throw new Error('Application configuration is not loaded yet.');
+  }
+  return config;
+}
 import { signTransaction as walletSignTransaction } from './stellar';
 
 // Custom error classes for clear categorization
@@ -141,9 +142,7 @@ export async function getPoolInfo(): Promise<{
   totalDeposits: number;
   currentRoot: string;
 }> {
-  if (!POOL_CONTRACT_ID) {
-    throw new Error('POOL_CONTRACT_ID is not defined.');
-  }
+  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -180,9 +179,7 @@ export async function getPoolInfo(): Promise<{
 }
 
 export async function getMerkleRoot(): Promise<string> {
-  if (!POOL_CONTRACT_ID) {
-    throw new Error('POOL_CONTRACT_ID is not defined.');
-  }
+  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -212,9 +209,7 @@ export async function getMerkleRoot(): Promise<string> {
 }
 
 export async function getRate(): Promise<{ numerator: number; denominator: number }> {
-  if (!POOL_CONTRACT_ID) {
-    throw new Error('POOL_CONTRACT_ID is not defined.');
-  }
+  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -246,9 +241,7 @@ export async function getRate(): Promise<{ numerator: number; denominator: numbe
 }
 
 export async function getLeaf(index: number): Promise<string> {
-  if (!POOL_CONTRACT_ID) {
-    throw new Error('POOL_CONTRACT_ID is not defined.');
-  }
+  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -278,9 +271,7 @@ export async function getLeaf(index: number): Promise<string> {
 }
 
 export async function getLeafCount(): Promise<number> {
-  if (!POOL_CONTRACT_ID) {
-    throw new Error('POOL_CONTRACT_ID is not defined.');
-  }
+  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -310,9 +301,7 @@ export async function getLeafCount(): Promise<number> {
 }
 
 export async function getReserves(): Promise<{ usdc: bigint; eurc: bigint }> {
-  if (!POOL_CONTRACT_ID) {
-    throw new Error('POOL_CONTRACT_ID is not defined.');
-  }
+  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -354,9 +343,7 @@ export async function submitDeposit(
   amount: bigint | string | number,
   commitment: string
 ): Promise<{ txHash: string; leafIndex: number }> {
-  if (!POOL_CONTRACT_ID) {
-    throw new Error('POOL_CONTRACT_ID is not defined.');
-  }
+  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   // 1. Inputs validation
   if (!depositor || !StrKey.isValidEd25519PublicKey(depositor)) {
@@ -481,6 +468,7 @@ export async function submitPayment(
     throw new Error('Amount must be positive.');
   }
 
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
 
   // 2. Fetch active source account context (including sequence number)
@@ -529,7 +517,7 @@ export async function submitPayment(
   const xdrString = transaction.toXDR();
   let signedXdr;
   try {
-    signedXdr = await walletSignTransaction(xdrString);
+    signedXdr = await walletSignTransaction(xdrString, sender);
   } catch (error: any) {
     throw new Error(`Transaction signature rejected: ${error.message || error}`);
   }
@@ -582,9 +570,7 @@ export async function submitWithdraw(
   merkleRoot: string,
   withdrawalAmount: bigint | string | number
 ): Promise<{ txHash: string }> {
-  if (!POOL_CONTRACT_ID) {
-    throw new Error('POOL_CONTRACT_ID is not defined.');
-  }
+  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   // 1. Inputs validation
   if (!recipient || !StrKey.isValidEd25519PublicKey(recipient)) {
@@ -725,6 +711,7 @@ export async function getTokenBalance(
     return BigInt(0);
   }
 
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
   const dummyAccount = getDummyAccount();
   const contract = new Contract(tokenAddress);
   const userVal = new Address(userAddress).toScVal();
@@ -762,8 +749,9 @@ export async function getTokenBalance(
  * Hackathon Faucet / Fund logic
  */
 export async function fundTestnetUSDC(recipientAddress: string, amount: string = '200') {
+  const { USDC_SAC_ID, USDC_ISSUER_ADDRESS, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
   const issuerSecret = process.env.NEXT_PUBLIC_USDC_ISSUER_SECRET;
-  const issuerAddress = process.env.NEXT_PUBLIC_USDC_ISSUER_ADDRESS;
+  const issuerAddress = USDC_ISSUER_ADDRESS;
 
   if (!issuerSecret || !issuerAddress) {
     throw new Error('USDC Issuer Secret or Address not found in environment');
@@ -852,14 +840,22 @@ export async function fundTestnetUSDC(recipientAddress: string, amount: string =
 
 export async function establishTrustline(userAddress: string, assetCode: string, issuerAddress: string): Promise<string> {
   const { signTransaction } = await import('./stellar');
-  const { Horizon, TransactionBuilder, Asset } = await import('@stellar/stellar-sdk');
+  const { Horizon, TransactionBuilder, Asset, Operation } = await import('@stellar/stellar-sdk');
+  const { STELLAR_HORIZON_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
   const horizon = new Horizon.Server(STELLAR_HORIZON_URL);
   let userAccount;
   try {
     userAccount = await horizon.loadAccount(userAddress);
   } catch (e) {
-    throw new Error('Your Testnet account is not funded with XLM. Please use the Stellar Laboratory Friendbot first.');
+    try {
+      console.log('Account not found, requesting friendbot funding...');
+      const response = await fetch(`https://friendbot.stellar.org/?addr=${userAddress}`);
+      if (!response.ok) throw new Error('Friendbot funding failed');
+      userAccount = await horizon.loadAccount(userAddress);
+    } catch (friendbotErr) {
+      throw new Error('Your Testnet account is not funded with XLM, and automatic funding via Friendbot failed. Please use the Stellar Laboratory Friendbot manually.');
+    }
   }
 
   const asset = new Asset(assetCode, issuerAddress);
@@ -868,18 +864,39 @@ export async function establishTrustline(userAddress: string, assetCode: string,
     fee: BASE_FEE,
     networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
   })
-    .addOperation(Horizon.Operation.changeTrust({
+    .addOperation(Operation.changeTrust({
       asset: asset,
     }))
     .setTimeout(30)
     .build();
 
-  const signedXdr = await signTransaction(transaction.toXDR());
-  const signedTx = TransactionBuilder.fromXDR(signedXdr, STELLAR_NETWORK_PASSPHRASE);
+  console.log('--- DEBUG: ChangeTrust Transaction ---');
+  console.log('Transaction Source Account:', transaction.source);
+  console.log('User Address (from state):', userAddress);
+  console.log('Network Passphrase:', STELLAR_NETWORK_PASSPHRASE);
+  console.log('Asset Code/Issuer:', assetCode, issuerAddress);
   
-  const response = await horizon.submitTransaction(signedTx as any);
-  if (!response.successful) {
-    throw new Error('Failed to establish trustline');
+  const signedXdr = await signTransaction(transaction.toXDR(), userAddress);
+  const signedTx = TransactionBuilder.fromXDR(signedXdr, STELLAR_NETWORK_PASSPHRASE) as any;
+  
+  console.log('Reconstructed Tx Source:', signedTx.source);
+  console.log('Reconstructed Tx Signatures Count:', signedTx.signatures?.length);
+  if (signedTx.signatures?.length > 0) {
+    console.log('Signature Hint:', signedTx.signatures[0].hint().toString('hex'));
   }
-  return response.hash;
+  console.log('--------------------------------------');
+  
+  try {
+    const response = await horizon.submitTransaction(signedTx as any);
+    if (!response.successful) {
+      throw new Error('Failed to establish trustline');
+    }
+    return response.hash;
+  } catch (err: any) {
+    if (err.response && err.response.data && err.response.data.extras && err.response.data.extras.result_codes) {
+      const codes = err.response.data.extras.result_codes;
+      throw new Error(`Horizon rejected ChangeTrust: ${codes.transaction} / ${codes.operations ? codes.operations.join(', ') : ''}`);
+    }
+    throw err;
+  }
 }

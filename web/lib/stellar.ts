@@ -3,6 +3,7 @@ import { defaultModules } from '@creit.tech/stellar-wallets-kit/modules/utils';
 import { Networks } from '@creit.tech/stellar-wallets-kit';
 import { isConnected } from '@stellar/freighter-api';
 import { StrKey } from '@stellar/stellar-sdk';
+import { useStore } from '../store/useStore';
 
 const isBrowser = typeof window !== 'undefined';
 
@@ -88,7 +89,7 @@ export async function getPublicKey(): Promise<string> {
   }
 }
 
-export async function signTransaction(xdr: string): Promise<string> {
+export async function signTransaction(xdr: string, accountToSign?: string): Promise<string> {
   if (!isBrowser) {
     throw new Error('Signing is only supported in the browser.');
   }
@@ -104,9 +105,16 @@ export async function signTransaction(xdr: string): Promise<string> {
     }
   }
 
-  const result = await StellarWalletsKit.signTransaction(xdr, {
-    networkPassphrase: 'Testnet Public Stellar Network ; September 2015',
-  });
+  const config = useStore.getState().config;
+  const options: any = {
+    network: Networks.TESTNET,
+    networkPassphrase: config?.STELLAR_NETWORK_PASSPHRASE || 'Test SDF Network ; September 2015',
+  };
+  if (accountToSign) {
+    options.accountToSign = accountToSign;
+  }
+  
+  const result = await StellarWalletsKit.signTransaction(xdr, options);
 
   if (!result.signedTxXdr) {
     throw new Error('Transaction signing failed: returned XDR is empty.');

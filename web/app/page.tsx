@@ -7,7 +7,6 @@ import { Badge } from '../components/ui/Badge';
 import { TransactionDetailModal } from '../components/ui/TransactionDetailModal';
 
 import { getTokenBalance, fundTestnetUSDC, establishTrustline } from '../lib/contracts';
-import { USDC_SAC_ID, EURC_SAC_ID } from '../lib/constants';
 
 export default function Home() {
   const [filter, setFilter] = useState<'all' | 'swaps' | 'payroll'>('all');
@@ -22,6 +21,7 @@ export default function Home() {
   const fetchPoolState = useStore((state) => state.fetchPoolState);
   const notes = useStore((state) => state.notes);
   const transactions = useStore((state) => state.transactions);
+  const config = useStore((state) => state.config);
 
   const isConnected = status === 'connected';
 
@@ -43,18 +43,17 @@ export default function Home() {
       const txHash = await fundTestnetUSDC(address, '200');
       setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
       
-      // Update balances
-      if (!USDC_SAC_ID) {
+      if (!config?.USDC_SAC_ID) {
         setBalances((prev) => ({ ...prev, USDC: prev.USDC + 200 }));
       } else {
-        const balance = await getTokenBalance(address, USDC_SAC_ID);
+        const balance = await getTokenBalance(address, config.USDC_SAC_ID);
         setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
       }
     } catch (e: any) {
       if (e.message === 'TRUSTLINE_MISSING') {
         try {
           setFundError('Trustline missing. Please sign the transaction in Freighter to add USDC to your wallet!');
-          const issuerAddress = process.env.NEXT_PUBLIC_USDC_ISSUER_ADDRESS || 'GCUSVTVSWAHQMDO2KQC5H2TC6RCB7UNRQ5YD3XCPTNSCYWIQYMPN6VVX';
+          const issuerAddress = config?.USDC_ISSUER_ADDRESS || 'GCUSVTVSWAHQMDO2KQC5H2TC6RCB7UNRQ5YD3XCPTNSCYWIQYMPN6VVX';
           await establishTrustline(address, 'USDC', issuerAddress);
           
           setFundError('Trustline established! Funding your wallet now...');
@@ -62,8 +61,8 @@ export default function Home() {
           setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
           setFundError(null);
           
-          if (USDC_SAC_ID) {
-            const balance = await getTokenBalance(address, USDC_SAC_ID);
+          if (config?.USDC_SAC_ID) {
+            const balance = await getTokenBalance(address, config.USDC_SAC_ID);
             setBalances((prev) => ({ ...prev, USDC: Number(balance) / 10_000_000 }));
           }
         } catch (trustlineErr: any) {
@@ -88,8 +87,8 @@ export default function Home() {
 
           // Fetch balances from on-chain
           // In mock mode, getTokenBalance handles undefined SAC IDs
-          const usdcBal = await getTokenBalance(address, USDC_SAC_ID || '');
-          const eurcBal = await getTokenBalance(address, EURC_SAC_ID || '');
+          const usdcBal = await getTokenBalance(address, config?.USDC_SAC_ID || '');
+          const eurcBal = await getTokenBalance(address, config?.EURC_SAC_ID || '');
           setBalances({
             USDC: Number(usdcBal) / 10_000_000,
             EURC: Number(eurcBal) / 10_000_000,
