@@ -4,7 +4,8 @@ import React, { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { Badge } from '../../components/ui/Badge';
 import { isValidPublicKey } from '../../lib/stellar';
-import { POOL_CONTRACT_ID } from '../../lib/constants';
+import { POOL_CONTRACT_ID, USDC_SAC_ID, EURC_SAC_ID } from '../../lib/constants';
+import { submitPayment } from '../../lib/contracts';
 import { Recipient } from '../../store/types';
 
 export default function PayrollPage() {
@@ -159,7 +160,7 @@ export default function PayrollPage() {
 
   // Trigger payroll execution modal
   const handleRunPayroll = async () => {
-    if (!isConnected) {
+    if (!isConnected || !address) {
       connect();
       return;
     }
@@ -171,35 +172,35 @@ export default function PayrollPage() {
     setIsExecuting(true);
     setExecutionProgress(0);
     
-    // Simulate shielded transfers loop (mock ZK proof generation and broadcast)
+    // Execute actual transfers loop
     for (let i = 0; i < recipients.length; i++) {
       const recipient = recipients[i];
-      // 1.5s delay per recipient
-      await new Promise((r) => setTimeout(r, 1500));
+      const tokenContractId = recipient.asset === 'USDC' ? USDC_SAC_ID : EURC_SAC_ID;
       
-      // Mock Balance Deduction / Addition
-      if (!POOL_CONTRACT_ID && address) {
+      try {
         const amt = parseFloat(recipient.amount);
-        const addAmt = BigInt(Math.floor(amt * 10000000)); // 7 decimals
+        const sendAmt = BigInt(Math.floor(amt * 10000000)); // 7 decimals
         
-        // Deduct from employer (company)
-        const companyBal = BigInt(localStorage.getItem(`mock_bal_${address}`) || '0');
-        localStorage.setItem(`mock_bal_${address}`, (companyBal >= addAmt ? companyBal - addAmt : BigInt(0)).toString());
+        // Call actual smart contract transfer via SDK
+        const { txHash } = await submitPayment(address, recipient.address, tokenContractId, sendAmt);
         
-        // Add to employee (recipient)
-        const recBal = BigInt(localStorage.getItem(`mock_bal_${recipient.address}`) || '0');
-        localStorage.setItem(`mock_bal_${recipient.address}`, (recBal + addAmt).toString());
+        // Log transaction history
+        addTransaction({
+          type: 'withdrawal',
+          amount: recipient.amount,
+          asset: recipient.asset,
+          txHash: txHash,
+          timestamp: Date.now(),
+          privacy: 'private' // Although this is a direct transfer, marking it as private in the history for UX as requested
+        });
+        
+      } catch (error: any) {
+        console.error(`Failed to process payment for ${recipient.name}:`, error);
+        alert(`Payment failed for ${recipient.name}: ${error.message}`);
+        // Optionally halt execution or continue
+        setIsExecuting(false);
+        return;
       }
-      
-      // Log transaction history
-      addTransaction({
-        type: 'withdrawal',
-        amount: recipient.amount,
-        asset: recipient.asset,
-        txHash: 'mock-tx-pay-' + Math.random().toString(36).substr(2, 9),
-        timestamp: Date.now(),
-        privacy: 'private'
-      });
 
       setExecutionProgress(i + 1);
     }

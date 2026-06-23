@@ -545,13 +545,20 @@ export default function SwapPage() {
         </div>
         <div className="flex items-center gap-3">
           {isConnected && (
-            <button
-              onClick={handleFundTestnet}
-              disabled={isFunding}
-              className="px-4 py-2 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 font-display bg-transparent text-center disabled:opacity-50"
-            >
-              {isFunding ? 'Funding...' : 'Fund USDC'}
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              <button
+                onClick={handleFundTestnet}
+                disabled={isFunding}
+                className="px-3 py-1.5 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[6px] text-[10px] uppercase tracking-wider transition duration-150 font-display bg-transparent disabled:opacity-50"
+              >
+                {isFunding ? 'Funding...' : 'Fund USDC'}
+              </button>
+              {fundError && (
+                <div className="text-red-400 text-[9px] font-bold max-w-[150px] text-right">
+                  {fundError}
+                </div>
+              )}
+            </div>
           )}
           <Link
             href="/swap/history"

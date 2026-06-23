@@ -11,6 +11,11 @@ if [ ! -f "$ENV_FILE" ]; then
   echo "# ZendSwap Testnet Environment Configuration" > "$ENV_FILE"
 fi
 
+# Load env so we know if they are deployed
+if [ -f "$ENV_FILE" ]; then
+  source "$ENV_FILE"
+fi
+
 update_env() {
   local key=$1
   local val=$2
@@ -23,12 +28,12 @@ update_env() {
 
 generate_and_fund() {
   local alias=$1
-  if ! stellar keys address "$alias" >/dev/null 2>&1; then
+  if ! ./stellar.exe keys address "$alias" >/dev/null 2>&1; then
     echo "Generating and funding account: $alias..."
-    stellar keys generate "$alias" --network testnet --fund
+    ./stellar.exe keys generate "$alias" --network testnet --fund
   else
     local addr
-    addr=$(stellar keys address "$alias")
+    addr=$(./stellar.exe keys address "$alias")
     echo "Account $alias already exists: $addr"
   fi
 }
@@ -41,17 +46,17 @@ generate_and_fund "pool-operator"
 generate_and_fund "test-user"
 
 # Retrieve public keys and secrets
-USDC_ISSUER_ADDRESS=$(stellar keys address usdc-issuer)
-EURC_ISSUER_ADDRESS=$(stellar keys address eurc-issuer)
-ADMIN_ADDRESS=$(stellar keys address admin)
-POOL_OPERATOR_ADDRESS=$(stellar keys address pool-operator)
-TEST_USER_ADDRESS=$(stellar keys address test-user)
+USDC_ISSUER_ADDRESS=$(./stellar.exe keys address usdc-issuer)
+EURC_ISSUER_ADDRESS=$(./stellar.exe keys address eurc-issuer)
+ADMIN_ADDRESS=$(./stellar.exe keys address admin)
+POOL_OPERATOR_ADDRESS=$(./stellar.exe keys address pool-operator)
+TEST_USER_ADDRESS=$(./stellar.exe keys address test-user)
 
-USDC_ISSUER_SECRET=$(stellar keys secret usdc-issuer)
-EURC_ISSUER_SECRET=$(stellar keys secret eurc-issuer)
-ADMIN_SECRET=$(stellar keys secret admin)
-POOL_OPERATOR_SECRET=$(stellar keys secret pool-operator)
-TEST_USER_SECRET=$(stellar keys secret test-user)
+USDC_ISSUER_SECRET=$(./stellar.exe keys secret usdc-issuer)
+EURC_ISSUER_SECRET=$(./stellar.exe keys secret eurc-issuer)
+ADMIN_SECRET=$(./stellar.exe keys secret admin)
+POOL_OPERATOR_SECRET=$(./stellar.exe keys secret pool-operator)
+TEST_USER_SECRET=$(./stellar.exe keys secret test-user)
 
 # Update environment configurations
 update_env "USDC_ISSUER_ADDRESS" "$USDC_ISSUER_ADDRESS"
@@ -66,15 +71,23 @@ update_env "TEST_USER_ADDRESS" "$TEST_USER_ADDRESS"
 update_env "TEST_USER_SECRET" "$TEST_USER_SECRET"
 
 echo "=== Deploying Stellar Asset Contracts ==="
-echo "Deploying/Retrieving SAC for USDC..."
-USDC_SAC_ID=$(stellar contract asset deploy --asset "USDC:$USDC_ISSUER_ADDRESS" --network testnet --source admin)
-echo "USDC SAC ID: $USDC_SAC_ID"
-update_env "USDC_SAC_ID" "$USDC_SAC_ID"
+if [ -z "$USDC_SAC_ID" ]; then
+  echo "Deploying/Retrieving SAC for USDC..."
+  USDC_SAC_ID=$(./stellar.exe contract asset deploy --asset "USDC:$USDC_ISSUER_ADDRESS" --network testnet --source-account admin)
+  echo "USDC SAC ID: $USDC_SAC_ID"
+  update_env "USDC_SAC_ID" "$USDC_SAC_ID"
+else
+  echo "USDC SAC already deployed: $USDC_SAC_ID"
+fi
 
-echo "Deploying/Retrieving SAC for EURC..."
-EURC_SAC_ID=$(stellar contract asset deploy --asset "EURC:$EURC_ISSUER_ADDRESS" --network testnet --source admin)
-echo "EURC SAC ID: $EURC_SAC_ID"
-update_env "EURC_SAC_ID" "$EURC_SAC_ID"
+if [ -z "$EURC_SAC_ID" ]; then
+  echo "Deploying/Retrieving SAC for EURC..."
+  EURC_SAC_ID=$(./stellar.exe contract asset deploy --asset "EURC:$EURC_ISSUER_ADDRESS" --network testnet --source-account admin)
+  echo "EURC SAC ID: $EURC_SAC_ID"
+  update_env "EURC_SAC_ID" "$EURC_SAC_ID"
+else
+  echo "EURC SAC already deployed: $EURC_SAC_ID"
+fi
 
 # Function to check if a trustline exists on testnet
 has_trustline() {
@@ -95,31 +108,31 @@ echo "=== Establishing Trustlines ==="
 # Pool Operator trustlines
 if ! has_trustline "$POOL_OPERATOR_ADDRESS" "USDC" "$USDC_ISSUER_ADDRESS"; then
   echo "Creating trustline for pool-operator to USDC..."
-  stellar tx new change-trust --source-account pool-operator --line "USDC:$USDC_ISSUER_ADDRESS" --network testnet \
-    | stellar tx sign --source pool-operator --network testnet \
-    | stellar tx send --network testnet
+  ./stellar.exe tx new change-trust --source-account pool-operator --line "USDC:$USDC_ISSUER_ADDRESS" --network testnet --build-only \
+    | ./stellar.exe tx sign --sign-with-key pool-operator --network testnet \
+    | ./stellar.exe tx send --network testnet
 fi
 
 if ! has_trustline "$POOL_OPERATOR_ADDRESS" "EURC" "$EURC_ISSUER_ADDRESS"; then
   echo "Creating trustline for pool-operator to EURC..."
-  stellar tx new change-trust --source-account pool-operator --line "EURC:$EURC_ISSUER_ADDRESS" --network testnet \
-    | stellar tx sign --source pool-operator --network testnet \
-    | stellar tx send --network testnet
+  ./stellar.exe tx new change-trust --source-account pool-operator --line "EURC:$EURC_ISSUER_ADDRESS" --network testnet --build-only \
+    | ./stellar.exe tx sign --sign-with-key pool-operator --network testnet \
+    | ./stellar.exe tx send --network testnet
 fi
 
 # Test User trustlines
 if ! has_trustline "$TEST_USER_ADDRESS" "USDC" "$USDC_ISSUER_ADDRESS"; then
   echo "Creating trustline for test-user to USDC..."
-  stellar tx new change-trust --source-account test-user --line "USDC:$USDC_ISSUER_ADDRESS" --network testnet \
-    | stellar tx sign --source test-user --network testnet \
-    | stellar tx send --network testnet
+  ./stellar.exe tx new change-trust --source-account test-user --line "USDC:$USDC_ISSUER_ADDRESS" --network testnet --build-only \
+    | ./stellar.exe tx sign --sign-with-key test-user --network testnet \
+    | ./stellar.exe tx send --network testnet
 fi
 
 if ! has_trustline "$TEST_USER_ADDRESS" "EURC" "$EURC_ISSUER_ADDRESS"; then
   echo "Creating trustline for test-user to EURC..."
-  stellar tx new change-trust --source-account test-user --line "EURC:$EURC_ISSUER_ADDRESS" --network testnet \
-    | stellar tx sign --source test-user --network testnet \
-    | stellar tx send --network testnet
+  ./stellar.exe tx new change-trust --source-account test-user --line "EURC:$EURC_ISSUER_ADDRESS" --network testnet --build-only \
+    | ./stellar.exe tx sign --sign-with-key test-user --network testnet \
+    | ./stellar.exe tx send --network testnet
 fi
 
 # Function to get balance
@@ -128,7 +141,7 @@ get_balance() {
   local code=$2
   local issuer=$3
   curl -s "https://horizon-testnet.stellar.org/accounts/$addr" \
-    | jq -r ".balances[] | select(.asset_code==\"$code\" and .asset_issuer==\"$issuer\") | .balance" 2>/dev/null
+    | "C:/Users/TCE HUB/AppData/Local/Microsoft/WinGet/Packages/jqlang.jq_Microsoft.Winget.Source_8wekyb3d8bbwe/jq.exe" -r ".balances[] | select(.asset_code==\"$code\" and .asset_issuer==\"$issuer\") | .balance" 2>/dev/null
 }
 
 mint_if_needed() {
@@ -147,14 +160,15 @@ mint_if_needed() {
   
   if [ "$balance_int" -lt "$amount" ]; then
     echo "Minting $amount $code to $recipient_addr (current: $balance)..."
-    stellar tx new payment \
+    ./stellar.exe tx new payment \
       --source-account "$issuer_alias" \
       --destination "$recipient_addr" \
       --amount "$amount" \
       --asset "$code:$issuer_addr" \
       --network testnet \
-      | stellar tx sign --source "$issuer_alias" --network testnet \
-      | stellar tx send --network testnet
+      --build-only \
+      | ./stellar.exe tx sign --sign-with-key "$issuer_alias" --network testnet \
+      | ./stellar.exe tx send --network testnet
   else
     echo "$code balance for $recipient_addr is sufficient ($balance)."
   fi

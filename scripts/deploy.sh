@@ -24,17 +24,17 @@ update_env() {
 }
 
 echo "=== Building Contracts ==="
-(cd contracts && cargo rustc -p ultrahonk-verifier --target wasm32v1-none --release -- --crate-type=cdylib)
-(cd contracts && cargo rustc -p zendswap-pool --target wasm32v1-none --release -- --crate-type=cdylib)
+(cd contracts && cargo build --target wasm32v1-none --release -p ultrahonk-verifier)
+(cd contracts && cargo build --target wasm32v1-none --release -p zendswap-pool)
 
 echo "=== Deploying ultrahonk-verifier ==="
 if [ -n "$VERIFIER_CONTRACT_ID" ]; then
   echo "Verifier contract already deployed at: $VERIFIER_CONTRACT_ID"
 else
   echo "Deploying ultrahonk-verifier contract to testnet..."
-  VERIFIER_CONTRACT_ID=$(stellar contract deploy \
+  VERIFIER_CONTRACT_ID=$(./stellar.exe contract deploy \
     --wasm contracts/target/wasm32v1-none/release/ultrahonk_verifier.wasm \
-    --source admin \
+    --source-account admin \
     --network testnet)
   echo "Deployed Verifier Contract ID: $VERIFIER_CONTRACT_ID"
   update_env "VERIFIER_CONTRACT_ID" "$VERIFIER_CONTRACT_ID"
@@ -45,9 +45,9 @@ if [ -n "$POOL_CONTRACT_ID" ]; then
   echo "Pool contract already deployed at: $POOL_CONTRACT_ID"
 else
   echo "Deploying zendswap-pool contract to testnet..."
-  POOL_CONTRACT_ID=$(stellar contract deploy \
+  POOL_CONTRACT_ID=$(./stellar.exe contract deploy \
     --wasm contracts/target/wasm32v1-none/release/zendswap_pool.wasm \
-    --source admin \
+    --source-account admin \
     --network testnet)
   echo "Deployed Pool Contract ID: $POOL_CONTRACT_ID"
   update_env "POOL_CONTRACT_ID" "$POOL_CONTRACT_ID"
@@ -57,8 +57,8 @@ fi
 is_initialized() {
   local pool_id=$1
   local info
-  info=$(stellar contract invoke --id "$pool_id" --network testnet -- get_pool_info 2>/dev/null)
-  if [ $? -eq 0 ] && echo "$info" | jq -e '.current_rate != 0' >/dev/null 2>&1; then
+  info=$(./stellar.exe contract invoke --id "$pool_id" --source-account admin --network testnet -- get_pool_info 2>/dev/null)
+  if [ $? -eq 0 ] && echo "$info" | "C:/Users/TCE HUB/AppData/Local/Microsoft/WinGet/Packages/jqlang.jq_Microsoft.Winget.Source_8wekyb3d8bbwe/jq.exe" -e '.current_rate != 0' >/dev/null 2>&1; then
     return 0
   else
     return 1
@@ -70,9 +70,9 @@ if is_initialized "$POOL_CONTRACT_ID"; then
   echo "Pool contract is already initialized."
 else
   echo "Initializing pool contract..."
-  stellar contract invoke \
+  ./stellar.exe contract invoke \
     --id "$POOL_CONTRACT_ID" \
-    --source admin \
+    --source-account admin \
     --network testnet \
     -- \
     initialize \
