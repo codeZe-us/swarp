@@ -10,8 +10,9 @@
  * Toolchain: @noir-lang/noir_js 1.0.0-beta.9 + @aztec/bb.js 0.87.0
  */
 
+import './worker-globals';
 import { Noir } from '@noir-lang/noir_js';
-import { UltraHonkBackend } from '@aztec/bb.js';
+import { UltraHonkBackend } from '@aztec/bb.js/dest/browser/index.js';
 
 export interface SwapProverInput {
   // Private inputs
