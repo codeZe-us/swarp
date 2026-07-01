@@ -1053,7 +1053,7 @@ mod tests {
         let usdc_addr = usdc_sac.address();
         let eurc_addr = eurc_sac.address();
 
-        let verifier = env.register(ultrahonk_verifier::UltraHonkVerifierContract, ());
+        let verifier = env.register(mock_verifier::MockVerifier, ());
 
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(env, &contract_id);
@@ -1403,7 +1403,7 @@ mod tests {
         let info = client.get_pool_info();
         assert_eq!(info.usdc_reserve, 0);
         assert_eq!(info.eurc_reserve, 0);
-        assert_eq!(info.current_rate, 9_200_000);
+        assert_eq!(info.current_rate, 0); // Deprecated in PoolInfo
         assert_eq!(info.rate_denominator, 10_000_000);
         assert_eq!(info.total_deposits, 0);
         assert_eq!(info.current_root, client.get_root());
@@ -1426,7 +1426,7 @@ mod tests {
         let usdc_addr = usdc_sac.address();
         let eurc_addr = eurc_sac.address();
 
-        let verifier = env.register(ultrahonk_verifier::UltraHonkVerifierContract, ());
+        let verifier = env.register(mock_verifier::MockVerifier, ());
 
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(&env, &contract_id);
