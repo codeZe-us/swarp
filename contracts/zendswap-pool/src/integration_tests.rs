@@ -6,6 +6,7 @@ use soroban_sdk::{Address, Bytes, BytesN, Env, Vec};
 
 fn setup_integration_test(
     env: &Env,
+    use_real_verifier: bool,
 ) -> (
     ZendSwapPoolClient<'_>,
     Address,
@@ -21,7 +22,11 @@ fn setup_integration_test(
     let usdc_addr = usdc_sac.address();
     let eurc_addr = eurc_sac.address();
 
-    let verifier = env.register(mock_verifier::MockVerifier, ());
+    let verifier = if use_real_verifier {
+        env.register(ultrahonk_verifier::UltraHonkVerifierContract, ())
+    } else {
+        env.register(mock_verifier::MockVerifier, ())
+    };
 
     let contract_id = env.register(ZendSwapPool, ());
     let client = ZendSwapPoolClient::new(env, &contract_id);
@@ -51,7 +56,7 @@ fn test_integration_usdc_to_eurc_swap() {
     #[allow(deprecated)]
     env.budget().reset_unlimited();
 
-    let (client, usdc_addr, eurc_addr, depositor, contract_id, _) = setup_integration_test(&env);
+    let (client, usdc_addr, eurc_addr, depositor, contract_id, _) = setup_integration_test(&env, false);
 
     let usdc_client = TokenClient::new(&env, &usdc_addr);
     let eurc_client = TokenClient::new(&env, &eurc_addr);
@@ -108,7 +113,7 @@ fn test_integration_eurc_to_usdc_swap() {
     #[allow(deprecated)]
     env.budget().reset_unlimited();
 
-    let (client, usdc_addr, eurc_addr, depositor, contract_id, _) = setup_integration_test(&env);
+    let (client, usdc_addr, eurc_addr, depositor, contract_id, _) = setup_integration_test(&env, false);
 
     let usdc_client = TokenClient::new(&env, &usdc_addr);
     let eurc_client = TokenClient::new(&env, &eurc_addr);
@@ -166,9 +171,9 @@ fn test_integration_multiple_users_isolation() {
     env.budget().reset_unlimited();
 
     let (client_a, usdc_addr, eurc_addr, depositor_a, _contract_a, _) =
-        setup_integration_test(&env);
+        setup_integration_test(&env, false);
 
-    let verifier = env.register(ultrahonk_verifier::UltraHonkVerifierContract, ());
+    let verifier = env.register(mock_verifier::MockVerifier, ());
     let admin_b = Address::generate(&env);
     let contract_b = env.register(ZendSwapPool, ());
     let client_b = ZendSwapPoolClient::new(&env, &contract_b);
@@ -221,7 +226,7 @@ fn test_integration_double_spend_fails() {
     #[allow(deprecated)]
     env.budget().reset_unlimited();
 
-    let (client, _usdc_addr, _eurc_addr, depositor, _, _) = setup_integration_test(&env);
+    let (client, _usdc_addr, _eurc_addr, depositor, _, _) = setup_integration_test(&env, false);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
     client.deposit(&depositor, &0, &500, &commitment);
@@ -245,7 +250,7 @@ fn test_integration_wrong_merkle_root_fails() {
     #[allow(deprecated)]
     env.budget().reset_unlimited();
 
-    let (client, _usdc_addr, _eurc_addr, depositor, _, _) = setup_integration_test(&env);
+    let (client, _usdc_addr, _eurc_addr, depositor, _, _) = setup_integration_test(&env, false);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
     client.deposit(&depositor, &0, &500, &commitment);
@@ -276,7 +281,7 @@ fn test_integration_wrong_rate_fails() {
     #[allow(deprecated)]
     env.budget().reset_unlimited();
 
-    let (client, _usdc_addr, _eurc_addr, depositor, _, admin) = setup_integration_test(&env);
+    let (client, _usdc_addr, _eurc_addr, depositor, _, admin) = setup_integration_test(&env, false);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
     client.deposit(&depositor, &0, &500, &commitment);
@@ -371,7 +376,7 @@ fn test_integration_insufficient_pool_reserves_fails() {
     let usdc_addr = usdc_sac.address();
     let eurc_addr = eurc_sac.address();
 
-    let verifier = env.register(ultrahonk_verifier::UltraHonkVerifierContract, ());
+    let verifier = env.register(mock_verifier::MockVerifier, ());
 
     let contract_id = env.register(ZendSwapPool, ());
     let client = ZendSwapPoolClient::new(&env, &contract_id);
@@ -405,7 +410,7 @@ fn test_integration_deposit_unsupported_token_fails() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let (client, _, _, depositor, _, _) = setup_integration_test(&env);
+    let (client, _, _, depositor, _, _) = setup_integration_test(&env, true);
 
     let _fake_token = Address::generate(&env);
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
@@ -421,7 +426,7 @@ fn test_integration_garbage_proof_fails_no_panic() {
     #[allow(deprecated)]
     env.budget().reset_unlimited();
 
-    let (client, _usdc_addr, _eurc_addr, depositor, _, _) = setup_integration_test(&env);
+    let (client, _usdc_addr, _eurc_addr, depositor, _, _) = setup_integration_test(&env, false);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
     client.deposit(&depositor, &0, &500, &commitment);
