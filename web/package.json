@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node patch-bb.js && node build-worker.js && next dev --webpack",
-    "build": "node patch-bb.js && node build-worker.js && next build",
+    "build": "node patch-bb.js && node build-worker.js && next build --webpack",
     "start": "next start --webpack",
     "lint": "eslint",
     "postinstall": "node patch-bb.js"

@@ -1163,6 +1163,8 @@ export default function SwapPage() {
 
             <p className="text-[10px] text-mutedText/60 text-center mt-4 leading-relaxed font-semibold max-w-sm mx-auto">
               Zero-knowledge proof generation and validation are run locally in the browser before submitting to Soroban.
+              <br /><br />
+              <span className="text-amber-500/80">Note: The deposit asset type will be revealed when you withdraw. The amount stays private.</span>
             </p>
           </div>
         </div>

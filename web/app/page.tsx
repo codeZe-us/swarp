@@ -27,7 +27,7 @@ export default function Home() {
   const isConnected = status === 'connected';
 
   // Balances state
-  const [balances, setBalances] = useState({ USDC: 0, EURC: 0, MGUSD: 0, YLDS: 0 });
+  const [balances, setBalances] = useState({ USDC: 0, EURC: 0, MGUSD: 0, YLDS: 0, XLM: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch balances and pool state on connection
@@ -42,12 +42,14 @@ export default function Home() {
           const eurcBal = await getTokenBalance(address, config?.EURC_SAC_ID || '');
           const mgusdBal = await getTokenBalance(address, config?.MGUSD_SAC_ID || '');
           const yldsBal = await getTokenBalance(address, config?.YLDS_SAC_ID || '');
+          const xlmBal = await getTokenBalance(address, config?.XLM_SAC_ID || '');
           
           setBalances({
             USDC: Number(usdcBal) / 10_000_000,
             EURC: Number(eurcBal) / 10_000_000,
             MGUSD: Number(mgusdBal) / 10_000_000,
             YLDS: Number(yldsBal) / 10_000_000,
+            XLM: Number(xlmBal) / 10_000_000,
           });
         } catch (e) {
           console.warn('Failed to load live data:', e);
@@ -61,7 +63,7 @@ export default function Home() {
       return () => clearInterval(interval);
     } else {
       setIsLoading(false);
-      setBalances({ USDC: 0, EURC: 0, MGUSD: 0, YLDS: 0 });
+      setBalances({ USDC: 0, EURC: 0, MGUSD: 0, YLDS: 0, XLM: 0 });
     }
   }, [isConnected, address, fetchPoolState, config]);
 
@@ -70,7 +72,8 @@ export default function Home() {
   const decimalRate = rateNum / rateDen;
 
   const eurcUsdVal = balances.EURC / decimalRate;
-  const totalValue = balances.USDC + eurcUsdVal + balances.MGUSD + balances.YLDS;
+  const xlmUsdVal = balances.XLM * 0.08;
+  const totalValue = balances.USDC + eurcUsdVal + balances.MGUSD + balances.YLDS + xlmUsdVal;
 
   const activeNotes = useMemo(() => notes.filter((n) => n.status === 'deposited'), [notes]);
   
@@ -79,6 +82,7 @@ export default function Home() {
     return activeNotes.reduce((sum, note) => {
       const val = Number(note.amount) / 10_000_000;
       if (note.asset === 'EURC') return sum + val / decimalRate;
+      if (note.asset === 'XLM') return sum + val * 0.08;
       return sum + val; // treating MGUSD, USDC, YLDS as 1:1 for display pool value
     }, 0);
   }, [activeNotes, decimalRate]);
@@ -189,10 +193,17 @@ export default function Home() {
             </div>
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">EURC</span>
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">MGUSD</span>
             <div>
-              <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.EURC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-              <div className="text-[13px] text-gray-500">≈ ${eurcUsdVal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+              <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div className="text-[13px] text-gray-500">≈ ${balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            </div>
+          </div>
+          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">XLM</span>
+            <div>
+              <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.XLM.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div className="text-[13px] text-gray-500">≈ ${(balances.XLM * 0.08).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
             </div>
           </div>
           <div className="p-6 md:p-8 flex-1 flex flex-col justify-between">

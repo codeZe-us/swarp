@@ -70,7 +70,7 @@ self.onmessage = async (event: MessageEvent<ProverWorkerMessage>) => {
       asset_in:          input.asset_in,
       asset_out:         input.asset_out,
       path_elements:     input.path_elements,
-      path_indices:      input.path_indices.map(x => x.toString()),
+      path_indices:      input.path_indices.map((x: number) => x.toString()),
       exchange_rate:     input.exchange_rate,
       rate_denominator:  input.rate_denominator,
       nullifier_hash:    input.nullifier_hash,

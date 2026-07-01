@@ -10,12 +10,13 @@ import { Note } from '../store/types';
  */
 export function createNote(
   amount: bigint,
-  assetId: number, // 0 for USDC, 1 for EURC
+  assetId: number, // 0-4 for USDC, EURC, MGUSD, YLDS, XLM
   secret?: bigint
 ): Note {
   const secretVal = secret ?? generateSecret();
   const commitment = poseidon2Hash([amount, BigInt(assetId), secretVal]);
-  const assetName: 'USDC' | 'EURC' = assetId === 0 ? 'USDC' : 'EURC';
+  const ASSET_CODES = ['USDC', 'EURC', 'MGUSD', 'YLDS', 'XLM'];
+  const assetName = ASSET_CODES[assetId] || 'UNKNOWN';
 
   // Support environments without window.crypto.randomUUID
   const id = typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID
