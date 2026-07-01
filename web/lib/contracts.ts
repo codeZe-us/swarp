@@ -134,7 +134,7 @@ function getDummyAccount(): Account {
  * Read-only getters
  */
 
-export async function getPoolInfo(): Promise<{
+export async function getPoolInfo(poolContractIdOverride?: string): Promise<{
   usdcReserve: bigint;
   eurcReserve: bigint;
   currentRate: number;
@@ -142,7 +142,9 @@ export async function getPoolInfo(): Promise<{
   totalDeposits: number;
   currentRoot: string;
 }> {
-  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
+  const config = getConfig();
+  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -178,8 +180,10 @@ export async function getPoolInfo(): Promise<{
   };
 }
 
-export async function getMerkleRoot(): Promise<string> {
-  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
+export async function getMerkleRoot(poolContractIdOverride?: string): Promise<string> {
+  const config = getConfig();
+  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -208,8 +212,10 @@ export async function getMerkleRoot(): Promise<string> {
   return Buffer.from(rootBytes).toString('hex');
 }
 
-export async function getRate(assetInId: number, assetOutId: number): Promise<{ numerator: number; denominator: number }> {
-  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
+export async function getRate(assetInId: number, assetOutId: number, poolContractIdOverride?: string): Promise<{ numerator: number; denominator: number }> {
+  const config = getConfig();
+  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -246,8 +252,10 @@ export async function getRate(assetInId: number, assetOutId: number): Promise<{ 
   return { numerator, denominator };
 }
 
-export async function getLeaf(index: number): Promise<string> {
-  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
+export async function getLeaf(index: number, poolContractIdOverride?: string): Promise<string> {
+  const config = getConfig();
+  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -276,8 +284,10 @@ export async function getLeaf(index: number): Promise<string> {
   return Buffer.from(leafBytes).toString('hex');
 }
 
-export async function getLeafCount(): Promise<number> {
-  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
+export async function getLeafCount(poolContractIdOverride?: string): Promise<number> {
+  const config = getConfig();
+  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -306,8 +316,10 @@ export async function getLeafCount(): Promise<number> {
   return typeof count === 'bigint' ? Number(count) : Number(count);
 }
 
-export async function getReserves(): Promise<bigint[]> {
-  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
+export async function getReserves(poolContractIdOverride?: string): Promise<bigint[]> {
+  const config = getConfig();
+  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
 
   const dummyAccount = getDummyAccount();
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -639,9 +651,12 @@ export async function submitWithdraw(
   proof: string,
   nullifier: string,
   merkleRoot: string,
-  withdrawalAmount: bigint | string | number
+  withdrawalAmount: bigint | string | number,
+  poolContractIdOverride?: string
 ): Promise<{ txHash: string }> {
-  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
+  const config = getConfig();
+  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
 
   // 1. Inputs validation
   if (!recipient || !StrKey.isValidEd25519PublicKey(recipient)) {

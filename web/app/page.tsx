@@ -193,10 +193,24 @@ export default function Home() {
             </div>
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">EURC</span>
+            <div>
+              <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.EURC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div className="text-[13px] text-gray-500">≈ ${(balances.EURC / decimalRate).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            </div>
+          </div>
+          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">MGUSD</span>
             <div>
               <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
               <div className="text-[13px] text-gray-500">≈ ${balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            </div>
+          </div>
+          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">YLDS</span>
+            <div>
+              <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.YLDS.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+              <div className="text-[13px] text-gray-500">≈ ${balances.YLDS.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
             </div>
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
@@ -240,7 +254,8 @@ export default function Home() {
                 USDC: '#FFFFFF',
                 EURC: '#7C3AED',
                 MGUSD: '#A874F5',
-                YLDS: '#06B6D4'
+                YLDS: '#06B6D4',
+                XLM: '#10B981'
               };
               
               const color = hexColors[item.asset] || '#6B7280';

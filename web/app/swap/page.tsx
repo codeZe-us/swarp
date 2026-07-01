@@ -10,7 +10,7 @@ import { reconstructCommitments } from '../../lib/events';
 import { buildTree, getProof, verifyProof, computeRootFromPath } from '../../lib/merkle';
 import { generateSwapProof, SwapProofInput } from '../../lib/prover';
 import { ASSETS, getAssetByCode, getAssetById } from '../../lib/assets';
-import { getRate } from '../../lib/contracts';
+import { getRate, getReserves, getMerkleRoot } from '../../lib/contracts';
 import { formatProofForContract } from '../../lib/proof-formatter';
 
 export default function SwapPage() {
@@ -259,7 +259,8 @@ export default function SwapPage() {
         console.warn(`MOCK MODE: Token contract for ${assetInCode} is not configured.`);
       }
 
-      const note = createNote(amountBigInt, assetId);
+      const poolContractId = (config as any)?.POOL_CONTRACT_ID;
+      const note = createNote(amountBigInt, assetId, poolContractId);
 
       // note.commitment is stored as a decimal BigInt string from poseidon2Hash.
       // submitDeposit() expects a 64-char hex string for encoding as bytes32.
@@ -374,13 +375,12 @@ export default function SwapPage() {
       const withdrawAsset = getAssetByCode(withdrawAssetOutCode);
       if (!depositAsset || !withdrawAsset) throw new Error('Invalid asset');
       
-      const withdrawRate = await getRate(depositAsset.id, withdrawAsset.id);
+      const withdrawRate = await getRate(depositAsset.id, withdrawAsset.id, note.poolContractId);
       const withdrawAmountBig = (depositAmountBig * BigInt(withdrawRate.numerator)) / BigInt(withdrawRate.denominator);
 
-      // Read reserves from Zanzibar pool state
-      const reservesStr = useStore.getState().reserves || [];
-      const reserveAvailableStr = reservesStr[withdrawAsset.id] || '0';
-      const reserveAvailable = BigInt(reserveAvailableStr);
+      // Read reserves directly for the pool
+      const poolReserves = await getReserves(note.poolContractId);
+      const reserveAvailable = poolReserves.length > withdrawAsset.id ? poolReserves[withdrawAsset.id] : BigInt(0);
 
       if (reserveAvailable < withdrawAmountBig) {
         throw new Error(
@@ -399,9 +399,9 @@ export default function SwapPage() {
       // Step 1: Fetching pool state
       // -------------------------------------------------------------
       setWithdrawStep(1);
-      // Fetch latest roots and leaves from contract
-      await fetchPoolState();
-      const currentRoot = useStore.getState().merkleRoot;
+      // We don't call fetchPoolState() here as it updates the global store, 
+      // instead we just query the root directly for the specific pool.
+      const currentRoot = await getMerkleRoot(note.poolContractId);
       // merkleRoot is plain 64-char hex (no 0x). Empty string or all-zeros means not initialized.
       if (!currentRoot || /^0+$/.test(currentRoot)) {
         throw new Error('Could not fetch active Merkle root from chain.');
@@ -411,8 +411,8 @@ export default function SwapPage() {
       // Step 2: Building Merkle proof
       // -------------------------------------------------------------
       setWithdrawStep(2);
-      // Reconstruct leaf array from historical commitment events
-      const leaves = await reconstructCommitments();
+      // Reconstruct leaf array from historical commitment events for the specific pool
+      const leaves = await reconstructCommitments(note.poolContractId);
       
       const commitmentBig = BigInt(note.commitment);
       // Always look up commitment in event-reconstructed leaves — the stored
@@ -507,7 +507,8 @@ export default function SwapPage() {
         proofHex,
         nullifierBig.toString(16).padStart(64, '0'),
         rootBigInt.toString(16).padStart(64, '0'),
-        withdrawAmountBig.toString()
+        withdrawAmountBig.toString(),
+        note.poolContractId
       );
 
       // -------------------------------------------------------------
@@ -952,7 +953,14 @@ export default function SwapPage() {
 
                       {isWithdrawDropdownOpen && (
                         <div className="absolute left-0 right-0 mt-2 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display max-h-48 overflow-y-auto">
-                          {ASSETS.map((asset) => (
+                          {ASSETS.filter((asset) => {
+                            const note = notes.find(n => n.id === selectedNoteId);
+                            const legacyPoolId = (config as any)?.LEGACY_POOL_CONTRACT_ID;
+                            if (note && note.poolContractId === legacyPoolId) {
+                              return asset.code === 'USDC' || asset.code === 'EURC';
+                            }
+                            return true;
+                          }).map((asset) => (
                             <button
                               key={asset.code}
                               onClick={() => {

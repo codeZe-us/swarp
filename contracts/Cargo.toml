@@ -3,6 +3,9 @@ resolver = "2"
 members = [
     "ultrahonk-verifier",
     "zendswap-pool",
+    "ultrahonk-verifier-multi",
+    "zendswap-pool-multi",
+    "mock-verifier",
 ]
 
 [workspace.dependencies]

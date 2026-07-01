@@ -9,6 +9,7 @@ export interface Note {
   withdrawTxHash: string | null;
   status: 'created' | 'pending' | 'deposited' | 'withdrawn';
   createdAt: number;
+  poolContractId?: string;
 }
 
 export interface Transaction {

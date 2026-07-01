@@ -11,6 +11,7 @@ import { Note } from '../store/types';
 export function createNote(
   amount: bigint,
   assetId: number, // 0-4 for USDC, EURC, MGUSD, YLDS, XLM
+  poolContractId?: string,
   secret?: bigint
 ): Note {
   const secretVal = secret ?? generateSecret();
@@ -34,6 +35,7 @@ export function createNote(
     withdrawTxHash: null,
     status: 'created',
     createdAt: Date.now(),
+    poolContractId,
   };
 }
 

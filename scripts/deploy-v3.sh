@@ -36,10 +36,10 @@ VERIFIER_CONTRACT_ID=$(./stellar.exe contract deploy \
 echo "Deployed Verifier Contract ID: $VERIFIER_CONTRACT_ID"
 update_env "VERIFIER_CONTRACT_ID" "$VERIFIER_CONTRACT_ID"
 
-echo "=== Deploying zendswap-pool v3 ==="
-echo "Deploying zendswap-pool v3 contract to testnet..."
+echo "=== Deploying zendswap-pool-multi v3 ==="
+echo "Deploying zendswap-pool-multi v3 contract to testnet..."
 POOL_CONTRACT_ID=$(./stellar.exe contract deploy \
-  --wasm contracts/target/wasm32v1-none/release/zendswap_pool.wasm \
+  --wasm contracts/target/wasm32v1-none/release/zendswap_pool_multi.wasm \
   --source-account admin \
   --network testnet)
 echo "Deployed Pool Contract ID: $POOL_CONTRACT_ID"
@@ -47,6 +47,18 @@ update_env "POOL_CONTRACT_ID" "$POOL_CONTRACT_ID"
 
 # Update web/.env.local directly too
 if [ -f "web/.env.local" ]; then
+  # First, save the old pool ID as the legacy pool
+  if grep -q "^NEXT_PUBLIC_POOL_CONTRACT_ID=" "web/.env.local"; then
+    OLD_POOL_ID=$(grep "^NEXT_PUBLIC_POOL_CONTRACT_ID=" "web/.env.local" | cut -d '=' -f2)
+    if [ -n "$OLD_POOL_ID" ]; then
+      if grep -q "^NEXT_PUBLIC_LEGACY_POOL_CONTRACT_ID=" "web/.env.local"; then
+        sed -i "s|^NEXT_PUBLIC_LEGACY_POOL_CONTRACT_ID=.*|NEXT_PUBLIC_LEGACY_POOL_CONTRACT_ID=$OLD_POOL_ID|" "web/.env.local"
+      else
+        echo "NEXT_PUBLIC_LEGACY_POOL_CONTRACT_ID=$OLD_POOL_ID" >> "web/.env.local"
+      fi
+    fi
+  fi
+
   sed -i "s|^NEXT_PUBLIC_VERIFIER_CONTRACT_ID=.*|NEXT_PUBLIC_VERIFIER_CONTRACT_ID=$VERIFIER_CONTRACT_ID|" "web/.env.local"
   sed -i "s|^NEXT_PUBLIC_POOL_CONTRACT_ID=.*|NEXT_PUBLIC_POOL_CONTRACT_ID=$POOL_CONTRACT_ID|" "web/.env.local"
   # Also handle legacy naming if it exists
