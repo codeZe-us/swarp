@@ -30,7 +30,7 @@ fn setup_integration_test(
     assets.push_back(usdc_addr.clone());
     assets.push_back(eurc_addr.clone());
     
-    client.initialize(&admin, &assets, &verifier);
+    client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
     client.set_rate(&admin, &0, &1, &9200000, &10000000);
     client.set_rate(&admin, &1, &0, &10869565, &10000000);
     
@@ -162,7 +162,12 @@ fn test_integration_multiple_users_isolation() {
     let admin_b = Address::generate(&env);
     let contract_b = env.register(ZendSwapPool, ());
     let client_b = ZendSwapPoolClient::new(&env, &contract_b);
-    let mut assets_b = Vec::new(&env);\n    assets_b.push_back(usdc_addr.clone());\n    assets_b.push_back(eurc_addr.clone());\n    client_b.initialize(&admin_b, &assets_b, &verifier);\n    client_b.set_rate(&admin_b, &0, &1, &9200000, &10000000);\n    client_b.set_rate(&admin_b, &1, &0, &10869565, &10000000);
+    let mut assets_b = Vec::new(&env);
+    assets_b.push_back(usdc_addr.clone());
+    assets_b.push_back(eurc_addr.clone());
+    client_b.initialize(&admin_b, &assets_b, &verifier, &9200000, &10000000);
+    client_b.set_rate(&admin_b, &0, &1, &9200000, &10000000);
+    client_b.set_rate(&admin_b, &1, &0, &10869565, &10000000);
     
     let depositor_b = Address::generate(&env);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor_b, &1_000_000_000);
@@ -329,7 +334,12 @@ fn test_integration_wrong_verification_key_fails() {
     
     let contract_id = env.register(ZendSwapPool, ());
     let client = ZendSwapPoolClient::new(&env, &contract_id);
-    let mut assets = Vec::new(&env);\n    assets.push_back(usdc_addr.clone());\n    assets.push_back(eurc_addr.clone());\n    client.initialize(&admin, &assets, &wrong_verifier);\n    client.set_rate(&admin, &0, &1, &9200000, &10000000);\n    client.set_rate(&admin, &1, &0, &10869565, &10000000);
+    let mut assets = Vec::new(&env);
+    assets.push_back(usdc_addr.clone());
+    assets.push_back(eurc_addr.clone());
+    client.initialize(&admin, &assets, &wrong_verifier, &9200000, &10000000);
+    client.set_rate(&admin, &0, &1, &9200000, &10000000);
+    client.set_rate(&admin, &1, &0, &10869565, &10000000);
     
     soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&depositor, &1_000_000_000);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor, &1_000_000_000);
@@ -367,7 +377,12 @@ fn test_integration_insufficient_pool_reserves_fails() {
     
     let contract_id = env.register(ZendSwapPool, ());
     let client = ZendSwapPoolClient::new(&env, &contract_id);
-    let mut assets = Vec::new(&env);\n    assets.push_back(usdc_addr.clone());\n    assets.push_back(eurc_addr.clone());\n    client.initialize(&admin, &assets, &verifier);\n    client.set_rate(&admin, &0, &1, &9200000, &10000000);\n    client.set_rate(&admin, &1, &0, &10869565, &10000000);
+    let mut assets = Vec::new(&env);
+    assets.push_back(usdc_addr.clone());
+    assets.push_back(eurc_addr.clone());
+    client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
+    client.set_rate(&admin, &0, &1, &9200000, &10000000);
+    client.set_rate(&admin, &1, &0, &10869565, &10000000);
     
     soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&depositor, &1_000_000_000);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor, &1_000_000_000);

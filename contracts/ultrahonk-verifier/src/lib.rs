@@ -314,7 +314,7 @@ mod test {
         public_inputs.push_back(BytesN::from_array(&env, &asset_out_public_bytes));
 
         // 6. asset_in: 0
-        let mut asset_in_bytes = [0u8; 32];
+        let asset_in_bytes = [0u8; 32];
         // asset_in is 0 in Prover.toml, so it's all zeros
         public_inputs.push_back(BytesN::from_array(&env, &asset_in_bytes));
 
@@ -367,7 +367,7 @@ mod test {
         asset_out_public_bytes[31] = 1;
         public_inputs.push_back(BytesN::from_array(&env, &asset_out_public_bytes));
 
-        let mut asset_in_bytes = [0u8; 32];
+        let asset_in_bytes = [0u8; 32];
         public_inputs.push_back(BytesN::from_array(&env, &asset_in_bytes));
 
         let verified = client.verify(&proof_bytes, &public_inputs);
