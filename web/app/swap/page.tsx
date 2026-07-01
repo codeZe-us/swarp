@@ -12,6 +12,8 @@ import { generateSwapProof, SwapProofInput } from '../../lib/prover';
 import { ASSETS, getAssetByCode, getAssetById } from '../../lib/assets';
 import { getRate, getReserves, getMerkleRoot } from '../../lib/contracts';
 import { formatProofForContract } from '../../lib/proof-formatter';
+import { ZendSwapError, handleError } from '../../lib/errors';
+import { ErrorDisplay } from '../../components/ui/ErrorDisplay';
 
 export default function SwapPage() {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit');
@@ -45,7 +47,7 @@ export default function SwapPage() {
 
   // Transaction execution states (Deposit)
   const [depositTxStatus, setDepositTxStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [depositTxError, setDepositTxError] = useState<string | null>(null);
+  const [depositTxError, setDepositTxError] = useState<ZendSwapError | null>(null);
   const [depositTxHash, setDepositTxHash] = useState<string | null>(null);
   const [depositLeafIndex, setDepositLeafIndex] = useState<number | null>(null);
 
@@ -59,7 +61,7 @@ export default function SwapPage() {
   const [recipientAddress, setRecipientAddress] = useState<string>('');
   const [withdrawStep, setWithdrawStep] = useState<number>(0); // 0: idle, 1: fetching, 2: building, 3: proving, 4: submitting, 5: success
   const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [withdrawError, setWithdrawError] = useState<ZendSwapError | null>(null);
   const [workerStage, setWorkerStage] = useState<'loading' | 'computing' | 'proving' | null>(null);
   const [provingSeconds, setProvingSeconds] = useState<number>(0);
   const [withdrawTxHash, setWithdrawTxHash] = useState<string | null>(null);
@@ -295,9 +297,10 @@ export default function SwapPage() {
       setDepositTxHash(result.txHash);
       setDepositTxStatus('success');
       setAmountIn('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Deposit flow failed:', error);
-      setDepositTxError(error?.message || 'Transaction submission failed. Please try again.');
+      const zError = handleError(error, 'transaction');
+      setDepositTxError(zError);
       setDepositTxStatus('error');
     }
   };
@@ -536,19 +539,10 @@ export default function SwapPage() {
       setWithdrawTxHash(result.txHash);
       setWithdrawStatus('success');
       setSelectedNoteId(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Withdraw flow failed:', error);
-      
-      let failMessage = error?.message || 'Withdrawal transaction failed.';
-      
-      // Enforce edge case error messaging
-      if (failMessage.includes('Contract, #6') || failMessage.includes('InvalidMerkleRoot')) {
-        failMessage = 'The Merkle root expired because another transaction was confirmed. Please try again.';
-      } else if (failMessage.includes('Contract, #5') || failMessage.includes('NullifierSpent')) {
-        failMessage = 'This deposit note has already been withdrawn (nullifier spent).';
-      }
-
-      setWithdrawError(failMessage);
+      const zError = handleError(error, 'transaction');
+      setWithdrawError(zError);
       setWithdrawStatus('error');
     } finally {
       // Safeguard: make sure memory references to secrets are wiped
@@ -854,13 +848,8 @@ export default function SwapPage() {
           )}
 
           {depositTxStatus === 'error' && depositTxError && (
-            <div className="w-full max-w-[500px] bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
-              <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div className="text-xs font-semibold text-red-400 leading-relaxed">
-                {depositTxError}
-              </div>
+            <div className="w-full max-w-[500px]">
+              <ErrorDisplay error={depositTxError} variant="inline" />
             </div>
           )}
         </div>
@@ -1018,13 +1007,8 @@ export default function SwapPage() {
 
                 {/* Error Box */}
                 {withdrawStatus === 'error' && withdrawError && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
-                    <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div className="text-xs font-semibold text-red-400 leading-relaxed">
-                      {withdrawError}
-                    </div>
+                  <div className="mt-4">
+                    <ErrorDisplay error={withdrawError} variant="inline" onRetry={() => setWithdrawStatus('idle')} />
                   </div>
                 )}
               </div>
@@ -1135,16 +1119,9 @@ export default function SwapPage() {
                   </div>
                 )}
 
-                {withdrawStatus === 'error' && (
+                {withdrawStatus === 'error' && withdrawError && (
                   <div className="flex flex-col gap-3 mt-2">
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
-                      <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <div className="text-xs font-semibold text-red-400 leading-relaxed">
-                        {withdrawError || 'Prover or submission failed.'}
-                      </div>
-                    </div>
+                    <ErrorDisplay error={withdrawError} variant="inline" />
                     <div className="flex gap-2 font-display">
                       <button
                         type="button"

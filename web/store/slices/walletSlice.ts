@@ -4,12 +4,13 @@ import { Networks } from '@creit.tech/stellar-wallets-kit';
 import { isConnected } from '@stellar/freighter-api';
 import { StoreState } from '../useStore';
 import { connectWallet, disconnectWallet, initKit, isValidPublicKey } from '../../lib/stellar';
+import { ZendSwapError, handleError } from '../../lib/errors';
 
 export interface WalletSlice {
   address: string | null;
   network: 'testnet' | 'mainnet';
   status: 'disconnected' | 'connecting' | 'connected' | 'error';
-  error: string | null;
+  error: ZendSwapError | null;
   kit: typeof StellarWalletsKit | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
@@ -38,10 +39,10 @@ export const createWalletSlice: StateCreator<
       get().loadTransactions(address);
       await get().loadPayroll(address);
       await get().loadTeam(address);
-    } catch (err: any) {
-      const errorMsg = err?.message || 'Failed to connect wallet';
-      set({ status: 'error', error: errorMsg });
-      throw err;
+    } catch (err: unknown) {
+      const zError = handleError(err, 'wallet_connect');
+      set({ status: 'error', error: zError });
+      throw zError;
     }
   },
   disconnect: async () => {
