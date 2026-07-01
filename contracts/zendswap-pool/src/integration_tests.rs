@@ -281,7 +281,7 @@ fn test_integration_wrong_rate_fails() {
     #[allow(deprecated)]
     env.budget().reset_unlimited();
 
-    let (client, _usdc_addr, _eurc_addr, depositor, _, admin) = setup_integration_test(&env, false);
+    let (client, _usdc_addr, _eurc_addr, depositor, _, admin) = setup_integration_test(&env, true);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
     client.deposit(&depositor, &0, &500, &commitment);
