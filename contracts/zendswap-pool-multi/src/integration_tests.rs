@@ -2,7 +2,7 @@
 
 use super::*;
 use soroban_sdk::testutils::Address as _;
-use soroban_sdk::{Env, Address, Bytes, BytesN, Vec};
+use soroban_sdk::{Address, Bytes, BytesN, Env, Vec};
 
 fn setup_integration_test(
     env: &Env,
@@ -26,10 +26,10 @@ fn setup_integration_test(
     } else {
         env.register(mock_verifier::MockVerifier, ())
     };
-    
+
     let contract_id = env.register(ZendSwapPool, ());
     let client = ZendSwapPoolClient::new(env, &contract_id);
-    
+
     client.initialize(&admin, &assets, &verifier, &10000000, &10000000);
     client.set_rate(&admin, &0, &1, &9200000, &10000000);
     client.set_rate(&admin, &1, &0, &10860000, &10000000);
@@ -41,12 +41,14 @@ fn setup_integration_test(
     client.set_rate(&admin, &4, &0, &800000, &10000000);
     client.set_rate(&admin, &2, &4, &12500000, &10000000);
     client.set_rate(&admin, &4, &2, &800000, &10000000);
-    
+
     for i in 0..5 {
-        soroban_sdk::token::StellarAssetClient::new(env, &assets.get(i).unwrap()).mint(&depositor, &1_000_000_000);
-        soroban_sdk::token::StellarAssetClient::new(env, &assets.get(i).unwrap()).mint(&contract_id, &10_000_000);
+        soroban_sdk::token::StellarAssetClient::new(env, &assets.get(i).unwrap())
+            .mint(&depositor, &1_000_000_000);
+        soroban_sdk::token::StellarAssetClient::new(env, &assets.get(i).unwrap())
+            .mint(&contract_id, &10_000_000);
     }
-    
+
     (client, assets, depositor, contract_id, admin)
 }
 
@@ -55,12 +57,8 @@ fn test_integration_usdc_to_eurc_swap() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
-    env.budget().reset_default();
-    // env.budget().set_limits(u64::MAX, u64::MAX);
 
-    let (client, assets, depositor, contract_id, _) =
-        setup_integration_test(&env, false);
+    let (client, assets, depositor, contract_id, _) = setup_integration_test(&env, false);
 
     let usdc_addr = assets.get(0).unwrap();
     let eurc_addr = assets.get(1).unwrap();
@@ -92,7 +90,10 @@ fn test_integration_usdc_to_eurc_swap() {
         &460,
     );
 
-    assert_eq!(usdc_client.balance(&depositor), initial_depositor_usdc - 500);
+    assert_eq!(
+        usdc_client.balance(&depositor),
+        initial_depositor_usdc - 500
+    );
     assert_eq!(eurc_client.balance(&recipient), 460);
     assert_eq!(usdc_client.balance(&contract_id), initial_pool_usdc + 500);
     assert_eq!(eurc_client.balance(&contract_id), initial_pool_eurc - 460);
@@ -114,10 +115,8 @@ fn test_integration_eurc_to_usdc_swap() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
-    let (client, assets, depositor, contract_id, _) =
-        setup_integration_test(&env, false);
+    let (client, assets, depositor, contract_id, _) = setup_integration_test(&env, false);
 
     let usdc_addr = assets.get(0).unwrap();
     let eurc_addr = assets.get(1).unwrap();
@@ -149,7 +148,10 @@ fn test_integration_eurc_to_usdc_swap() {
         &460,
     );
 
-    assert_eq!(eurc_client.balance(&depositor), initial_depositor_eurc - 500);
+    assert_eq!(
+        eurc_client.balance(&depositor),
+        initial_depositor_eurc - 500
+    );
     assert_eq!(usdc_client.balance(&recipient), 460);
     assert_eq!(eurc_client.balance(&contract_id), initial_pool_eurc + 500);
     assert_eq!(usdc_client.balance(&contract_id), initial_pool_usdc - 460);
@@ -171,10 +173,8 @@ fn test_integration_multiple_users_isolation() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
-    let (client_a, assets_a, depositor_a, _contract_a, _) =
-        setup_integration_test(&env, false);
+    let (client_a, assets_a, depositor_a, _contract_a, _) = setup_integration_test(&env, false);
     let usdc_addr = assets_a.get(0).unwrap();
     let eurc_addr = assets_a.get(1).unwrap();
     let verifier = env.register(mock_verifier::MockVerifier, ());
@@ -184,10 +184,12 @@ fn test_integration_multiple_users_isolation() {
     client_b.initialize(&admin_b, &assets_a, &verifier, &10000000, &10000000);
     client_b.set_rate(&admin_b, &0, &1, &9200000, &10000000);
     client_b.set_rate(&admin_b, &1, &0, &10860000, &10000000);
-    
+
     let depositor_b = Address::generate(&env);
-    soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor_b, &1_000_000_000);
-    soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&depositor_b, &1_000_000_000);
+    soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr)
+        .mint(&depositor_b, &1_000_000_000);
+    soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr)
+        .mint(&depositor_b, &1_000_000_000);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_b, &10_000_000);
     soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&contract_b, &10_000_000);
 
@@ -203,29 +205,13 @@ fn test_integration_multiple_users_isolation() {
     let nullifier_a = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient_a = Address::generate(&env);
 
-    client_a.withdraw(
-        &recipient_a,
-        &0,
-        &1,
-        &proof_a,
-        &nullifier_a,
-        &root_a,
-        &460,
-    );
+    client_a.withdraw(&recipient_a, &0, &1, &proof_a, &nullifier_a, &root_a, &460);
 
     let proof_b = Bytes::from_slice(&env, test_fixtures::EURC_TO_USDC_PROOF);
     let nullifier_b = BytesN::from_array(&env, &test_fixtures::EURC_TO_USDC_NULLIFIER);
     let recipient_b = Address::generate(&env);
 
-    client_b.withdraw(
-        &recipient_b,
-        &1,
-        &0,
-        &proof_b,
-        &nullifier_b,
-        &root_b,
-        &460,
-    );
+    client_b.withdraw(&recipient_b, &1, &0, &proof_b, &nullifier_b, &root_b, &460);
 
     let eurc_client = TokenClient::new(&env, &eurc_addr);
     let usdc_client = TokenClient::new(&env, &usdc_addr);
@@ -238,7 +224,6 @@ fn test_integration_double_spend_fails() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
     let (client, assets, depositor, _, _) = setup_integration_test(&env, false);
     let _usdc_addr = assets.get(0).unwrap();
@@ -252,15 +237,9 @@ fn test_integration_double_spend_fails() {
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient = Address::generate(&env);
 
-    client.withdraw(
-        &recipient,
-        &0,
-        &1, &proof, &nullifier_hash, &root, &460);
+    client.withdraw(&recipient, &0, &1, &proof, &nullifier_hash, &root, &460);
 
-    let res = client.try_withdraw(
-        &recipient,
-        &0,
-        &1, &proof, &nullifier_hash, &root, &460);
+    let res = client.try_withdraw(&recipient, &0, &1, &proof, &nullifier_hash, &root, &460);
     assert!(res.is_err());
 }
 
@@ -269,7 +248,6 @@ fn test_integration_wrong_merkle_root_fails() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
     let (client, assets, depositor, _, _) = setup_integration_test(&env, false);
     let _usdc_addr = assets.get(0).unwrap();
@@ -281,13 +259,18 @@ fn test_integration_wrong_merkle_root_fails() {
     let proof = Bytes::from_slice(&env, test_fixtures::USDC_TO_EURC_PROOF);
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient = Address::generate(&env);
-    
+
     let fake_root = BytesN::from_array(&env, &[0xAA; 32]);
 
     let res = client.try_withdraw(
         &recipient,
         &0,
-        &1, &proof, &nullifier_hash, &fake_root, &460);
+        &1,
+        &proof,
+        &nullifier_hash,
+        &fake_root,
+        &460,
+    );
     assert!(res.is_err());
 }
 
@@ -296,7 +279,6 @@ fn test_integration_wrong_rate_fails() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
     let (client, _, depositor, _, admin) = setup_integration_test(&env, true);
 
@@ -305,13 +287,16 @@ fn test_integration_wrong_rate_fails() {
     let root = client.get_root();
 
     client.set_rate(&admin, &0, &1, &10_000_000, &10_000_000);
-    
+
     for _ in 0..11 {
         client.set_rate(&admin, &0, &1, &10_000_000, &10_000_000);
     }
 
     let current_rates: Vec<u64> = env.as_contract(&client.address, || {
-        env.storage().instance().get(&DataKey::RecentRates(0, 1)).unwrap()
+        env.storage()
+            .instance()
+            .get(&DataKey::RecentRates(0, 1))
+            .unwrap()
     });
     std::println!("current_rates in test: {:?}", current_rates);
 
@@ -319,10 +304,7 @@ fn test_integration_wrong_rate_fails() {
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient = Address::generate(&env);
 
-    let res = client.try_withdraw(
-        &recipient,
-        &0,
-        &1, &proof, &nullifier_hash, &root, &460);
+    let res = client.try_withdraw(&recipient, &0, &1, &proof, &nullifier_hash, &root, &460);
     assert!(res.is_err());
 }
 
@@ -331,11 +313,7 @@ pub struct WrongVerifierMock;
 
 #[contractimpl]
 impl WrongVerifierMock {
-    pub fn verify(
-        _env: Env,
-        _proof: Bytes,
-        _public_inputs: Vec<BytesN<32>>,
-    ) -> bool {
+    pub fn verify(_env: Env, _proof: Bytes, _public_inputs: Vec<BytesN<32>>) -> bool {
         false
     }
 }
@@ -345,7 +323,6 @@ fn test_integration_wrong_verification_key_fails() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
     let admin = Address::generate(&env);
     let depositor = Address::generate(&env);
@@ -353,9 +330,9 @@ fn test_integration_wrong_verification_key_fails() {
     let eurc_sac = env.register_stellar_asset_contract_v2(admin.clone());
     let usdc_addr = usdc_sac.address();
     let eurc_addr = eurc_sac.address();
-    
+
     let wrong_verifier = env.register(WrongVerifierMock, ());
-    
+
     let contract_id = env.register(ZendSwapPool, ());
     let client = ZendSwapPoolClient::new(&env, &contract_id);
     let mut assets = Vec::new(&env);
@@ -364,7 +341,7 @@ fn test_integration_wrong_verification_key_fails() {
     client.initialize(&admin, &assets, &wrong_verifier, &10000000, &10000000);
     client.set_rate(&admin, &0, &1, &9200000, &10000000);
     client.set_rate(&admin, &1, &0, &10860000, &10000000);
-    
+
     soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&depositor, &1_000_000_000);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor, &1_000_000_000);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_id, &10_000_000);
@@ -377,10 +354,7 @@ fn test_integration_wrong_verification_key_fails() {
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient = Address::generate(&env);
 
-    let res = client.try_withdraw(
-        &recipient,
-        &0,
-        &1, &proof, &nullifier_hash, &root, &460);
+    let res = client.try_withdraw(&recipient, &0, &1, &proof, &nullifier_hash, &root, &460);
     assert!(res.is_err());
 }
 
@@ -389,7 +363,6 @@ fn test_integration_insufficient_pool_reserves_fails() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
     let admin = Address::generate(&env);
     let depositor = Address::generate(&env);
@@ -398,7 +371,7 @@ fn test_integration_insufficient_pool_reserves_fails() {
     let usdc_addr = usdc_sac.address();
     let eurc_addr = eurc_sac.address();
     let verifier = env.register(mock_verifier::MockVerifier, ());
-    
+
     let contract_id = env.register(ZendSwapPool, ());
     let client = ZendSwapPoolClient::new(&env, &contract_id);
     let mut assets = Vec::new(&env);
@@ -407,10 +380,10 @@ fn test_integration_insufficient_pool_reserves_fails() {
     client.initialize(&admin, &assets, &verifier, &10000000, &10000000);
     client.set_rate(&admin, &0, &1, &9200000, &10000000);
     client.set_rate(&admin, &1, &0, &10860000, &10000000);
-    
+
     soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&depositor, &1_000_000_000);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor, &1_000_000_000);
-    
+
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_id, &400);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
@@ -421,10 +394,7 @@ fn test_integration_insufficient_pool_reserves_fails() {
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient = Address::generate(&env);
 
-    let res = client.try_withdraw(
-        &recipient,
-        &0,
-        &1, &proof, &nullifier_hash, &root, &460);
+    let res = client.try_withdraw(&recipient, &0, &1, &proof, &nullifier_hash, &root, &460);
     assert!(res.is_err());
 }
 
@@ -435,9 +405,9 @@ fn test_integration_deposit_unsupported_token_fails() {
     env.mock_all_auths();
 
     let (client, _, _, depositor, _) = setup_integration_test(&env, false);
-    
+
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
-    
+
     client.deposit(&depositor, &99, &500, &commitment);
 }
 
@@ -446,7 +416,6 @@ fn test_integration_garbage_proof_fails_no_panic() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
     let (client, _, depositor, _, _) = setup_integration_test(&env, false);
 
@@ -461,7 +430,12 @@ fn test_integration_garbage_proof_fails_no_panic() {
     let res = client.try_withdraw(
         &recipient,
         &0,
-        &1, &garbage_proof, &nullifier_hash, &root, &460);
+        &1,
+        &garbage_proof,
+        &nullifier_hash,
+        &root,
+        &460,
+    );
     assert!(res.is_err());
 }
 
@@ -470,7 +444,6 @@ fn test_integration_usdc_to_mgusd_swap() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
     let (client, assets, depositor, contract_id, _) = setup_integration_test(&env, false);
     let usdc_addr = assets.get(0).unwrap();
@@ -503,7 +476,10 @@ fn test_integration_usdc_to_mgusd_swap() {
         &500,
     );
 
-    assert_eq!(usdc_client.balance(&depositor), initial_depositor_usdc - 500);
+    assert_eq!(
+        usdc_client.balance(&depositor),
+        initial_depositor_usdc - 500
+    );
     assert_eq!(mgusd_client.balance(&recipient), 500);
     assert_eq!(usdc_client.balance(&contract_id), initial_pool_usdc + 500);
     assert_eq!(mgusd_client.balance(&contract_id), initial_pool_mgusd - 500);
@@ -514,7 +490,6 @@ fn test_integration_xlm_to_usdc_swap() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
     let (client, assets, depositor, contract_id, _) = setup_integration_test(&env, false);
     let xlm_addr = assets.get(4).unwrap();
@@ -558,7 +533,6 @@ fn test_integration_mgusd_to_xlm_swap() {
     let env = Env::default();
     env.mock_all_auths();
     env.cost_estimate().budget().reset_unlimited();
-    env.budget().reset_unlimited();
 
     let (client, assets, depositor, contract_id, _) = setup_integration_test(&env, false);
     let mgusd_addr = assets.get(2).unwrap();
@@ -591,7 +565,10 @@ fn test_integration_mgusd_to_xlm_swap() {
         &625,
     );
 
-    assert_eq!(mgusd_client.balance(&depositor), initial_depositor_mgusd - 500);
+    assert_eq!(
+        mgusd_client.balance(&depositor),
+        initial_depositor_mgusd - 500
+    );
     assert_eq!(xlm_client.balance(&recipient), 625);
     assert_eq!(mgusd_client.balance(&contract_id), initial_pool_mgusd + 500);
     assert_eq!(xlm_client.balance(&contract_id), initial_pool_xlm - 625);

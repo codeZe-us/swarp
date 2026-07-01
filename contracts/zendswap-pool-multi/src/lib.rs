@@ -4,12 +4,13 @@ extern crate alloc;
 #[cfg(test)]
 extern crate std;
 
-use soroban_sdk::{
-    contract, contractimpl, contracttype, Address, Bytes, BytesN, Env, Vec, U256, IntoVal, Symbol, Val,
-};
 use soroban_poseidon::poseidon2_hash;
 use soroban_sdk::crypto::bn254::Bn254Fr;
 use soroban_sdk::token::Client as TokenClient;
+use soroban_sdk::{
+    contract, contractimpl, contracttype, Address, Bytes, BytesN, Env, IntoVal, Symbol, Val, Vec,
+    U256,
+};
 
 #[soroban_sdk::contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -26,7 +27,6 @@ pub enum Error {
     Unauthorized = 9,
     InvalidRate = 10,
 }
-
 
 // 2^63 - 1: upper bound matching the circuit's 64-bit range proof.
 const MAX_DEPOSIT_AMOUNT: i128 = i64::MAX as i128;
@@ -48,9 +48,9 @@ pub enum DataKey {
     RecentRoots,
     CurrentRoot,
     FilledSubtrees,
-    TokenRegistry(u64),               // asset_id -> Address
-    RateTable(u64, u64),              // (asset_in_id, asset_out_id) -> (u64, u64)
-    RecentRates(u64, u64),            // (asset_in_id, asset_out_id) -> Vec<u64>
+    TokenRegistry(u64),    // asset_id -> Address
+    RateTable(u64, u64),   // (asset_in_id, asset_out_id) -> (u64, u64)
+    RecentRates(u64, u64), // (asset_in_id, asset_out_id) -> Vec<u64>
 }
 
 // Amount is excluded from the event intentionally: the token transfer is already
@@ -88,7 +88,6 @@ pub struct PoolInfo {
     pub total_deposits: u32,
     pub current_root: BytesN<32>,
 }
-
 
 fn extend_ttl(env: &Env) {
     env.storage().instance().extend_ttl(17280, 518400);
@@ -171,7 +170,9 @@ impl ZendSwapPool {
         env.storage().instance().set(&DataKey::CurrentIndex, &0u32);
 
         for (i, asset) in assets.iter().enumerate() {
-            env.storage().instance().set(&DataKey::TokenRegistry(i as u64), &asset);
+            env.storage()
+                .instance()
+                .set(&DataKey::TokenRegistry(i as u64), &asset);
         }
 
         // Initialize pairs with default rates (for testing/simplicity)
@@ -184,28 +185,38 @@ impl ZendSwapPool {
                     );
                     let mut recent: Vec<u64> = Vec::new(&env);
                     recent.push_back(default_rate_numerator);
-                    env.storage().instance().set(&DataKey::RecentRates(i as u64, j as u64), &recent);
+                    env.storage()
+                        .instance()
+                        .set(&DataKey::RecentRates(i as u64, j as u64), &recent);
                 }
             }
         }
 
         let leaves: Vec<BytesN<32>> = Vec::new(&env);
         env.storage().persistent().set(&DataKey::Leaves, &leaves);
-        env.storage().persistent().extend_ttl(&DataKey::Leaves, 17280, 518400);
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::Leaves, 17280, 518400);
 
         let zeros = get_zeros_bytes(&env);
         let mut filled: Vec<BytesN<32>> = Vec::new(&env);
         for i in 0..TREE_DEPTH {
             filled.push_back(zeros.get_unchecked(i));
         }
-        env.storage().instance().set(&DataKey::FilledSubtrees, &filled);
+        env.storage()
+            .instance()
+            .set(&DataKey::FilledSubtrees, &filled);
 
         let empty_root = zeros.get_unchecked(TREE_DEPTH);
-        env.storage().instance().set(&DataKey::CurrentRoot, &empty_root);
+        env.storage()
+            .instance()
+            .set(&DataKey::CurrentRoot, &empty_root);
 
         let mut recent_roots: Vec<BytesN<32>> = Vec::new(&env);
         recent_roots.push_back(empty_root);
-        env.storage().instance().set(&DataKey::RecentRoots, &recent_roots);
+        env.storage()
+            .instance()
+            .set(&DataKey::RecentRoots, &recent_roots);
 
         extend_ttl(&env);
     }
@@ -227,7 +238,11 @@ impl ZendSwapPool {
 
         depositor.require_auth();
 
-        let token: Address = env.storage().instance().get(&DataKey::TokenRegistry(asset_id)).unwrap_or_else(|| panic!("unsupported token"));
+        let token: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::TokenRegistry(asset_id))
+            .unwrap_or_else(|| panic!("unsupported token"));
 
         if amount <= 0 {
             panic!("amount must be positive");
@@ -238,7 +253,7 @@ impl ZendSwapPool {
 
         TokenClient::new(&env, &token).transfer(
             &depositor,
-            &env.current_contract_address(),
+            env.current_contract_address(),
             &amount,
         );
 
@@ -246,7 +261,11 @@ impl ZendSwapPool {
 
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "deposit"),),
-            DepositEvent { commitment, leaf_index, token },
+            DepositEvent {
+                commitment,
+                leaf_index,
+                token,
+            },
         );
 
         leaf_index
@@ -274,7 +293,11 @@ impl ZendSwapPool {
 
     pub fn get_rate(env: Env, asset_in_id: u64, asset_out_id: u64) -> (u64, u64) {
         extend_ttl(&env);
-        let (num, denom) = env.storage().instance().get(&DataKey::RateTable(asset_in_id, asset_out_id)).unwrap_or((0, 10000000));
+        let (num, denom) = env
+            .storage()
+            .instance()
+            .get(&DataKey::RateTable(asset_in_id, asset_out_id))
+            .unwrap_or((0, 10000000));
         (num, denom)
     }
 
@@ -282,8 +305,13 @@ impl ZendSwapPool {
         extend_ttl(&env);
         let mut reserves = Vec::new(&env);
         for i in 0..5 {
-            if let Some(token) = env.storage().instance().get::<_, Address>(&DataKey::TokenRegistry(i)) {
-                let balance = TokenClient::new(&env, &token).balance(&env.current_contract_address());
+            if let Some(token) = env
+                .storage()
+                .instance()
+                .get::<_, Address>(&DataKey::TokenRegistry(i))
+            {
+                let balance =
+                    TokenClient::new(&env, &token).balance(&env.current_contract_address());
                 reserves.push_back(balance);
             } else {
                 reserves.push_back(0);
@@ -308,7 +336,10 @@ impl ZendSwapPool {
 
     pub fn get_leaf_count(env: Env) -> u32 {
         extend_ttl(&env);
-        env.storage().instance().get(&DataKey::CurrentIndex).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get(&DataKey::CurrentIndex)
+            .unwrap_or(0)
     }
 
     #[allow(deprecated)]
@@ -336,11 +367,14 @@ impl ZendSwapPool {
             return Err(Error::InvalidRate);
         }
 
-        if new_rate < 100_000 || new_rate > 100_000_000 {
+        if !(100_000..=100_000_000).contains(&new_rate) {
             return Err(Error::InvalidRate);
         }
 
-        env.storage().instance().set(&DataKey::RateTable(asset_in_id, asset_out_id), &(new_rate, new_denominator));
+        env.storage().instance().set(
+            &DataKey::RateTable(asset_in_id, asset_out_id),
+            &(new_rate, new_denominator),
+        );
 
         let mut recent_rates: Vec<u64> = env
             .storage()
@@ -351,7 +385,10 @@ impl ZendSwapPool {
         if recent_rates.len() > MAX_RECENT_RATES {
             recent_rates.remove(0);
         }
-        env.storage().instance().set(&DataKey::RecentRates(asset_in_id, asset_out_id), &recent_rates);
+        env.storage().instance().set(
+            &DataKey::RecentRates(asset_in_id, asset_out_id),
+            &recent_rates,
+        );
 
         // Optional: you could update RateUpdateEvent to include asset IDs, but we'll leave it as is for simplicity if the frontend relies on the old structure.
 
@@ -359,17 +396,16 @@ impl ZendSwapPool {
     }
 
     #[allow(deprecated)]
-    pub fn fund_pool(
-        env: Env,
-        funder: Address,
-        asset_id: u64,
-        amount: i128,
-    ) -> Result<(), Error> {
+    pub fn fund_pool(env: Env, funder: Address, asset_id: u64, amount: i128) -> Result<(), Error> {
         extend_ttl(&env);
 
         funder.require_auth();
 
-        let token: Address = match env.storage().instance().get(&DataKey::TokenRegistry(asset_id)) {
+        let token: Address = match env
+            .storage()
+            .instance()
+            .get(&DataKey::TokenRegistry(asset_id))
+        {
             Some(addr) => addr,
             None => return Err(Error::UnsupportedToken),
         };
@@ -378,11 +414,7 @@ impl ZendSwapPool {
             return Err(Error::InvalidAmount);
         }
 
-        TokenClient::new(&env, &token).transfer(
-            &funder,
-            &env.current_contract_address(),
-            &amount,
-        );
+        TokenClient::new(&env, &token).transfer(&funder, env.current_contract_address(), &amount);
 
         env.events().publish(
             (Symbol::new(&env, "fund_pool"),),
@@ -402,7 +434,7 @@ impl ZendSwapPool {
         let reserves = Self::get_reserves(env.clone());
         let usdc_reserve = reserves.get(0).unwrap_or(0);
         let eurc_reserve = reserves.get(1).unwrap_or(0);
-        
+
         let (current_rate, _) = Self::get_rate(env.clone(), 0, 1);
         let rate_denominator = 10000000;
         let total_deposits = Self::get_leaf_count(env.clone());
@@ -418,6 +450,7 @@ impl ZendSwapPool {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[allow(deprecated)] // events().publish() deprecated; emit() not yet in soroban-sdk v26.
     pub fn withdraw(
         env: Env,
@@ -431,7 +464,11 @@ impl ZendSwapPool {
     ) -> Result<(), Error> {
         extend_ttl(&env);
 
-        let asset_out: Address = match env.storage().instance().get(&DataKey::TokenRegistry(asset_out_id)) {
+        let asset_out: Address = match env
+            .storage()
+            .instance()
+            .get(&DataKey::TokenRegistry(asset_out_id))
+        {
             Some(addr) => addr,
             None => return Err(Error::UnsupportedToken),
         };
@@ -455,7 +492,11 @@ impl ZendSwapPool {
             BytesN::from_array(env, &bytes)
         }
 
-        let (_, rate_denom): (u64, u64) = env.storage().instance().get(&DataKey::RateTable(asset_in_id, asset_out_id)).unwrap();
+        let (_, rate_denom): (u64, u64) = env
+            .storage()
+            .instance()
+            .get(&DataKey::RateTable(asset_in_id, asset_out_id))
+            .unwrap();
 
         let recent_rates: Vec<u64> = env
             .storage()
@@ -496,8 +537,13 @@ impl ZendSwapPool {
             public_inputs.push_back(u64_to_bytes32(&env, asset_out_id));
             public_inputs.push_back(merkle_root.clone());
 
-            let args = soroban_sdk::vec![&env, proof.clone().into_val(&env), public_inputs.into_val(&env)];
-            let invoke_res = env.try_invoke_contract::<bool, Val>(&verifier, &Symbol::new(&env, "verify"), args);
+            let args = soroban_sdk::vec![
+                &env,
+                proof.clone().into_val(&env),
+                public_inputs.into_val(&env)
+            ];
+            let invoke_res =
+                env.try_invoke_contract::<bool, Val>(&verifier, &Symbol::new(&env, "verify"), args);
 
             if let Ok(Ok(true)) = invoke_res {
                 verified = true;
@@ -511,7 +557,9 @@ impl ZendSwapPool {
 
         // spent set update (effects first to prevent reentrancy)
         env.storage().persistent().set(&nullifier_key, &true);
-        env.storage().persistent().extend_ttl(&nullifier_key, 17280, 518400);
+        env.storage()
+            .persistent()
+            .extend_ttl(&nullifier_key, 17280, 518400);
 
         TokenClient::new(&env, &asset_out).transfer(
             &env.current_contract_address(),
@@ -519,10 +567,8 @@ impl ZendSwapPool {
             &withdrawal_amount,
         );
 
-        env.events().publish(
-            (Symbol::new(&env, "withdraw"),),
-            nullifier_hash,
-        );
+        env.events()
+            .publish((Symbol::new(&env, "withdraw"),), nullifier_hash);
 
         Ok(())
     }
@@ -548,15 +594,21 @@ fn do_insert_leaf(env: &Env, commitment: BytesN<32>) -> (u32, BytesN<32>) {
         .unwrap_or_else(|| Vec::new(env));
     leaves.push_back(commitment.clone());
     env.storage().persistent().set(&DataKey::Leaves, &leaves);
-    env.storage().persistent().extend_ttl(&DataKey::Leaves, 17280, 518400);
+    env.storage()
+        .persistent()
+        .extend_ttl(&DataKey::Leaves, 17280, 518400);
 
-    let mut filled: Vec<BytesN<32>> = env.storage().instance().get(&DataKey::FilledSubtrees).unwrap();
+    let mut filled: Vec<BytesN<32>> = env
+        .storage()
+        .instance()
+        .get(&DataKey::FilledSubtrees)
+        .unwrap();
     let zeros = get_zeros_bytes(env);
 
     let mut current_hash = commitment;
     let mut idx = leaf_index;
     for level in 0..TREE_DEPTH {
-        if idx % 2 == 0 {
+        if idx.is_multiple_of(2) {
             filled.set(level, current_hash.clone());
             current_hash = hash_pair(env, &current_hash, &zeros.get_unchecked(level));
         } else {
@@ -566,9 +618,15 @@ fn do_insert_leaf(env: &Env, commitment: BytesN<32>) -> (u32, BytesN<32>) {
     }
     let new_root = current_hash;
 
-    env.storage().instance().set(&DataKey::FilledSubtrees, &filled);
-    env.storage().instance().set(&DataKey::CurrentIndex, &(leaf_index + 1));
-    env.storage().instance().set(&DataKey::CurrentRoot, &new_root);
+    env.storage()
+        .instance()
+        .set(&DataKey::FilledSubtrees, &filled);
+    env.storage()
+        .instance()
+        .set(&DataKey::CurrentIndex, &(leaf_index + 1));
+    env.storage()
+        .instance()
+        .set(&DataKey::CurrentRoot, &new_root);
 
     let mut recent_roots: Vec<BytesN<32>> = env
         .storage()
@@ -579,7 +637,9 @@ fn do_insert_leaf(env: &Env, commitment: BytesN<32>) -> (u32, BytesN<32>) {
     if recent_roots.len() > MAX_RECENT_ROOTS {
         recent_roots.remove(0);
     }
-    env.storage().instance().set(&DataKey::RecentRoots, &recent_roots);
+    env.storage()
+        .instance()
+        .set(&DataKey::RecentRoots, &recent_roots);
 
     (leaf_index, new_root)
 }
@@ -587,6 +647,7 @@ fn do_insert_leaf(env: &Env, commitment: BytesN<32>) -> (u32, BytesN<32>) {
 // Not a contract entry-point: full tree iteration exceeds Soroban's instruction budget.
 // Test-only native call.
 #[cfg(test)]
+#[allow(clippy::ptr_arg)]
 fn compute_root_from_leaves(env: &Env, leaves: &alloc::vec::Vec<BytesN<32>>) -> BytesN<32> {
     let leaf_count = leaves.len() as u32;
     let zeros = get_zeros_bytes(env);
@@ -597,6 +658,7 @@ fn compute_root_from_leaves(env: &Env, leaves: &alloc::vec::Vec<BytesN<32>>) -> 
 
     let total = MAX_LEAVES as usize;
     let mut layer: alloc::vec::Vec<BytesN<32>> = alloc::vec::Vec::with_capacity(total);
+    #[allow(clippy::needless_range_loop)]
     for i in 0..total {
         if (i as u32) < leaf_count {
             layer.push(leaves[i].clone());
@@ -641,7 +703,7 @@ mod integration_tests;
 mod tests {
     use super::*;
     use soroban_sdk::testutils::Address as _;
-    use soroban_sdk::{Env, Address};
+    use soroban_sdk::{Address, Env};
 
     fn setup_pool(env: &Env) -> (ZendSwapPoolClient<'_>, Address, Address, Address) {
         let admin = Address::generate(env);
@@ -673,8 +735,10 @@ mod tests {
         assets.push_back(usdc_addr.clone());
         assets.push_back(eurc_addr.clone());
         client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
-        soroban_sdk::token::StellarAssetClient::new(env, &usdc_addr).mint(&depositor, &1_000_000_000);
-        soroban_sdk::token::StellarAssetClient::new(env, &eurc_addr).mint(&depositor, &1_000_000_000);
+        soroban_sdk::token::StellarAssetClient::new(env, &usdc_addr)
+            .mint(&depositor, &1_000_000_000);
+        soroban_sdk::token::StellarAssetClient::new(env, &eurc_addr)
+            .mint(&depositor, &1_000_000_000);
         (client, usdc_addr, eurc_addr, depositor, contract_id)
     }
 
@@ -758,12 +822,14 @@ mod tests {
         let env = Env::default();
         let (client, _, _, _) = setup_pool(&env);
         let empty_root = client.get_root();
-        let commitment = BytesN::from_array(&env, &[
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ]);
+        let commitment = BytesN::from_array(
+            &env,
+            &[
+                0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ],
+        );
         let (leaf_idx, new_root) = client.insert_leaf(&commitment);
         assert_eq!(leaf_idx, 0);
         assert_ne!(new_root, empty_root);
@@ -776,22 +842,25 @@ mod tests {
     fn test_insert_two_leaves_root_matches_compute_root() {
         let env = Env::default();
         env.cost_estimate().budget().reset_unlimited();
-        env.budget().reset_unlimited();
         let (client, _, _, _) = setup_pool(&env);
 
         // Values must be < BN254 field modulus.
-        let commitment_a = BytesN::from_array(&env, &[
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0A,
-        ]);
-        let commitment_b = BytesN::from_array(&env, &[
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B,
-        ]);
+        let commitment_a = BytesN::from_array(
+            &env,
+            &[
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x0A,
+            ],
+        );
+        let commitment_b = BytesN::from_array(
+            &env,
+            &[
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x0B,
+            ],
+        );
 
         let (idx_a, _) = client.insert_leaf(&commitment_a);
         let (idx_b, root_after_b) = client.insert_leaf(&commitment_b);
@@ -810,18 +879,19 @@ mod tests {
     fn test_verify_merkle_root() {
         let env = Env::default();
         env.cost_estimate().budget().reset_unlimited();
-        env.budget().reset_unlimited();
         let (client, _, _, _) = setup_pool(&env);
 
         let empty_root = client.get_root();
         assert!(client.verify_merkle_root(&empty_root));
 
-        let commitment = BytesN::from_array(&env, &[
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42,
-        ]);
+        let commitment = BytesN::from_array(
+            &env,
+            &[
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x42,
+            ],
+        );
         let (_, new_root) = client.insert_leaf(&commitment);
         assert!(client.verify_merkle_root(&new_root));
 
@@ -833,7 +903,6 @@ mod tests {
     fn test_recent_roots_buffer_capacity() {
         let env = Env::default();
         env.cost_estimate().budget().reset_unlimited();
-        env.budget().reset_unlimited();
         let (client, _, _, _) = setup_pool(&env);
 
         let empty_root = client.get_root();
@@ -853,7 +922,6 @@ mod tests {
     fn test_single_leaf_root_parity() {
         let env = Env::default();
         env.cost_estimate().budget().reset_unlimited();
-        env.budget().reset_unlimited();
         let (client, _, _, _) = setup_pool(&env);
 
         let mut leaf_bytes = [0u8; 32];
@@ -880,7 +948,10 @@ mod tests {
         assert_eq!(leaf_idx, 0);
         assert_eq!(client.get_leaf_count(), 1);
         assert_eq!(client.get_leaf(&0), c);
-        assert_eq!(TokenClient::new(&env, &usdc_addr).balance(&contract_id), 1000);
+        assert_eq!(
+            TokenClient::new(&env, &usdc_addr).balance(&contract_id),
+            1000
+        );
     }
 
     #[test]
@@ -891,7 +962,10 @@ mod tests {
         let c = commitment(&env, 7);
         let leaf_idx = client.deposit(&depositor, &1u64, &500, &c);
         assert_eq!(leaf_idx, 0);
-        assert_eq!(TokenClient::new(&env, &eurc_addr).balance(&contract_id), 500);
+        assert_eq!(
+            TokenClient::new(&env, &eurc_addr).balance(&contract_id),
+            500
+        );
     }
 
     #[test]
@@ -926,7 +1000,6 @@ mod tests {
         let env = Env::default();
         env.mock_all_auths();
         env.cost_estimate().budget().reset_unlimited();
-        env.budget().reset_unlimited();
         let (client, _usdc_addr, _eurc_addr, depositor, _) = setup_pool_with_sac(&env);
         for i in 0u32..5 {
             let asset_id: u64 = if i % 2 == 0 { 0 } else { 1 };
@@ -970,17 +1043,19 @@ mod tests {
         let usdc_addr = usdc_sac.address();
         let eurc_addr = eurc_sac.address();
         let verifier = env.register(mock_verifier::MockVerifier, ());
-        
+
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(env, &contract_id);
         let mut assets = Vec::new(env);
         assets.push_back(usdc_addr.clone());
         assets.push_back(eurc_addr.clone());
         client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
-        
-        soroban_sdk::token::StellarAssetClient::new(env, &usdc_addr).mint(&depositor, &1_000_000_000);
-        soroban_sdk::token::StellarAssetClient::new(env, &eurc_addr).mint(&depositor, &1_000_000_000);
-        
+
+        soroban_sdk::token::StellarAssetClient::new(env, &usdc_addr)
+            .mint(&depositor, &1_000_000_000);
+        soroban_sdk::token::StellarAssetClient::new(env, &eurc_addr)
+            .mint(&depositor, &1_000_000_000);
+
         (client, usdc_addr, eurc_addr, depositor, contract_id)
     }
 
@@ -994,7 +1069,8 @@ mod tests {
 
         let eurc_client = TokenClient::new(&env, &eurc_addr);
 
-        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_id, &10_000_000);
+        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr)
+            .mint(&contract_id, &10_000_000);
 
         let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
         let leaf_idx = client.deposit(&depositor, &0u64, &500, &commitment);
@@ -1031,32 +1107,52 @@ mod tests {
         let (client, _usdc_addr, eurc_addr, depositor, contract_id) =
             setup_pool_with_mock_verifier(&env);
 
-        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_id, &10_000_000);
+        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr)
+            .mint(&contract_id, &10_000_000);
 
         let commitment_bytes: [u8; 32] = [
-            0x10, 0x53, 0xdc, 0xa3, 0xa0, 0x15, 0x9d, 0x82,
-            0x31, 0xc5, 0x22, 0xb2, 0xb8, 0x12, 0x5e, 0xf5,
-            0x9a, 0xe9, 0x32, 0xf1, 0x3f, 0x9a, 0x45, 0xcc,
-            0x04, 0xe6, 0xcd, 0x94, 0x8d, 0xc5, 0xc9, 0x1b,
+            0x10, 0x53, 0xdc, 0xa3, 0xa0, 0x15, 0x9d, 0x82, 0x31, 0xc5, 0x22, 0xb2, 0xb8, 0x12,
+            0x5e, 0xf5, 0x9a, 0xe9, 0x32, 0xf1, 0x3f, 0x9a, 0x45, 0xcc, 0x04, 0xe6, 0xcd, 0x94,
+            0x8d, 0xc5, 0xc9, 0x1b,
         ];
-        client.deposit(&depositor, &0u64, &500, &BytesN::from_array(&env, &commitment_bytes));
+        client.deposit(
+            &depositor,
+            &0u64,
+            &500,
+            &BytesN::from_array(&env, &commitment_bytes),
+        );
 
         const STATIC_PROOF: &[u8] = include_bytes!("../../ultrahonk-verifier/static_proof.proof");
         let proof = Bytes::from_slice(&env, STATIC_PROOF);
 
         let recipient = Address::generate(&env);
         let nullifier_bytes: [u8; 32] = [
-            0x04, 0x5e, 0x9c, 0xf1, 0x3d, 0x3a, 0xb9, 0x2c,
-            0xc2, 0x7b, 0xc4, 0xce, 0x81, 0x11, 0xd4, 0xc3,
-            0x27, 0x8c, 0xe8, 0x47, 0x64, 0x81, 0x26, 0x48,
-            0xe6, 0x91, 0x13, 0xb4, 0x35, 0x07, 0xda, 0xf8,
+            0x04, 0x5e, 0x9c, 0xf1, 0x3d, 0x3a, 0xb9, 0x2c, 0xc2, 0x7b, 0xc4, 0xce, 0x81, 0x11,
+            0xd4, 0xc3, 0x27, 0x8c, 0xe8, 0x47, 0x64, 0x81, 0x26, 0x48, 0xe6, 0x91, 0x13, 0xb4,
+            0x35, 0x07, 0xda, 0xf8,
         ];
         let nullifier_hash = BytesN::from_array(&env, &nullifier_bytes);
         let root = client.get_root();
 
-        client.withdraw(&recipient, &0u64, &1u64, &proof, &nullifier_hash, &root, &460i128);
+        client.withdraw(
+            &recipient,
+            &0u64,
+            &1u64,
+            &proof,
+            &nullifier_hash,
+            &root,
+            &460i128,
+        );
 
-        let res2 = client.try_withdraw(&recipient, &0u64, &1u64, &proof, &nullifier_hash, &root, &460i128);
+        let res2 = client.try_withdraw(
+            &recipient,
+            &0u64,
+            &1u64,
+            &proof,
+            &nullifier_hash,
+            &root,
+            &460i128,
+        );
         assert!(res2.is_err());
     }
 
@@ -1068,25 +1164,38 @@ mod tests {
         let (client, _usdc_addr, eurc_addr, depositor, contract_id) =
             setup_pool_with_mock_verifier(&env);
 
-        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_id, &10_000_000);
+        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr)
+            .mint(&contract_id, &10_000_000);
 
         let commitment_bytes: [u8; 32] = [
-            0x10, 0x53, 0xdc, 0xa3, 0xa0, 0x15, 0x9d, 0x82,
-            0x31, 0xc5, 0x22, 0xb2, 0xb8, 0x12, 0x5e, 0xf5,
-            0x9a, 0xe9, 0x32, 0xf1, 0x3f, 0x9a, 0x45, 0xcc,
-            0x04, 0xe6, 0xcd, 0x94, 0x8d, 0xc5, 0xc9, 0x1b,
+            0x10, 0x53, 0xdc, 0xa3, 0xa0, 0x15, 0x9d, 0x82, 0x31, 0xc5, 0x22, 0xb2, 0xb8, 0x12,
+            0x5e, 0xf5, 0x9a, 0xe9, 0x32, 0xf1, 0x3f, 0x9a, 0x45, 0xcc, 0x04, 0xe6, 0xcd, 0x94,
+            0x8d, 0xc5, 0xc9, 0x1b,
         ];
-        client.deposit(&depositor, &0u64, &500, &BytesN::from_array(&env, &commitment_bytes));
+        client.deposit(
+            &depositor,
+            &0u64,
+            &500,
+            &BytesN::from_array(&env, &commitment_bytes),
+        );
 
         const STATIC_PROOF: &[u8] = include_bytes!("../../ultrahonk-verifier/static_proof.proof");
         let proof = Bytes::from_slice(&env, STATIC_PROOF);
 
         let recipient = Address::generate(&env);
         let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
-        
+
         let fake_root = BytesN::from_array(&env, &[0xFF; 32]);
 
-        let res = client.try_withdraw(&recipient, &0u64, &1u64, &proof, &nullifier_hash, &fake_root, &460i128);
+        let res = client.try_withdraw(
+            &recipient,
+            &0u64,
+            &1u64,
+            &proof,
+            &nullifier_hash,
+            &fake_root,
+            &460i128,
+        );
         assert!(res.is_err());
     }
 
@@ -1098,7 +1207,8 @@ mod tests {
         let (client, _usdc_addr, eurc_addr, depositor, contract_id) =
             setup_pool_with_mock_verifier(&env);
 
-        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_id, &10_000_000);
+        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr)
+            .mint(&contract_id, &10_000_000);
 
         let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
         client.deposit(&depositor, &0u64, &500, &commitment);
@@ -1109,7 +1219,15 @@ mod tests {
         let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
         let root = client.get_root();
 
-        let res = client.try_withdraw(&recipient, &0u64, &1u64, &garbage_proof, &nullifier_hash, &root, &460i128);
+        let res = client.try_withdraw(
+            &recipient,
+            &0u64,
+            &1u64,
+            &garbage_proof,
+            &nullifier_hash,
+            &root,
+            &460i128,
+        );
         assert!(res.is_err());
     }
 
@@ -1173,12 +1291,24 @@ mod tests {
         assets.push_back(eurc.clone());
         client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
 
-        assert!(client.try_set_rate(&admin, &0u64, &1u64, &99_999, &10_000_001).is_err());
-        assert!(client.try_set_rate(&admin, &0u64, &1u64, &9_200_000, &9_999_999).is_err());
-        assert!(client.try_set_rate(&admin, &0u64, &1u64, &99_999, &10_000_000).is_err());
-        assert!(client.try_set_rate(&admin, &0u64, &1u64, &100_000_001, &10_000_000).is_err());
-        assert!(client.try_set_rate(&admin, &0u64, &1u64, &0, &10_000_000).is_err());
-        assert!(client.try_set_rate(&admin, &0u64, &1u64, &9_200_000, &0).is_err());
+        assert!(client
+            .try_set_rate(&admin, &0u64, &1u64, &99_999, &10_000_001)
+            .is_err());
+        assert!(client
+            .try_set_rate(&admin, &0u64, &1u64, &9_200_000, &9_999_999)
+            .is_err());
+        assert!(client
+            .try_set_rate(&admin, &0u64, &1u64, &99_999, &10_000_000)
+            .is_err());
+        assert!(client
+            .try_set_rate(&admin, &0u64, &1u64, &100_000_001, &10_000_000)
+            .is_err());
+        assert!(client
+            .try_set_rate(&admin, &0u64, &1u64, &0, &10_000_000)
+            .is_err());
+        assert!(client
+            .try_set_rate(&admin, &0u64, &1u64, &9_200_000, &0)
+            .is_err());
     }
 
     #[test]
@@ -1226,7 +1356,6 @@ mod tests {
         let env = Env::default();
         env.mock_all_auths();
         env.cost_estimate().budget().reset_unlimited();
-        env.budget().reset_unlimited();
 
         let admin = Address::generate(&env);
         let depositor = Address::generate(&env);
@@ -1235,17 +1364,20 @@ mod tests {
         let usdc_addr = usdc_sac.address();
         let eurc_addr = eurc_sac.address();
         let verifier = env.register(mock_verifier::MockVerifier, ());
-        
+
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(&env, &contract_id);
         let mut assets = Vec::new(&env);
         assets.push_back(usdc_addr.clone());
         assets.push_back(eurc_addr.clone());
         client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
-        
-        soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&depositor, &1_000_000_000);
-        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor, &1_000_000_000);
-        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_id, &10_000_000);
+
+        soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr)
+            .mint(&depositor, &1_000_000_000);
+        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr)
+            .mint(&depositor, &1_000_000_000);
+        soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr)
+            .mint(&contract_id, &10_000_000);
 
         let eurc_client = TokenClient::new(&env, &eurc_addr);
 
