@@ -1,7 +1,7 @@
 export interface Note {
   id: string;
   amount: string;
-  asset: 'USDC' | 'EURC';
+  asset: string;
   secret: string;
   commitment: string;
   leafIndex: number | null;
@@ -14,7 +14,7 @@ export interface Note {
 export interface Transaction {
   type: 'deposit' | 'withdrawal';
   amount: string;
-  asset: 'USDC' | 'EURC';
+  asset: string;
   txHash: string;
   timestamp: number;
   privacy: 'public' | 'private';
@@ -26,7 +26,7 @@ export interface Recipient {
   department: string;
   address: string;
   amount: string;
-  asset: 'USDC' | 'EURC';
+  asset: string;
 }
 
 export interface TeamMember {

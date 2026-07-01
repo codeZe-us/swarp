@@ -1,6 +1,5 @@
 import { rpc, scValToNative, xdr } from '@stellar/stellar-sdk';
-import { POOL_CONTRACT_ID, SOROBAN_RPC_URL } from './constants';
-import { withRetry } from './contracts';
+import { withRetry, getConfig, getLeafCount, getLeaf } from './contracts';
 import { getZeroValues } from './merkle';
 
 export interface DepositEventData {
@@ -14,6 +13,7 @@ export interface DepositEventData {
  * Automatically handles historical query limits (pruning to 7-day windows in RPC nodes).
  */
 export async function fetchDepositEvents(fromLedger?: number): Promise<DepositEventData[]> {
+  const { POOL_CONTRACT_ID, SOROBAN_RPC_URL } = getConfig();
   if (!POOL_CONTRACT_ID) {
     console.warn('MOCK MODE: fetchDepositEvents');
     return [];
@@ -78,10 +78,45 @@ export async function fetchDepositEvents(fromLedger?: number): Promise<DepositEv
 }
 
 /**
+ * Reconstructs the full leaf array by reading directly from on-chain contract storage.
+ * More reliable than events since it reads from persistent storage, not ephemeral event logs.
+ */
+export async function reconstructCommitmentsFromChain(): Promise<bigint[]> {
+  const count = await getLeafCount();
+  if (count === 0) return [];
+
+  const leaves: bigint[] = [];
+  for (let i = 0; i < count; i++) {
+    try {
+      const hexLeaf = await getLeaf(i);
+      leaves.push(BigInt('0x' + hexLeaf));
+    } catch (e) {
+      console.warn(`Failed to fetch leaf ${i} from chain:`, e);
+      // Fill with zero leaf on error
+      const zeros = getZeroValues();
+      leaves.push(zeros[0]);
+    }
+  }
+  return leaves;
+}
+
+/**
  * Reconstructs the full, ordered array of commitments as BigInts.
- * Fills any indexing gaps with the default level-0 zero value.
+ * Primary: reads from on-chain contract storage (getLeaf).
+ * Fallback: reconstructs from deposit events.
  */
 export async function reconstructCommitments(): Promise<bigint[]> {
+  // Try reading directly from the contract first (most reliable)
+  try {
+    const chainLeaves = await reconstructCommitmentsFromChain();
+    if (chainLeaves.length > 0) {
+      console.log(`reconstructCommitments: loaded ${chainLeaves.length} leaves from on-chain storage`);
+      return chainLeaves;
+    }
+  } catch (e) {
+    console.warn('reconstructCommitmentsFromChain failed, falling back to events:', e);
+  }
+
   const events = await fetchDepositEvents();
   const zeros = getZeroValues();
   const zeroLeaf = zeros[0];

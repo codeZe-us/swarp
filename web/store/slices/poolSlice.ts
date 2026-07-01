@@ -1,12 +1,11 @@
 import { StateCreator } from 'zustand';
 import { StoreState } from '../useStore';
-import { getPoolInfo } from '../../lib/contracts';
+import { getPoolInfo, getReserves } from '../../lib/contracts';
 
 export interface PoolSlice {
   merkleRoot: string;
   exchangeRate: { numerator: number; denominator: number };
-  usdcReserves: string;
-  eurcReserves: string;
+  reserves: string[];
   totalDeposits: number;
   commitments: string[];
   fetchPoolState: () => Promise<void>;
@@ -15,39 +14,14 @@ export interface PoolSlice {
 
 const isBrowser = typeof window !== 'undefined';
 
-const getInitialPoolState = () => {
-  if (isBrowser) {
-    const saved = localStorage.getItem('swarp_pool_state');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // Ignore
-      }
-    }
-  }
-  return {
-    merkleRoot: '0',
-    exchangeRate: { numerator: 1, denominator: 1 },
-    usdcReserves: '0',
-    eurcReserves: '0',
-    totalDeposits: 0,
-  };
+const initialPoolState = {
+  merkleRoot: '0',
+  exchangeRate: { numerator: 1, denominator: 1 },
+  reserves: ['0', '0', '0', '0', '0'],
+  totalDeposits: 0,
 };
 
-const getInitialCommitments = () => {
-  if (isBrowser) {
-    const saved = localStorage.getItem('swarp_pool_commitments');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // Ignore
-      }
-    }
-  }
-  return [];
-};
+const initialCommitments: string[] = [];
 
 export const createPoolSlice: StateCreator<
   StoreState,
@@ -55,27 +29,29 @@ export const createPoolSlice: StateCreator<
   [],
   PoolSlice
 > = (set) => {
-  const initialPoolState = getInitialPoolState();
-  const initialCommitments = getInitialCommitments();
-
   return {
     merkleRoot: initialPoolState.merkleRoot,
     exchangeRate: initialPoolState.exchangeRate,
-    usdcReserves: initialPoolState.usdcReserves,
-    eurcReserves: initialPoolState.eurcReserves,
+    reserves: initialPoolState.reserves,
     totalDeposits: initialPoolState.totalDeposits,
     commitments: initialCommitments,
     fetchPoolState: async () => {
       try {
         const poolInfo = await getPoolInfo();
+        let reservesArray: bigint[] = [];
+        try {
+          reservesArray = await getReserves();
+        } catch (e) {
+          console.warn('Failed to fetch get_reserves()', e);
+        }
+        
         const poolState = {
           merkleRoot: poolInfo.currentRoot, // plain 64-char hex, no 0x prefix
           exchangeRate: { 
             numerator: poolInfo.currentRate, 
             denominator: poolInfo.rateDenominator 
           },
-          usdcReserves: poolInfo.usdcReserve.toString(),
-          eurcReserves: poolInfo.eurcReserve.toString(),
+          reserves: reservesArray.length > 0 ? reservesArray.map(r => r.toString()) : ['0', '0', '0', '0', '0'],
           totalDeposits: poolInfo.totalDeposits,
         };
         set(poolState);
@@ -83,34 +59,13 @@ export const createPoolSlice: StateCreator<
           localStorage.setItem('swarp_pool_state', JSON.stringify(poolState));
         }
       } catch (error) {
-        console.warn('Failed to fetch pool state from contract, using fallback mock data:', error);
-        // Fallback to mock data to keep the UI functional when contracts/RPC are not ready
-        const mockState = {
-          merkleRoot: '2d9a6c8e3f4b5a7d8c9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c', // plain 64-char hex
-          exchangeRate: { numerator: 9200000, denominator: 10000000 },
-          usdcReserves: '18420000000', // 18,420 USDC (7 decimals)
-          eurcReserves: '9860000000',  // 9,860 EURC (7 decimals)
-          totalDeposits: 42,
-        };
-        set(mockState);
-        if (isBrowser) {
-          localStorage.setItem('swarp_pool_state', JSON.stringify(mockState));
-        }
+        console.error('Failed to fetch pool state from contract:', error);
       }
     },
     fetchCommitments: async () => {
-      try {
-        const mockCommitments = [
-          '0x1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f',
-          '0x2a3b4c5d6e7f8g9h0i1j2k3l4m5n6o7p8q9r0s1t2u3v4w5x6y7z8a9b0c1d2e3f',
-        ];
-        set({ commitments: mockCommitments });
-        if (isBrowser) {
-          localStorage.setItem('swarp_pool_commitments', JSON.stringify(mockCommitments));
-        }
-      } catch (error) {
-        console.error('Failed to fetch commitments:', error);
-      }
+      // In a real implementation this would query the contract or an indexer for the commitments
+      // For now, we just clear it out since there are no actual deposits yet
+      set({ commitments: [] });
     },
   };
 };

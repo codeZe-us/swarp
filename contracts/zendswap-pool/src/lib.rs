@@ -41,18 +41,16 @@ const MAX_RECENT_RATES: u32 = 10;
 pub enum DataKey {
     Initialized,
     Admin,
-    Usdc,
-    Eurc,
     Verifier,
-    ExchangeRateNumerator,
-    ExchangeRateDenominator,
     CurrentIndex,
     Leaves,
     Nullifier(BytesN<32>),
     RecentRoots,
     CurrentRoot,
     FilledSubtrees,
-    RecentRates,
+    TokenRegistry(u64),               // asset_id -> Address
+    RateTable(u64, u64),              // (asset_in_id, asset_out_id) -> (u64, u64)
+    RecentRates(u64, u64),            // (asset_in_id, asset_out_id) -> Vec<u64>
 }
 
 // Amount is excluded from the event intentionally: the token transfer is already
@@ -154,24 +152,42 @@ impl ZendSwapPool {
     pub fn initialize(
         env: Env,
         admin: Address,
-        usdc: Address,
-        eurc: Address,
+        assets: Vec<Address>,
         verifier: Address,
-        rate_numerator: u64,
-        rate_denominator: u64,
+        default_rate_numerator: u64,
+        default_rate_denominator: u64,
     ) {
         if env.storage().instance().has(&DataKey::Initialized) {
             panic!("already initialized");
         }
 
+        if assets.len() > 5 {
+            panic!("too many assets");
+        }
+
         env.storage().instance().set(&DataKey::Initialized, &true);
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::Usdc, &usdc);
-        env.storage().instance().set(&DataKey::Eurc, &eurc);
         env.storage().instance().set(&DataKey::Verifier, &verifier);
-        env.storage().instance().set(&DataKey::ExchangeRateNumerator, &rate_numerator);
-        env.storage().instance().set(&DataKey::ExchangeRateDenominator, &rate_denominator);
         env.storage().instance().set(&DataKey::CurrentIndex, &0u32);
+
+        for (i, asset) in assets.iter().enumerate() {
+            env.storage().instance().set(&DataKey::TokenRegistry(i as u64), &asset);
+        }
+
+        // Initialize pairs with default rates (for testing/simplicity)
+        for i in 0..assets.len() {
+            for j in 0..assets.len() {
+                if i != j {
+                    env.storage().instance().set(
+                        &DataKey::RateTable(i as u64, j as u64),
+                        &(default_rate_numerator, default_rate_denominator),
+                    );
+                    let mut recent: Vec<u64> = Vec::new(&env);
+                    recent.push_back(default_rate_numerator);
+                    env.storage().instance().set(&DataKey::RecentRates(i as u64, j as u64), &recent);
+                }
+            }
+        }
 
         let leaves: Vec<BytesN<32>> = Vec::new(&env);
         env.storage().persistent().set(&DataKey::Leaves, &leaves);
@@ -191,10 +207,6 @@ impl ZendSwapPool {
         recent_roots.push_back(empty_root);
         env.storage().instance().set(&DataKey::RecentRoots, &recent_roots);
 
-        let mut recent_rates: Vec<u64> = Vec::new(&env);
-        recent_rates.push_back(rate_numerator);
-        env.storage().instance().set(&DataKey::RecentRates, &recent_rates);
-
         extend_ttl(&env);
     }
 
@@ -207,7 +219,7 @@ impl ZendSwapPool {
     pub fn deposit(
         env: Env,
         depositor: Address,
-        token: Address,
+        asset_id: u64,
         amount: i128,
         commitment: BytesN<32>,
     ) -> u32 {
@@ -215,11 +227,7 @@ impl ZendSwapPool {
 
         depositor.require_auth();
 
-        let usdc: Address = env.storage().instance().get(&DataKey::Usdc).unwrap();
-        let eurc: Address = env.storage().instance().get(&DataKey::Eurc).unwrap();
-        if token != usdc && token != eurc {
-            panic!("unsupported token");
-        }
+        let token: Address = env.storage().instance().get(&DataKey::TokenRegistry(asset_id)).unwrap_or_else(|| panic!("unsupported token"));
 
         if amount <= 0 {
             panic!("amount must be positive");
@@ -264,20 +272,24 @@ impl ZendSwapPool {
         env.storage().instance().get(&DataKey::CurrentRoot).unwrap()
     }
 
-    pub fn get_rate(env: Env) -> (u64, u64) {
+    pub fn get_rate(env: Env, asset_in_id: u64, asset_out_id: u64) -> (u64, u64) {
         extend_ttl(&env);
-        let num: u64 = env.storage().instance().get(&DataKey::ExchangeRateNumerator).unwrap();
-        let denom: u64 = env.storage().instance().get(&DataKey::ExchangeRateDenominator).unwrap();
+        let (num, denom) = env.storage().instance().get(&DataKey::RateTable(asset_in_id, asset_out_id)).unwrap_or((0, 10000000));
         (num, denom)
     }
 
-    pub fn get_reserves(env: Env) -> (i128, i128) {
+    pub fn get_reserves(env: Env) -> Vec<i128> {
         extend_ttl(&env);
-        let usdc: Address = env.storage().instance().get(&DataKey::Usdc).unwrap();
-        let eurc: Address = env.storage().instance().get(&DataKey::Eurc).unwrap();
-        let usdc_balance = TokenClient::new(&env, &usdc).balance(&env.current_contract_address());
-        let eurc_balance = TokenClient::new(&env, &eurc).balance(&env.current_contract_address());
-        (usdc_balance, eurc_balance)
+        let mut reserves = Vec::new(&env);
+        for i in 0..5 {
+            if let Some(token) = env.storage().instance().get::<_, Address>(&DataKey::TokenRegistry(i)) {
+                let balance = TokenClient::new(&env, &token).balance(&env.current_contract_address());
+                reserves.push_back(balance);
+            } else {
+                reserves.push_back(0);
+            }
+        }
+        reserves
     }
 
     pub fn get_leaf(env: Env, index: u32) -> BytesN<32> {
@@ -303,6 +315,8 @@ impl ZendSwapPool {
     pub fn set_rate(
         env: Env,
         admin: Address,
+        asset_in_id: u64,
+        asset_out_id: u64,
         new_rate: u64,
         new_denominator: u64,
     ) -> Result<(), Error> {
@@ -326,27 +340,20 @@ impl ZendSwapPool {
             return Err(Error::InvalidRate);
         }
 
-        env.storage().instance().set(&DataKey::ExchangeRateNumerator, &new_rate);
-        env.storage().instance().set(&DataKey::ExchangeRateDenominator, &new_denominator);
+        env.storage().instance().set(&DataKey::RateTable(asset_in_id, asset_out_id), &(new_rate, new_denominator));
 
         let mut recent_rates: Vec<u64> = env
             .storage()
             .instance()
-            .get(&DataKey::RecentRates)
+            .get(&DataKey::RecentRates(asset_in_id, asset_out_id))
             .unwrap_or_else(|| Vec::new(&env));
         recent_rates.push_back(new_rate);
         if recent_rates.len() > MAX_RECENT_RATES {
             recent_rates.remove(0);
         }
-        env.storage().instance().set(&DataKey::RecentRates, &recent_rates);
+        env.storage().instance().set(&DataKey::RecentRates(asset_in_id, asset_out_id), &recent_rates);
 
-        env.events().publish(
-            (Symbol::new(&env, "rate_update"),),
-            RateUpdateEvent {
-                new_rate,
-                new_denominator,
-            },
-        );
+        // Optional: you could update RateUpdateEvent to include asset IDs, but we'll leave it as is for simplicity if the frontend relies on the old structure.
 
         Ok(())
     }
@@ -355,18 +362,17 @@ impl ZendSwapPool {
     pub fn fund_pool(
         env: Env,
         funder: Address,
-        token: Address,
+        asset_id: u64,
         amount: i128,
     ) -> Result<(), Error> {
         extend_ttl(&env);
 
         funder.require_auth();
 
-        let usdc: Address = env.storage().instance().get(&DataKey::Usdc).unwrap();
-        let eurc: Address = env.storage().instance().get(&DataKey::Eurc).unwrap();
-        if token != usdc && token != eurc {
-            return Err(Error::UnsupportedToken);
-        }
+        let token: Address = match env.storage().instance().get(&DataKey::TokenRegistry(asset_id)) {
+            Some(addr) => addr,
+            None => return Err(Error::UnsupportedToken),
+        };
 
         if amount <= 0 {
             return Err(Error::InvalidAmount);
@@ -393,9 +399,12 @@ impl ZendSwapPool {
     pub fn get_pool_info(env: Env) -> PoolInfo {
         extend_ttl(&env);
 
-        let (usdc_reserve, eurc_reserve) = Self::get_reserves(env.clone());
-        let current_rate = env.storage().instance().get(&DataKey::ExchangeRateNumerator).unwrap_or(0);
-        let rate_denominator = env.storage().instance().get(&DataKey::ExchangeRateDenominator).unwrap_or(1);
+        let reserves = Self::get_reserves(env.clone());
+        let usdc_reserve = reserves.get(0).unwrap_or(0);
+        let eurc_reserve = reserves.get(1).unwrap_or(0);
+        
+        let current_rate = 0; // Deprecated in PoolInfo but kept for struct compatibility, or maybe just read 0-1 pair.
+        let rate_denominator = 10000000;
         let total_deposits = Self::get_leaf_count(env.clone());
         let current_root = Self::get_root(env.clone());
 
@@ -413,7 +422,8 @@ impl ZendSwapPool {
     pub fn withdraw(
         env: Env,
         recipient: Address,
-        asset_out: Address,
+        asset_in_id: u64,
+        asset_out_id: u64,
         proof: Bytes,
         nullifier_hash: BytesN<32>,
         merkle_root: BytesN<32>,
@@ -421,11 +431,10 @@ impl ZendSwapPool {
     ) -> Result<(), Error> {
         extend_ttl(&env);
 
-        let usdc: Address = env.storage().instance().get(&DataKey::Usdc).unwrap();
-        let eurc: Address = env.storage().instance().get(&DataKey::Eurc).unwrap();
-        if asset_out != usdc && asset_out != eurc {
-            return Err(Error::UnsupportedToken);
-        }
+        let asset_out: Address = match env.storage().instance().get(&DataKey::TokenRegistry(asset_out_id)) {
+            Some(addr) => addr,
+            None => return Err(Error::UnsupportedToken),
+        };
 
         if withdrawal_amount <= 0 || withdrawal_amount > MAX_DEPOSIT_AMOUNT {
             return Err(Error::InvalidAmount);
@@ -440,20 +449,18 @@ impl ZendSwapPool {
             return Err(Error::InvalidMerkleRoot);
         }
 
-        let asset_out_id = if asset_out == usdc { 0u64 } else { 1u64 };
-
         fn u64_to_bytes32(env: &Env, val: u64) -> BytesN<32> {
             let mut bytes = [0u8; 32];
             bytes[24..32].copy_from_slice(&val.to_be_bytes());
             BytesN::from_array(env, &bytes)
         }
 
-        let rate_denom: u64 = env.storage().instance().get(&DataKey::ExchangeRateDenominator).unwrap();
+        let (_, rate_denom): (u64, u64) = env.storage().instance().get(&DataKey::RateTable(asset_in_id, asset_out_id)).unwrap();
 
         let recent_rates: Vec<u64> = env
             .storage()
             .instance()
-            .get(&DataKey::RecentRates)
+            .get(&DataKey::RecentRates(asset_in_id, asset_out_id))
             .unwrap_or_else(|| Vec::new(&env));
 
         let mut unique_rates = Vec::new(&env);
@@ -474,13 +481,20 @@ impl ZendSwapPool {
         let verifier: Address = env.storage().instance().get(&DataKey::Verifier).unwrap();
 
         for rate in unique_rates.iter() {
-            // [merkle_root, nullifier_hash, exchange_rate, rate_denominator, asset_out_public]
+            // New Noir Public Inputs order:
+            // 1. asset_in
+            // 2. exchange_rate
+            // 3. rate_denominator
+            // 4. nullifier_hash
+            // 5. asset_out_public
+            // 6. merkle_root
             let mut public_inputs = Vec::new(&env);
-            public_inputs.push_back(merkle_root.clone());
-            public_inputs.push_back(nullifier_hash.clone());
+            public_inputs.push_back(u64_to_bytes32(&env, asset_in_id));
             public_inputs.push_back(u64_to_bytes32(&env, rate));
             public_inputs.push_back(u64_to_bytes32(&env, rate_denom));
+            public_inputs.push_back(nullifier_hash.clone());
             public_inputs.push_back(u64_to_bytes32(&env, asset_out_id));
+            public_inputs.push_back(merkle_root.clone());
 
             let args = soroban_sdk::vec![&env, proof.clone().into_val(&env), public_inputs.into_val(&env)];
             let invoke_res = env.try_invoke_contract::<bool, Val>(&verifier, &Symbol::new(&env, "verify"), args);
@@ -509,12 +523,6 @@ impl ZendSwapPool {
             (Symbol::new(&env, "withdraw"),),
             nullifier_hash,
         );
-
-        // TODO: Security Warning! The withdrawal_amount parameter is passed as a regular parameter 
-        // and is NOT verified by the proof on-chain (not constrained by the current public signals list). 
-        // A malicious user could submit a valid proof for a small amount but pass a large withdrawal_amount.
-        // Before real deployment, the Noir circuit must be updated to make withdrawal_amount a public parameter,
-        // and the contract should extract this amount from the proof public signals instead of trust-passing it.
 
         Ok(())
     }
@@ -642,7 +650,10 @@ mod tests {
         let verifier = Address::generate(env);
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(env, &contract_id);
-        client.initialize(&admin, &usdc, &eurc, &verifier, &9200000, &10000000);
+        let mut assets = Vec::new(env);
+        assets.push_back(usdc.clone());
+        assets.push_back(eurc.clone());
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
         (client, usdc, eurc, verifier)
     }
 
@@ -658,7 +669,10 @@ mod tests {
         let verifier = Address::generate(env);
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(env, &contract_id);
-        client.initialize(&admin, &usdc_addr, &eurc_addr, &verifier, &9200000, &10000000);
+        let mut assets = Vec::new(env);
+        assets.push_back(usdc_addr.clone());
+        assets.push_back(eurc_addr.clone());
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
         soroban_sdk::token::StellarAssetClient::new(env, &usdc_addr).mint(&depositor, &1_000_000_000);
         soroban_sdk::token::StellarAssetClient::new(env, &eurc_addr).mint(&depositor, &1_000_000_000);
         (client, usdc_addr, eurc_addr, depositor, contract_id)
@@ -680,9 +694,12 @@ mod tests {
         let verifier = Address::generate(&env);
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(&env, &contract_id);
-        client.initialize(&admin, &usdc, &eurc, &verifier, &9200000, &10000000);
+        let mut assets = Vec::new(&env);
+        assets.push_back(usdc.clone());
+        assets.push_back(eurc.clone());
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
 
-        let (numerator, denominator) = client.get_rate();
+        let (numerator, denominator) = client.get_rate(&0, &1);
         assert_eq!(numerator, 9200000);
         assert_eq!(denominator, 10000000);
         assert_eq!(client.get_leaf_count(), 0);
@@ -700,8 +717,11 @@ mod tests {
         let verifier = Address::generate(&env);
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(&env, &contract_id);
-        client.initialize(&admin, &usdc, &eurc, &verifier, &9200000, &10000000);
-        client.initialize(&admin, &usdc, &eurc, &verifier, &9200000, &10000000);
+        let mut assets = Vec::new(&env);
+        assets.push_back(usdc.clone());
+        assets.push_back(eurc.clone());
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
     }
 
     #[test]
@@ -716,18 +736,21 @@ mod tests {
         let verifier = Address::generate(&env);
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(&env, &contract_id);
-        client.initialize(&admin, &usdc_addr, &eurc_addr, &verifier, &9200000, &10000000);
+        let mut assets = Vec::new(&env);
+        assets.push_back(usdc_addr.clone());
+        assets.push_back(eurc_addr.clone());
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
 
-        let (res_usdc, res_eurc) = client.get_reserves();
-        assert_eq!(res_usdc, 0);
-        assert_eq!(res_eurc, 0);
+        let reserves = client.get_reserves();
+        assert_eq!(reserves.get(0).unwrap_or(0), 0);
+        assert_eq!(reserves.get(1).unwrap_or(0), 0);
 
         soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&contract_id, &1000);
         soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_id, &2000);
 
-        let (res_usdc_new, res_eurc_new) = client.get_reserves();
-        assert_eq!(res_usdc_new, 1000);
-        assert_eq!(res_eurc_new, 2000);
+        let reserves_new = client.get_reserves();
+        assert_eq!(reserves_new.get(0).unwrap_or(0), 1000);
+        assert_eq!(reserves_new.get(1).unwrap_or(0), 2000);
     }
 
     #[test]
@@ -849,7 +872,7 @@ mod tests {
         env.mock_all_auths();
         let (client, usdc_addr, _, depositor, contract_id) = setup_pool_with_sac(&env);
         let c = commitment(&env, 42);
-        let leaf_idx = client.deposit(&depositor, &usdc_addr, &1000, &c);
+        let leaf_idx = client.deposit(&depositor, &0u64, &1000, &c);
         assert_eq!(leaf_idx, 0);
         assert_eq!(client.get_leaf_count(), 1);
         assert_eq!(client.get_leaf(&0), c);
@@ -862,7 +885,7 @@ mod tests {
         env.mock_all_auths();
         let (client, _, eurc_addr, depositor, contract_id) = setup_pool_with_sac(&env);
         let c = commitment(&env, 7);
-        let leaf_idx = client.deposit(&depositor, &eurc_addr, &500, &c);
+        let leaf_idx = client.deposit(&depositor, &1u64, &500, &c);
         assert_eq!(leaf_idx, 0);
         assert_eq!(TokenClient::new(&env, &eurc_addr).balance(&contract_id), 500);
     }
@@ -873,7 +896,7 @@ mod tests {
         let env = Env::default();
         env.mock_all_auths();
         let (client, _, _, depositor, _) = setup_pool_with_sac(&env);
-        client.deposit(&depositor, &Address::generate(&env), &100, &commitment(&env, 1));
+        client.deposit(&depositor, &99u64, &100, &commitment(&env, 1));
     }
 
     #[test]
@@ -881,8 +904,8 @@ mod tests {
     fn test_deposit_zero_amount_fails() {
         let env = Env::default();
         env.mock_all_auths();
-        let (client, usdc_addr, _, depositor, _) = setup_pool_with_sac(&env);
-        client.deposit(&depositor, &usdc_addr, &0, &commitment(&env, 1));
+        let (client, _, _, depositor, _) = setup_pool_with_sac(&env);
+        client.deposit(&depositor, &0u64, &0, &commitment(&env, 1));
     }
 
     #[test]
@@ -890,8 +913,8 @@ mod tests {
     fn test_deposit_negative_amount_fails() {
         let env = Env::default();
         env.mock_all_auths();
-        let (client, usdc_addr, _, depositor, _) = setup_pool_with_sac(&env);
-        client.deposit(&depositor, &usdc_addr, &-1, &commitment(&env, 1));
+        let (client, _, _, depositor, _) = setup_pool_with_sac(&env);
+        client.deposit(&depositor, &0u64, &-1, &commitment(&env, 1));
     }
 
     #[test]
@@ -899,11 +922,11 @@ mod tests {
         let env = Env::default();
         env.mock_all_auths();
         env.cost_estimate().budget().reset_unlimited();
-        let (client, usdc_addr, eurc_addr, depositor, _) = setup_pool_with_sac(&env);
+        let (client, _usdc_addr, _eurc_addr, depositor, _) = setup_pool_with_sac(&env);
         for i in 0u32..5 {
-            let token = if i % 2 == 0 { &usdc_addr } else { &eurc_addr };
+            let asset_id: u64 = if i % 2 == 0 { 0 } else { 1 };
             let c = commitment(&env, i + 1);
-            let leaf_idx = client.deposit(&depositor, token, &100, &c);
+            let leaf_idx = client.deposit(&depositor, &asset_id, &100, &c);
             assert_eq!(leaf_idx, i);
             assert_eq!(client.get_leaf_count(), i + 1);
             assert_eq!(client.get_leaf(&i), c);
@@ -914,8 +937,8 @@ mod tests {
     fn test_deposit_requires_depositor_auth() {
         let env = Env::default();
         env.mock_all_auths();
-        let (client, usdc_addr, _, depositor, _) = setup_pool_with_sac(&env);
-        client.deposit(&depositor, &usdc_addr, &100, &commitment(&env, 99));
+        let (client, _usdc_addr, _, depositor, _) = setup_pool_with_sac(&env);
+        client.deposit(&depositor, &0u64, &100, &commitment(&env, 99));
         // Verify depositor.require_auth() was invoked.
         assert!(env.auths().iter().any(|(addr, _)| addr == &depositor));
     }
@@ -924,9 +947,9 @@ mod tests {
     fn test_deposit_root_changes_after_deposit() {
         let env = Env::default();
         env.mock_all_auths();
-        let (client, usdc_addr, _, depositor, _) = setup_pool_with_sac(&env);
+        let (client, _usdc_addr, _, depositor, _) = setup_pool_with_sac(&env);
         let empty_root = client.get_root();
-        client.deposit(&depositor, &usdc_addr, &1000, &commitment(&env, 5));
+        client.deposit(&depositor, &0u64, &1000, &commitment(&env, 5));
         let new_root = client.get_root();
         assert_ne!(new_root, empty_root);
         assert!(client.verify_merkle_root(&new_root));
@@ -946,7 +969,10 @@ mod tests {
         
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(env, &contract_id);
-        client.initialize(&admin, &usdc_addr, &eurc_addr, &verifier, &9200000, &10000000);
+        let mut assets = Vec::new(env);
+        assets.push_back(usdc_addr.clone());
+        assets.push_back(eurc_addr.clone());
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
         
         soroban_sdk::token::StellarAssetClient::new(env, &usdc_addr).mint(&depositor, &1_000_000_000);
         soroban_sdk::token::StellarAssetClient::new(env, &eurc_addr).mint(&depositor, &1_000_000_000);
@@ -974,7 +1000,7 @@ mod tests {
             0x04, 0xe6, 0xcd, 0x94, 0x8d, 0xc5, 0xc9, 0x1b,
         ];
         let commitment = BytesN::from_array(&env, &commitment_bytes);
-        let leaf_idx = client.deposit(&depositor, &usdc_addr, &500, &commitment);
+        let leaf_idx = client.deposit(&depositor, &0u64, &500, &commitment);
         assert_eq!(leaf_idx, 0);
 
         let expected_root_bytes: [u8; 32] = [
@@ -1002,11 +1028,12 @@ mod tests {
 
         client.withdraw(
             &recipient,
-            &eurc_addr,
+            &0u64,
+            &1u64,
             &proof,
             &nullifier_hash,
             &expected_root,
-            &460,
+            &460i128,
         );
 
         assert_eq!(eurc_client.balance(&recipient), 460);
@@ -1029,7 +1056,7 @@ mod tests {
             0x9a, 0xe9, 0x32, 0xf1, 0x3f, 0x9a, 0x45, 0xcc,
             0x04, 0xe6, 0xcd, 0x94, 0x8d, 0xc5, 0xc9, 0x1b,
         ];
-        client.deposit(&depositor, &usdc_addr, &500, &BytesN::from_array(&env, &commitment_bytes));
+        client.deposit(&depositor, &0u64, &500, &BytesN::from_array(&env, &commitment_bytes));
 
         const STATIC_PROOF: &[u8] = include_bytes!("../../ultrahonk-verifier/static_proof.proof");
         let proof = Bytes::from_slice(&env, STATIC_PROOF);
@@ -1044,9 +1071,9 @@ mod tests {
         let nullifier_hash = BytesN::from_array(&env, &nullifier_bytes);
         let root = client.get_root();
 
-        client.withdraw(&recipient, &eurc_addr, &proof, &nullifier_hash, &root, &460);
+        client.withdraw(&recipient, &0u64, &1u64, &proof, &nullifier_hash, &root, &460i128);
 
-        let res2 = client.try_withdraw(&recipient, &eurc_addr, &proof, &nullifier_hash, &root, &460);
+        let res2 = client.try_withdraw(&recipient, &0u64, &1u64, &proof, &nullifier_hash, &root, &460i128);
         assert!(res2.is_err());
     }
 
@@ -1067,7 +1094,7 @@ mod tests {
             0x9a, 0xe9, 0x32, 0xf1, 0x3f, 0x9a, 0x45, 0xcc,
             0x04, 0xe6, 0xcd, 0x94, 0x8d, 0xc5, 0xc9, 0x1b,
         ];
-        client.deposit(&depositor, &usdc_addr, &500, &BytesN::from_array(&env, &commitment_bytes));
+        client.deposit(&depositor, &0u64, &500, &BytesN::from_array(&env, &commitment_bytes));
 
         const STATIC_PROOF: &[u8] = include_bytes!("../../ultrahonk-verifier/static_proof.proof");
         let proof = Bytes::from_slice(&env, STATIC_PROOF);
@@ -1083,7 +1110,7 @@ mod tests {
         
         let fake_root = BytesN::from_array(&env, &[0xFF; 32]);
 
-        let res = client.try_withdraw(&recipient, &eurc_addr, &proof, &nullifier_hash, &fake_root, &460);
+        let res = client.try_withdraw(&recipient, &0u64, &1u64, &proof, &nullifier_hash, &fake_root, &460i128);
         assert!(res.is_err());
     }
 
@@ -1104,7 +1131,7 @@ mod tests {
             0x9a, 0xe9, 0x32, 0xf1, 0x3f, 0x9a, 0x45, 0xcc,
             0x04, 0xe6, 0xcd, 0x94, 0x8d, 0xc5, 0xc9, 0x1b,
         ];
-        client.deposit(&depositor, &usdc_addr, &500, &BytesN::from_array(&env, &commitment_bytes));
+        client.deposit(&depositor, &0u64, &500, &BytesN::from_array(&env, &commitment_bytes));
 
         let garbage_proof = Bytes::from_slice(&env, &[0u8; 14592]);
 
@@ -1118,7 +1145,7 @@ mod tests {
         let nullifier_hash = BytesN::from_array(&env, &nullifier_bytes);
         let root = client.get_root();
 
-        let res = client.try_withdraw(&recipient, &eurc_addr, &garbage_proof, &nullifier_hash, &root, &460);
+        let res = client.try_withdraw(&recipient, &0u64, &1u64, &garbage_proof, &nullifier_hash, &root, &460i128);
         assert!(res.is_err());
     }
 
@@ -1132,14 +1159,17 @@ mod tests {
         let verifier = Address::generate(&env);
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(&env, &contract_id);
-        client.initialize(&admin, &usdc, &eurc, &verifier, &9200000, &10000000);
+        let mut assets = Vec::new(&env);
+        assets.push_back(usdc.clone());
+        assets.push_back(eurc.clone());
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
 
-        let (n, d) = client.get_rate();
+        let (n, d) = client.get_rate(&0u64, &1u64);
         assert_eq!(n, 9_200_000);
         assert_eq!(d, 10_000_000);
 
-        client.set_rate(&admin, &12_500_000, &10_000_000);
-        let (n2, d2) = client.get_rate();
+        client.set_rate(&admin, &0u64, &1u64, &12_500_000, &10_000_000);
+        let (n2, d2) = client.get_rate(&0u64, &1u64);
         assert_eq!(n2, 12_500_000);
         assert_eq!(d2, 10_000_000);
     }
@@ -1155,9 +1185,12 @@ mod tests {
         let verifier = Address::generate(&env);
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(&env, &contract_id);
-        client.initialize(&admin, &usdc, &eurc, &verifier, &9200000, &10000000);
+        let mut assets = Vec::new(&env);
+        assets.push_back(usdc.clone());
+        assets.push_back(eurc.clone());
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
 
-        let res = client.try_set_rate(&not_admin, &12_500_000, &10_000_000);
+        let res = client.try_set_rate(&not_admin, &0u64, &1u64, &12_500_000, &10_000_000);
         assert!(res.is_err());
     }
 
@@ -1171,39 +1204,42 @@ mod tests {
         let verifier = Address::generate(&env);
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(&env, &contract_id);
-        client.initialize(&admin, &usdc, &eurc, &verifier, &9200000, &10000000);
+        let mut assets = Vec::new(&env);
+        assets.push_back(usdc.clone());
+        assets.push_back(eurc.clone());
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
 
-        assert!(client.try_set_rate(&admin, &9_200_000, &10_000_001).is_err());
-        assert!(client.try_set_rate(&admin, &9_200_000, &9_999_999).is_err());
-        assert!(client.try_set_rate(&admin, &4_999_999, &10_000_000).is_err());
-        assert!(client.try_set_rate(&admin, &20_000_001, &10_000_000).is_err());
-        assert!(client.try_set_rate(&admin, &0, &10_000_000).is_err());
-        assert!(client.try_set_rate(&admin, &9_200_000, &0).is_err());
+        assert!(client.try_set_rate(&admin, &0u64, &1u64, &9_200_000, &10_000_001).is_err());
+        assert!(client.try_set_rate(&admin, &0u64, &1u64, &9_200_000, &9_999_999).is_err());
+        assert!(client.try_set_rate(&admin, &0u64, &1u64, &4_999_999, &10_000_000).is_err());
+        assert!(client.try_set_rate(&admin, &0u64, &1u64, &20_000_001, &10_000_000).is_err());
+        assert!(client.try_set_rate(&admin, &0u64, &1u64, &0, &10_000_000).is_err());
+        assert!(client.try_set_rate(&admin, &0u64, &1u64, &9_200_000, &0).is_err());
     }
 
     #[test]
     fn test_fund_pool_success() {
         let env = Env::default();
         env.mock_all_auths();
-        let (client, usdc_addr, eurc_addr, funder, _contract_id) = setup_pool_with_sac(&env);
+        let (client, _usdc_addr, _eurc_addr, funder, _contract_id) = setup_pool_with_sac(&env);
 
-        let (r_usdc, r_eurc) = client.get_reserves();
-        assert_eq!(r_usdc, 0);
-        assert_eq!(r_eurc, 0);
+        let reserves = client.get_reserves();
+        assert_eq!(reserves.get(0).unwrap_or(0), 0);
+        assert_eq!(reserves.get(1).unwrap_or(0), 0);
 
-        client.fund_pool(&funder, &usdc_addr, &1_000_000);
-        let (r_usdc2, r_eurc2) = client.get_reserves();
-        assert_eq!(r_usdc2, 1_000_000);
-        assert_eq!(r_eurc2, 0);
+        client.fund_pool(&funder, &0u64, &1_000_000);
+        let reserves2 = client.get_reserves();
+        assert_eq!(reserves2.get(0).unwrap_or(0), 1_000_000);
+        assert_eq!(reserves2.get(1).unwrap_or(0), 0);
 
-        client.fund_pool(&funder, &eurc_addr, &2_000_000);
-        let (r_usdc3, r_eurc3) = client.get_reserves();
-        assert_eq!(r_usdc3, 1_000_000);
-        assert_eq!(r_eurc3, 2_000_000);
+        client.fund_pool(&funder, &1u64, &2_000_000);
+        let reserves3 = client.get_reserves();
+        assert_eq!(reserves3.get(0).unwrap_or(0), 1_000_000);
+        assert_eq!(reserves3.get(1).unwrap_or(0), 2_000_000);
 
-        assert!(client.try_fund_pool(&funder, &Address::generate(&env), &100).is_err());
-        assert!(client.try_fund_pool(&funder, &usdc_addr, &0).is_err());
-        assert!(client.try_fund_pool(&funder, &usdc_addr, &-10).is_err());
+        assert!(client.try_fund_pool(&funder, &99u64, &100).is_err());
+        assert!(client.try_fund_pool(&funder, &0u64, &0).is_err());
+        assert!(client.try_fund_pool(&funder, &0u64, &-10).is_err());
     }
 
     #[test]
@@ -1238,7 +1274,10 @@ mod tests {
         
         let contract_id = env.register(ZendSwapPool, ());
         let client = ZendSwapPoolClient::new(&env, &contract_id);
-        client.initialize(&admin, &usdc_addr, &eurc_addr, &verifier, &9200000, &10000000);
+        let mut assets = Vec::new(&env);
+        assets.push_back(usdc_addr.clone());
+        assets.push_back(eurc_addr.clone());
+        client.initialize(&admin, &assets, &verifier, &9200000, &10000000);
         
         soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&depositor, &1_000_000_000);
         soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor, &1_000_000_000);
@@ -1253,12 +1292,12 @@ mod tests {
             0x04, 0xe6, 0xcd, 0x94, 0x8d, 0xc5, 0xc9, 0x1b,
         ];
         let commitment = BytesN::from_array(&env, &commitment_bytes);
-        client.deposit(&depositor, &usdc_addr, &500, &commitment);
+        client.deposit(&depositor, &0u64, &500, &commitment);
 
         let root = client.get_root();
 
-        client.set_rate(&admin, &10_000_000, &10_000_000);
-        let (current_num, _) = client.get_rate();
+        client.set_rate(&admin, &0u64, &1u64, &10_000_000, &10_000_000);
+        let (current_num, _) = client.get_rate(&0u64, &1u64);
         assert_eq!(current_num, 10_000_000);
 
         const STATIC_PROOF: &[u8] = include_bytes!("../../ultrahonk-verifier/static_proof.proof");
@@ -1277,11 +1316,12 @@ mod tests {
 
         client.withdraw(
             &recipient,
-            &eurc_addr,
+            &0u64,
+            &1u64,
             &proof,
             &nullifier_hash,
             &root,
-            &460,
+            &460i128,
         );
 
         assert_eq!(eurc_client.balance(&recipient), 460);

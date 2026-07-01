@@ -2,16 +2,16 @@ import { StateCreator } from 'zustand';
 import { StoreState } from '../useStore';
 
 export interface SwapSlice {
-  assetIn: 'USDC' | 'EURC';
-  assetOut: 'USDC' | 'EURC';
+  assetIn: string;
+  assetOut: string;
   amountIn: string;
   amountOut: string;
   proofStatus: 'idle' | 'generating' | 'success' | 'error';
   proofBytes: string | null;
   isSubmitting: boolean;
   submitStatus: string | null;
-  setAssetIn: (asset: 'USDC' | 'EURC') => void;
-  setAssetOut: (asset: 'USDC' | 'EURC') => void;
+  setAssetIn: (asset: string) => void;
+  setAssetOut: (asset: string) => void;
   setAmountIn: (amount: string) => void;
   setAmountOut: (amount: string) => void;
   setProofStatus: (status: 'idle' | 'generating' | 'success' | 'error') => void;

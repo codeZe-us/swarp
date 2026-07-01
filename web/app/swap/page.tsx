@@ -4,12 +4,13 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useStore } from '../../store/useStore';
 import { createNote, computeNullifier } from '../../lib/note';
-import { submitDeposit, submitWithdraw, getTokenBalance, fundTestnetUSDC } from '../../lib/contracts';
-import { USDC_SAC_ID, EURC_SAC_ID, POOL_CONTRACT_ID } from '../../lib/constants';
+import { submitDeposit, submitWithdraw, getTokenBalance, establishTrustline } from '../../lib/contracts';
 import { Badge } from '../../components/ui/Badge';
 import { reconstructCommitments } from '../../lib/events';
 import { buildTree, getProof, verifyProof, computeRootFromPath } from '../../lib/merkle';
 import { generateSwapProof, SwapProofInput } from '../../lib/prover';
+import { ASSETS, getAssetByCode, getAssetById } from '../../lib/assets';
+import { getRate } from '../../lib/contracts';
 import { formatProofForContract } from '../../lib/proof-formatter';
 
 export default function SwapPage() {
@@ -26,14 +27,21 @@ export default function SwapPage() {
   const exchangeRate = useStore((state) => state.exchangeRate);
   const fetchPoolState = useStore((state) => state.fetchPoolState);
   const notes = useStore((state) => state.notes);
+  const config = useStore((state) => state.config);
   
   const isConnected = status === 'connected';
 
   // Input states (Deposit)
-  const [assetIn, setAssetIn] = useState<'USDC' | 'EURC'>('USDC');
+  const [assetInCode, setAssetInCode] = useState<string>('USDC');
+  const [assetOutCode, setAssetOutCode] = useState<string>('EURC');
   const [amountIn, setAmountIn] = useState<string>('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isDropdownInOpen, setIsDropdownInOpen] = useState(false);
+  const [isDropdownOutOpen, setIsDropdownOutOpen] = useState(false);
+  const dropdownInRef = useRef<HTMLDivElement>(null);
+  const dropdownOutRef = useRef<HTMLDivElement>(null);
+  const [withdrawAssetOutCode, setWithdrawAssetOutCode] = useState<string>('EURC');
+  const [isWithdrawDropdownOpen, setIsWithdrawDropdownOpen] = useState(false);
+  const withdrawDropdownRef = useRef<HTMLDivElement>(null);
 
   // Transaction execution states (Deposit)
   const [depositTxStatus, setDepositTxStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -57,10 +65,15 @@ export default function SwapPage() {
   const [withdrawTxHash, setWithdrawTxHash] = useState<string | null>(null);
 
   // Balances state (defaulting to mock values)
-  const [balances, setBalances] = useState<{ USDC: number; EURC: number }>({
+  const [balances, setBalances] = useState<{ [key: string]: number }>({
     USDC: 18420.00,
     EURC: 9860.00,
+    MGUSD: 0,
+    YLDS: 0,
+    XLM: 0,
   });
+
+  const [currentRate, setCurrentRate] = useState<{ numerator: number; denominator: number }>({ numerator: 9200000, denominator: 10000000 });
 
   // Fetch pool state on mount
   useEffect(() => {
@@ -92,13 +105,17 @@ export default function SwapPage() {
       const fetchRealBalances = async () => {
         try {
           // In mock mode, getTokenBalance handles undefined SAC IDs
-          const usdcBal = await getTokenBalance(address, USDC_SAC_ID || '');
-          const eurcBal = await getTokenBalance(address, EURC_SAC_ID || '');
-          
-          setBalances({
-            USDC: Number(usdcBal) / 10_000_000,
-            EURC: Number(eurcBal) / 10_000_000,
-          });
+          const newBalances: Record<string, number> = {};
+          for (const asset of ASSETS) {
+            const sacId = (config as any)[`${asset.code}_SAC_ID`];
+            if (sacId) {
+              const bal = await getTokenBalance(address, sacId);
+              newBalances[asset.code] = Number(bal) / 10_000_000;
+            } else {
+              newBalances[asset.code] = 0;
+            }
+          }
+          setBalances(prev => ({...prev, ...newBalances}));
         } catch (e) {
           console.warn('Failed to fetch real balances, using fallback mock values:', e);
         }
@@ -108,6 +125,9 @@ export default function SwapPage() {
       setBalances({
         USDC: 0,
         EURC: 0,
+        MGUSD: 0,
+        YLDS: 0,
+        XLM: 0,
       });
     }
   }, [isConnected, address]);
@@ -115,9 +135,9 @@ export default function SwapPage() {
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
+      if (dropdownInRef.current && !dropdownInRef.current.contains(event.target as Node)) setIsDropdownInOpen(false);
+      if (dropdownOutRef.current && !dropdownOutRef.current.contains(event.target as Node)) setIsDropdownOutOpen(false);
+      if (withdrawDropdownRef.current && !withdrawDropdownRef.current.contains(event.target as Node)) setIsWithdrawDropdownOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -128,22 +148,37 @@ export default function SwapPage() {
     return notes.filter((n) => n.status === 'deposited');
   }, [notes]);
 
-  // Determine assetOut based on assetIn for Deposit
-  const assetOut = assetIn === 'USDC' ? 'EURC' : 'USDC';
+  // Fetch pair rate
+
+  useEffect(() => {
+    const fetchPairRate = async () => {
+      const assetIn = getAssetByCode(assetInCode);
+      const assetOut = getAssetByCode(assetOutCode);
+      if (assetIn && assetOut && assetIn.id !== assetOut.id) {
+        try {
+          const rate = await getRate(assetIn.id, assetOut.id);
+          setCurrentRate(rate);
+        } catch (e) {
+          console.warn('Failed to fetch pair rate', e);
+        }
+      }
+    };
+    fetchPairRate();
+  }, [assetInCode, assetOutCode]);
+
 
   // Calculate exchange rate
-  const rateNum = exchangeRate?.numerator || 9200000;
-  const rateDen = exchangeRate?.denominator || 10000000;
+  const rateNum = currentRate.numerator;
+  const rateDen = currentRate.denominator;
   const decimalRate = rateNum / rateDen;
 
   // Compute calculated withdrawal amount in real-time for Deposit
   const calculatedOut = useMemo(() => {
     if (!amountIn || isNaN(parseFloat(amountIn))) return '';
     const val = parseFloat(amountIn);
-    const rate = assetIn === 'USDC' ? decimalRate : 1 / decimalRate;
-    const out = val * rate;
+    const out = val * decimalRate;
     return Number(out.toFixed(7)).toString();
-  }, [amountIn, assetIn, decimalRate]);
+  }, [amountIn, decimalRate]);
 
   // Handle amountIn changes with up to 7 decimal places validation
   const handleAmountChange = (val: string) => {
@@ -157,39 +192,12 @@ export default function SwapPage() {
     }
   };
 
-  const handleFundTestnet = async () => {
-    if (!address) return;
-    setIsFunding(true);
-    setFundError(null);
-    setFundSuccess(null);
-    try {
-      const txHash = await fundTestnetUSDC(address, '200');
-      setFundSuccess(`Funded 200 USDC! Tx: ${txHash.slice(0, 8)}...`);
-      
-      // Update balances
-      if (!USDC_SAC_ID) {
-        // MOCK MODE: Artificially increment balance
-        setBalances((prev) => ({
-          ...prev,
-          USDC: prev.USDC + 200,
-        }));
-      } else {
-        const balance = await getTokenBalance(address, USDC_SAC_ID);
-        setBalances((prev) => ({
-          ...prev,
-          USDC: Number(balance) / 10_000_000,
-        }));
-      }
-    } catch (e: any) {
-      setFundError(e.message || 'Failed to fund testnet account');
-    } finally {
-      setIsFunding(false);
-    }
-  };
+  
 
   // Flip assets and amounts on swap icon click
   const handleFlipAssets = () => {
-    setAssetIn(assetOut);
+    setAssetInCode(assetOutCode);
+    setAssetOutCode(assetInCode);
     if (calculatedOut) {
       setAmountIn(calculatedOut);
     } else {
@@ -199,7 +207,7 @@ export default function SwapPage() {
 
   // Max button fill
   const handleMaxClick = () => {
-    const maxBalance = balances[assetIn];
+    const maxBalance = balances[assetInCode];
     setAmountIn(maxBalance.toString());
   };
 
@@ -213,7 +221,7 @@ export default function SwapPage() {
       return { isValid: false, message: 'Amount must be greater than 0' };
     }
     
-    const balance = balances[assetIn];
+    const balance = balances[assetInCode];
     if (val > balance) {
       return { isValid: false, message: 'Insufficient balance' };
     }
@@ -225,7 +233,7 @@ export default function SwapPage() {
     }
 
     return { isValid: true, message: 'Deposit' };
-  }, [amountIn, assetIn, balances]);
+  }, [amountIn, assetInCode, balances]);
 
   // Deposit transaction submission flow
   const handleDeposit = async () => {
@@ -244,11 +252,11 @@ export default function SwapPage() {
     try {
       const val = parseFloat(amountIn);
       const amountBigInt = BigInt(Math.round(val * 10_000_000));
-      const assetId = assetIn === 'USDC' ? 0 : 1;
-      const tokenAddress = assetIn === 'USDC' ? USDC_SAC_ID : EURC_SAC_ID;
+      const assetId = getAssetByCode(assetInCode)?.id || 0;
+      const tokenAddress = (config as any)[`${assetInCode}_SAC_ID`] || '';
 
       if (!tokenAddress) {
-        console.warn(`MOCK MODE: Token contract for ${assetIn} is not configured.`);
+        console.warn(`MOCK MODE: Token contract for ${assetInCode} is not configured.`);
       }
 
       const note = createNote(amountBigInt, assetId);
@@ -259,7 +267,7 @@ export default function SwapPage() {
 
       const result = await submitDeposit(
         address,
-        tokenAddress,
+        assetId,
         amountBigInt.toString(),
         commitmentHex
       );
@@ -276,7 +284,7 @@ export default function SwapPage() {
       addTransaction({
         type: 'deposit',
         amount: amountIn,
-        asset: assetIn,
+        asset: assetInCode,
         txHash: result.txHash,
         timestamp: Date.now(),
         privacy: 'public',
@@ -359,30 +367,30 @@ export default function SwapPage() {
       // Pre-flight check: Verify Pool Reserves in Output Asset
       // -------------------------------------------------------------
       const depositAmountBig = BigInt(note.amount);
-      const isUSDCIn = note.asset === 'USDC';
+      const isUSDCIn = false; // obsolete variable
       
-      // Calculate exact output withdrawal amount matching contract math
-      let withdrawAmountBig: bigint;
-      if (isUSDCIn) {
-        withdrawAmountBig = (depositAmountBig * BigInt(rateNum)) / BigInt(rateDen);
-      } else {
-        withdrawAmountBig = (depositAmountBig * BigInt(rateDen)) / BigInt(rateNum);
-      }
+      // We need to fetch the rate for the specific pair (note.asset -> withdrawAssetOutCode)
+      const depositAsset = getAssetByCode(note.asset);
+      const withdrawAsset = getAssetByCode(withdrawAssetOutCode);
+      if (!depositAsset || !withdrawAsset) throw new Error('Invalid asset');
+      
+      const withdrawRate = await getRate(depositAsset.id, withdrawAsset.id);
+      const withdrawAmountBig = (depositAmountBig * BigInt(withdrawRate.numerator)) / BigInt(withdrawRate.denominator);
 
       // Read reserves from Zanzibar pool state
-      const usdcReservesBig = BigInt(useStore.getState().usdcReserves || '0');
-      const eurcReservesBig = BigInt(useStore.getState().eurcReserves || '0');
-      const reserveAvailable = isUSDCIn ? eurcReservesBig : usdcReservesBig;
+      const reservesStr = useStore.getState().reserves || [];
+      const reserveAvailableStr = reservesStr[withdrawAsset.id] || '0';
+      const reserveAvailable = BigInt(reserveAvailableStr);
 
       if (reserveAvailable < withdrawAmountBig) {
         throw new Error(
-          `Insufficient pool reserves in ${isUSDCIn ? 'EURC' : 'USDC'} to satisfy this withdrawal. ` +
+          `Insufficient pool reserves in ${withdrawAssetOutCode} to satisfy this withdrawal. ` +
           `Required: ${(Number(withdrawAmountBig) / 10_000_000).toFixed(2)}, ` +
           `Available: ${(Number(reserveAvailable) / 10_000_000).toFixed(2)}.`
         );
       }
 
-      const outputAssetAddress = isUSDCIn ? EURC_SAC_ID : USDC_SAC_ID;
+      const outputAssetAddress = (config as any)[`${withdrawAssetOutCode}_SAC_ID`] || '';
       if (!outputAssetAddress) {
         console.warn(`MOCK MODE: Token contract for output asset is not configured.`);
       }
@@ -407,21 +415,33 @@ export default function SwapPage() {
       const leaves = await reconstructCommitments();
       
       const commitmentBig = BigInt(note.commitment);
-      let leafIdx = note.leafIndex;
-      if (leafIdx === null) {
-        leafIdx = leaves.findIndex((l) => l === commitmentBig);
-      }
-
-      if (leafIdx === -1 || leafIdx === null) {
-        if (!POOL_CONTRACT_ID) leafIdx = 0; // fallback in mock mode
-        else throw new Error('Note commitment not found in historical deposits list.');
+      // Always look up commitment in event-reconstructed leaves — the stored
+      // leafIndex may have been incorrectly set to 0 for all deposits.
+      let leafIdx: number = leaves.findIndex((l) => l === commitmentBig);
+      if (leafIdx === -1) {
+        // Fallback: trust the stored leafIndex only if findIndex failed
+        // (e.g., events window is pruned and the old deposit is no longer queryable)
+        if (note.leafIndex !== null && note.leafIndex !== undefined) {
+          leafIdx = note.leafIndex;
+          console.warn(
+            `Commitment not found in on-chain events (possibly pruned). ` +
+            `Falling back to stored leafIndex=${leafIdx}. Proof may fail if index is wrong.`
+          );
+        } else if (!config?.POOL_CONTRACT_ID) {
+          leafIdx = 0; // mock mode fallback
+        } else {
+          throw new Error(
+            'Note commitment not found in historical deposit events. ' +
+            'Events may be pruned or the deposit was never confirmed on-chain.'
+          );
+        }
       }
 
       let rootBigInt = buildTree(leaves);
       const { pathElements, pathIndices } = getProof(leaves, leafIdx);
 
       // MOCK MODE: Fix root to be valid!
-      if (!POOL_CONTRACT_ID) {
+      if (!config?.POOL_CONTRACT_ID) {
          rootBigInt = computeRootFromPath(commitmentBig, pathElements, pathIndices);
       }
 
@@ -443,20 +463,20 @@ export default function SwapPage() {
         deposit_amount: note.amount,
         withdrawal_amount: withdrawAmountBig.toString(),
         secret: toHex32(activeSecret),
-        asset_in: isUSDCIn ? '0' : '1',
-        asset_out: isUSDCIn ? '1' : '0',
+        asset_in: depositAsset.id.toString(),
+        asset_out: withdrawAsset.id.toString(),
         path_elements: pathElements.map((el) => toHex32(el)),
         path_indices: pathIndices,
-        exchange_rate: rateNum.toString(),
-        rate_denominator: rateDen.toString(),
+        exchange_rate: withdrawRate.numerator.toString(),
+        rate_denominator: withdrawRate.denominator.toString(),
         nullifier_hash: toHex32(nullifierBig),
-        asset_out_public: isUSDCIn ? '1' : '0',
+        asset_out_public: withdrawAsset.id.toString(),
         merkle_root: toHex32(rootBigInt),
       };
 
       // Trigger Web Worker UltraHonk prover
       let proofResult;
-      if (!POOL_CONTRACT_ID) {
+      if (!config?.POOL_CONTRACT_ID) {
         // MOCK MODE: Simulate prover time and return dummy proof
         setWorkerStage('computing');
         await new Promise((r) => setTimeout(r, 1000));
@@ -482,7 +502,8 @@ export default function SwapPage() {
       // Submit transaction via contracts.ts
       const result = await submitWithdraw(
         recipientAddress,
-        outputAssetAddress,
+        depositAsset.id,
+        withdrawAsset.id,
         proofHex,
         nullifierBig.toString(16).padStart(64, '0'),
         rootBigInt.toString(16).padStart(64, '0'),
@@ -505,7 +526,7 @@ export default function SwapPage() {
       addTransaction({
         type: 'withdrawal',
         amount: (Number(withdrawAmountBig) / 10_000_000).toString(),
-        asset: isUSDCIn ? 'EURC' : 'USDC',
+        asset: withdrawAssetOutCode,
         txHash: result.txHash,
         timestamp: Date.now(),
         privacy: 'private',
@@ -545,13 +566,19 @@ export default function SwapPage() {
         </div>
         <div className="flex items-center gap-3">
           {isConnected && (
-            <button
-              onClick={handleFundTestnet}
-              disabled={isFunding}
-              className="px-4 py-2 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 font-display bg-transparent text-center disabled:opacity-50"
-            >
-              {isFunding ? 'Funding...' : 'Fund USDC'}
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              <Link
+                href="/fund"
+                className="px-3 py-1.5 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[6px] text-[10px] uppercase tracking-wider transition duration-150 font-display bg-transparent"
+              >
+                Fund Testnet
+              </Link>
+              {fundError && (
+                <div className="text-red-400 text-[9px] font-bold max-w-[150px] text-right">
+                  {fundError}
+                </div>
+              )}
+            </div>
           )}
           <Link
             href="/swap/history"
@@ -610,7 +637,7 @@ export default function SwapPage() {
                 <div className="flex items-center justify-between text-xs text-mutedText font-semibold">
                   <span>You deposit</span>
                   <div className="flex items-center gap-1.5 font-mono">
-                    <span>Balance {balances[assetIn].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>Balance {balances[assetInCode].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     {isConnected && (
                       <button 
                         onClick={handleMaxClick}
@@ -632,71 +659,46 @@ export default function SwapPage() {
                   />
                   
                   {/* Asset In Selector Dropdown */}
-                  <div className="relative" ref={dropdownRef}>
+                  <div className="relative" ref={dropdownInRef}>
                     <button
-                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                      onClick={() => setIsDropdownInOpen(!isDropdownInOpen)}
                       className="flex items-center gap-2 bg-[#0B0B0C] border border-[#1D1D1F] hover:border-mutedText/50 px-3 py-1.5 rounded-[9px] text-white text-sm font-bold shadow transition duration-200 font-display"
                     >
-                      {assetIn === 'USDC' ? (
+                      {getAssetByCode(assetInCode) && (
                         <>
-                          <div className="w-5 h-5 rounded-full bg-[#2775CA] flex items-center justify-center text-white text-[10px] font-bold font-sans">
-                            $
+                          <div className={`w-5 h-5 rounded-full ${getAssetByCode(assetInCode)!.iconBgColor} flex items-center justify-center ${getAssetByCode(assetInCode)!.iconTextColor} text-[10px] font-bold font-sans`}>
+                            {getAssetByCode(assetInCode)!.iconSymbol}
                           </div>
-                          <span>USDC</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-5 h-5 rounded-full bg-[#1A365D] border border-[#5E2A8C]/30 flex items-center justify-center text-purple-300 text-[10px] font-bold font-sans">
-                            €
-                          </div>
-                          <span>EURC</span>
+                          <span>{assetInCode}</span>
                         </>
                       )}
-                      <svg className={`w-3.5 h-3.5 text-mutedText transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className={`w-3.5 h-3.5 text-mutedText transition-transform duration-200 ${isDropdownInOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
 
-                    {isDropdownOpen && (
+                    {isDropdownInOpen && (
                       <div className="absolute right-0 mt-2 w-36 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display">
-                        <button
-                          onClick={() => {
-                            if (assetIn !== 'USDC') {
-                              setAssetIn('USDC');
+                        {ASSETS.filter(a => a.code !== assetOutCode).map((asset) => (
+                          <button
+                            key={asset.code}
+                            onClick={() => {
+                              setAssetInCode(asset.code);
                               setAmountIn('');
-                            }
-                            setIsDropdownOpen(false);
-                          }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-[9px] text-xs font-bold transition duration-150 ${
-                            assetIn === 'USDC'
-                              ? 'bg-[#1D1D1F] text-white'
-                              : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
-                          }`}
-                        >
-                          <div className="w-5 h-5 rounded-full bg-[#2775CA] flex items-center justify-center text-white text-[9px] font-bold font-sans">
-                            $
-                          </div>
-                          USDC
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (assetIn !== 'EURC') {
-                              setAssetIn('EURC');
-                              setAmountIn('');
-                            }
-                            setIsDropdownOpen(false);
-                          }}
-                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-[9px] text-xs font-bold transition duration-150 ${
-                            assetIn === 'EURC'
-                              ? 'bg-[#1D1D1F] text-white'
-                              : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
-                          }`}
-                        >
-                          <div className="w-5 h-5 rounded-full bg-[#1A365D] border border-[#5E2A8C]/30 flex items-center justify-center text-purple-300 text-[9px] font-bold font-sans">
-                            €
-                          </div>
-                          EURC
-                        </button>
+                              setIsDropdownInOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-[9px] text-xs font-bold transition duration-150 ${
+                              assetInCode === asset.code
+                                ? 'bg-[#1D1D1F] text-white'
+                                : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
+                            }`}
+                          >
+                            <div className={`w-5 h-5 rounded-full ${asset.iconBgColor} flex items-center justify-center ${asset.iconTextColor} text-[9px] font-bold font-sans`}>
+                              {asset.iconSymbol}
+                            </div>
+                            {asset.code}
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -725,21 +727,46 @@ export default function SwapPage() {
                   <div className="text-[#B488DC] text-3xl font-bold font-mono select-all">
                     {formattedCalculatedOut || '0.00'}
                   </div>
-                  <div className="flex items-center gap-2 bg-[#0B0B0C]/40 border border-[#1D1D1F]/60 px-3 py-1.5 rounded-[9px] text-white text-sm font-bold select-none cursor-not-allowed">
-                    {assetOut === 'USDC' ? (
-                      <>
-                        <div className="w-5 h-5 rounded-full bg-[#2775CA]/70 flex items-center justify-center text-white/70 text-[10px] font-bold font-sans">
-                          $
-                        </div>
-                        <span className="text-white/70 font-display">USDC</span>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-5 h-5 rounded-full bg-[#1A365D]/70 border border-[#5E2A8C]/20 flex items-center justify-center text-purple-300/70 text-[10px] font-bold font-sans">
-                          €
-                        </div>
-                        <span className="text-white/70 font-display">EURC</span>
-                      </>
+                  <div className="relative" ref={dropdownOutRef}>
+                    <button
+                      onClick={() => setIsDropdownOutOpen(!isDropdownOutOpen)}
+                      className="flex items-center gap-2 bg-[#0B0B0C] border border-[#1D1D1F] hover:border-mutedText/50 px-3 py-1.5 rounded-[9px] text-white text-sm font-bold shadow transition duration-200 font-display"
+                    >
+                      {getAssetByCode(assetOutCode) && (
+                        <>
+                          <div className={`w-5 h-5 rounded-full ${getAssetByCode(assetOutCode)!.iconBgColor} flex items-center justify-center ${getAssetByCode(assetOutCode)!.iconTextColor} text-[10px] font-bold font-sans`}>
+                            {getAssetByCode(assetOutCode)!.iconSymbol}
+                          </div>
+                          <span>{assetOutCode}</span>
+                        </>
+                      )}
+                      <svg className={`w-3.5 h-3.5 text-mutedText transition-transform duration-200 ${isDropdownOutOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {isDropdownOutOpen && (
+                      <div className="absolute right-0 mt-2 w-36 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display">
+                        {ASSETS.filter(a => a.code !== assetInCode).map((asset) => (
+                          <button
+                            key={asset.code}
+                            onClick={() => {
+                              setAssetOutCode(asset.code);
+                              setIsDropdownOutOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-[9px] text-xs font-bold transition duration-150 ${
+                              assetOutCode === asset.code
+                                ? 'bg-[#1D1D1F] text-white'
+                                : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
+                            }`}
+                          >
+                            <div className={`w-5 h-5 rounded-full ${asset.iconBgColor} flex items-center justify-center ${asset.iconTextColor} text-[9px] font-bold font-sans`}>
+                              {asset.iconSymbol}
+                            </div>
+                            {asset.code}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -750,9 +777,7 @@ export default function SwapPage() {
             <div className="flex justify-between items-center text-xs text-mutedText mt-4 font-semibold px-1 font-mono">
               <span className="font-sans">Rate</span>
               <span className="text-white font-bold">
-                {assetIn === 'USDC'
-                  ? `1 USDC = ${decimalRate.toFixed(4)} EURC`
-                  : `1 EURC = ${(1 / decimalRate).toFixed(4)} USDC`}
+                {`1 ${assetInCode} = ${decimalRate.toFixed(4)} ${assetOutCode}`}
               </span>
             </div>
 
@@ -781,7 +806,7 @@ export default function SwapPage() {
                   'Connect wallet to deposit'
                 ) : (
                   depositValidation.message === 'Deposit' && amountIn
-                    ? `Deposit ${amountIn} ${assetIn}`
+                    ? `Deposit ${amountIn} ${assetInCode}`
                     : depositValidation.message
                 )}
               </button>
@@ -870,9 +895,9 @@ export default function SwapPage() {
                       {withdrawableNotes.map((note) => {
                         const isSelected = selectedNoteId === note.id;
                         const depAmount = Number(note.amount) / 10_000_000;
-                        const withRate = note.asset === 'USDC' ? decimalRate : 1 / decimalRate;
-                        const withAmount = depAmount * withRate;
-                        const withAsset = note.asset === 'USDC' ? 'EURC' : 'USDC';
+                        // Display logic just shows the note amount
+                        const withAmount = depAmount;
+                        const withAsset = note.asset;
 
                         return (
                           <button
@@ -886,12 +911,8 @@ export default function SwapPage() {
                             }`}
                           >
                             <div className="flex flex-col gap-0.5">
-                              <span className="text-xs font-bold text-white flex items-center gap-1.5 font-mono">
+                              <span className="text-sm font-bold text-white flex items-center gap-1.5 font-mono">
                                 <span>{depAmount.toLocaleString('en-US', { maximumFractionDigits: 7 })} {note.asset}</span>
-                                <svg className="w-3.5 h-3.5 text-[#B488DC]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                </svg>
-                                <span className="text-[#B488DC]">{withAmount.toLocaleString('en-US', { maximumFractionDigits: 7 })} {withAsset}</span>
                               </span>
                               <span className="text-[10px] text-mutedText font-semibold mt-1 font-mono">
                                 Commitment: {note.commitment.slice(0, 8)}...{note.commitment.slice(-8)}
@@ -906,6 +927,55 @@ export default function SwapPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Withdrawal Asset Selector */}
+                {selectedNoteId && (
+                  <div className="flex flex-col gap-1.5 font-display">
+                    <label className="text-xs font-bold text-mutedText uppercase tracking-wider">
+                      Select Output Asset
+                    </label>
+                    <div className="relative" ref={withdrawDropdownRef}>
+                      <button
+                        onClick={() => setIsWithdrawDropdownOpen(!isWithdrawDropdownOpen)}
+                        className="w-full flex items-center justify-between bg-[#000000] border border-[#1D1D1F] hover:border-[#5E2A8C] rounded-[12px] p-3 text-xs text-white transition duration-200"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`w-5 h-5 rounded-full ${getAssetByCode(withdrawAssetOutCode)?.iconBgColor || ''} flex items-center justify-center ${getAssetByCode(withdrawAssetOutCode)?.iconTextColor || ''} text-[10px] font-bold font-sans`}>
+                            {getAssetByCode(withdrawAssetOutCode)?.iconSymbol}
+                          </div>
+                          <span className="font-bold">{withdrawAssetOutCode}</span>
+                        </div>
+                        <svg className={`w-4 h-4 text-mutedText transition-transform duration-200 ${isWithdrawDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      {isWithdrawDropdownOpen && (
+                        <div className="absolute left-0 right-0 mt-2 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display max-h-48 overflow-y-auto">
+                          {ASSETS.map((asset) => (
+                            <button
+                              key={asset.code}
+                              onClick={() => {
+                                setWithdrawAssetOutCode(asset.code);
+                                setIsWithdrawDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-xs font-bold transition duration-150 ${
+                                withdrawAssetOutCode === asset.code
+                                  ? 'bg-[#1D1D1F] text-white'
+                                  : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
+                              }`}
+                            >
+                              <div className={`w-6 h-6 rounded-full ${asset.iconBgColor} flex items-center justify-center ${asset.iconTextColor} text-[11px] font-bold font-sans`}>
+                                {asset.iconSymbol}
+                              </div>
+                              {asset.name} ({asset.code})
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Recipient Stellar Address */}
                 {selectedNoteId && (
@@ -1093,6 +1163,8 @@ export default function SwapPage() {
 
             <p className="text-[10px] text-mutedText/60 text-center mt-4 leading-relaxed font-semibold max-w-sm mx-auto">
               Zero-knowledge proof generation and validation are run locally in the browser before submitting to Soroban.
+              <br /><br />
+              <span className="text-amber-500/80">Note: The deposit asset type will be revealed when you withdraw. The amount stays private.</span>
             </p>
           </div>
         </div>

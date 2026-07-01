@@ -26,7 +26,7 @@ fn main(
     deposit_amount: Field,
     withdrawal_amount: Field,
     secret: Field,
-    asset_in: Field,
+    asset_in: pub Field,
     asset_out: Field,
     path_elements: [Field; 20],
     path_indices: [Field; 20],
@@ -50,13 +50,12 @@ fn main(
     assert(deposit_amount != 0, "deposit_amount must be > 0");
     assert(withdrawal_amount != 0, "withdrawal_amount must be > 0");
 
-    let ai_check = asset_in * (1 - asset_in);
-    assert(ai_check == 0, "asset_in must be binary (0 or 1)");
+    assert(asset_in as u32 < 5, "asset_in must be between 0 and 4");
+    assert(asset_out as u32 < 5, "asset_out must be between 0 and 4");
 
     assert(asset_out == asset_out_public, "asset_out != asset_out_public");
 
-    let asset_sum = asset_in + asset_out;
-    assert(asset_sum == 1, "asset_in + asset_out must equal 1 (no same-asset swaps)");
+    assert(asset_in != asset_out, "asset_in and asset_out must be different (no same-asset swaps)");
 
     let commitment = poseidon2_3([deposit_amount, asset_in, secret]);
 

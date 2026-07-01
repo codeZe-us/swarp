@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cargo build --target wasm32-unknown-unknown --release",
+    "build": "cargo build --target wasm32v1-none --release",
     "test": "cargo test || (echo Warning: Rust host testing skipped due to missing compiler toolchain/dlltool && exit 0)"
   }
 }

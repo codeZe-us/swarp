@@ -1,3 +1,9 @@
+/**
+ * web/lib/prover.ts
+ *
+ * Main-thread orchestrator for ZK proof generation.
+ * Loads the Web Worker from the public/ directory to bypass Next.js Webpack.
+ */
 import { SwapProverInput } from '../workers/prover.worker';
 
 export type SwapProofInput = SwapProverInput;
@@ -6,13 +12,6 @@ export type ProverProgressCallback = (stage: 'loading' | 'computing' | 'proving'
 
 let isProving = false;
 
-/**
- * Generates an UltraHonk proof using a background Web Worker.
- *
- * @param input The private and public inputs to the Noir circuit.
- * @param onProgress Callback invoked as the prover transitions between stages.
- * @returns Promise resolving to the generated proof and public inputs.
- */
 export async function generateSwapProof(
   input: SwapProofInput,
   onProgress?: ProverProgressCallback
@@ -33,13 +32,12 @@ export async function generateSwapProof(
     const circuit = await response.json();
 
     return await new Promise<{ proof: Uint8Array; publicInputs: string[] }>((resolve, reject) => {
-      worker = new Worker(new URL('../workers/prover.worker.ts', import.meta.url));
+      // Load the pre-bundled worker from the public/ directory.
+      // This bypasses Next.js Webpack entirely!
+      worker = new Worker('/prover.worker.js', { type: 'module' });
 
       timeoutId = setTimeout(() => {
-        if (worker) {
-          worker.terminate();
-          worker = null;
-        }
+        if (worker) { worker.terminate(); worker = null; }
         reject(new Error('Proof generation timed out (120s limit exceeded)'));
       }, 120000);
 
@@ -51,48 +49,33 @@ export async function generateSwapProof(
           case 'loading':
           case 'computing':
           case 'proving':
-            if (onProgress) {
-              onProgress(msg.type);
-            }
+            onProgress?.(msg.type);
             break;
           case 'done':
             if (timeoutId) clearTimeout(timeoutId);
-            if (worker) {
-              worker.terminate();
-              worker = null;
-            }
-            resolve({
-              proof: msg.proof,
-              publicInputs: msg.publicInputs,
-            });
+            if (worker) { worker.terminate(); worker = null; }
+            resolve({ proof: msg.proof, publicInputs: msg.publicInputs });
             break;
           case 'error':
             if (timeoutId) clearTimeout(timeoutId);
-            if (worker) {
-              worker.terminate();
-              worker = null;
-            }
+            if (worker) { worker.terminate(); worker = null; }
             reject(new Error(msg.error));
-            break;
-          default:
             break;
         }
       };
 
       worker.onerror = (err) => {
         if (timeoutId) clearTimeout(timeoutId);
-        if (worker) {
-          worker.terminate();
-          worker = null;
-        }
+        if (worker) { worker.terminate(); worker = null; }
         reject(new Error(`Worker error: ${err.message || 'Unknown error'}`));
       };
 
-      worker.postMessage({
-        type: 'PROVE',
-        circuit,
-        input,
-      });
+      console.log('=== PROOF INPUTS ===');
+      console.log(JSON.stringify(input, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+      , 2));
+      console.log('====================');
+      worker.postMessage({ type: 'PROVE', circuit, input });
     });
   } finally {
     isProving = false;

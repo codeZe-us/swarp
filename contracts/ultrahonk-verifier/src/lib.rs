@@ -162,9 +162,9 @@ impl UltraHonkVerifierContract {
     /// # Arguments
     /// 
     /// * `proof`         – raw proof bytes (must be exactly PROOF_BYTES = 14592 bytes)
-    /// * `public_inputs` – 5 public inputs, in the order:
+    /// * `public_inputs` – 6 public inputs, in the order:
     ///                     [merkle_root, nullifier_hash, exchange_rate,
-    ///                      rate_denominator, asset_out_public]
+    ///                      rate_denominator, asset_out_public, asset_in]
     ///
     /// # Returns
     /// `true` on valid proof, `false` on any failure or invalid inputs.
@@ -177,7 +177,7 @@ impl UltraHonkVerifierContract {
             return false;
         }
 
-        if public_inputs.len() != 5 {
+        if public_inputs.len() != 6 {
             return false;
         }
 
@@ -192,16 +192,19 @@ impl UltraHonkVerifierContract {
         //   [2] exchange_rate
         //   [3] rate_denominator
         //   [4] asset_out_public
+        //   [5] asset_in
         //
         // Noir circuit expects declaration order in main.nr:
-        //   exchange_rate, rate_denominator, nullifier_hash, asset_out_public, merkle_root
+        //   asset_in, exchange_rate, rate_denominator, nullifier_hash, asset_out_public, merkle_root
         let merkle_root = public_inputs.get(0).unwrap();
         let nullifier_hash = public_inputs.get(1).unwrap();
         let exchange_rate = public_inputs.get(2).unwrap();
         let rate_denominator = public_inputs.get(3).unwrap();
         let asset_out_public = public_inputs.get(4).unwrap();
+        let asset_in = public_inputs.get(5).unwrap();
 
         let mut pi_bytes = Bytes::new(&env);
+        pi_bytes.append(&Bytes::from_array(&env, &asset_in.to_array()));
         pi_bytes.append(&Bytes::from_array(&env, &exchange_rate.to_array()));
         pi_bytes.append(&Bytes::from_array(&env, &rate_denominator.to_array()));
         pi_bytes.append(&Bytes::from_array(&env, &nullifier_hash.to_array()));
@@ -310,6 +313,11 @@ mod test {
         asset_out_public_bytes[31] = 1;
         public_inputs.push_back(BytesN::from_array(&env, &asset_out_public_bytes));
 
+        // 6. asset_in: 0
+        let mut asset_in_bytes = [0u8; 32];
+        // asset_in is 0 in Prover.toml, so it's all zeros
+        public_inputs.push_back(BytesN::from_array(&env, &asset_in_bytes));
+
         let verified = client.verify(&proof_bytes, &public_inputs);
         assert!(verified, "Valid proof failed verification!");
     }
@@ -359,6 +367,9 @@ mod test {
         asset_out_public_bytes[31] = 1;
         public_inputs.push_back(BytesN::from_array(&env, &asset_out_public_bytes));
 
+        let mut asset_in_bytes = [0u8; 32];
+        public_inputs.push_back(BytesN::from_array(&env, &asset_in_bytes));
+
         let verified = client.verify(&proof_bytes, &public_inputs);
         assert!(!verified, "Modified public input should fail verification!");
     }
@@ -375,7 +386,7 @@ mod test {
 
         let mut public_inputs = Vec::new(&env);
         let dummy = BytesN::from_array(&env, &[0u8; 32]);
-        for _ in 0..5 {
+        for _ in 0..6 {
             public_inputs.push_back(dummy.clone());
         }
 

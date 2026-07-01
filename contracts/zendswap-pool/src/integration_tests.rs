@@ -25,7 +25,14 @@ fn setup_integration_test(
     
     let contract_id = env.register(ZendSwapPool, ());
     let client = ZendSwapPoolClient::new(env, &contract_id);
-    client.initialize(&admin, &usdc_addr, &eurc_addr, &verifier, &9200000, &10000000);
+    
+    let mut assets = Vec::new(env);
+    assets.push_back(usdc_addr.clone());
+    assets.push_back(eurc_addr.clone());
+    
+    client.initialize(&admin, &assets, &verifier);
+    client.set_rate(&admin, &0, &1, &9200000, &10000000);
+    client.set_rate(&admin, &1, &0, &10869565, &10000000);
     
     soroban_sdk::token::StellarAssetClient::new(env, &usdc_addr).mint(&depositor, &1_000_000_000);
     soroban_sdk::token::StellarAssetClient::new(env, &eurc_addr).mint(&depositor, &1_000_000_000);
@@ -53,7 +60,7 @@ fn test_integration_usdc_to_eurc_swap() {
     let initial_pool_eurc = eurc_client.balance(&contract_id);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
-    client.deposit(&depositor, &usdc_addr, &500, &commitment);
+    client.deposit(&depositor, &0, &500, &commitment);
 
     let expected_root = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_ROOT);
     assert_eq!(client.get_root(), expected_root);
@@ -64,7 +71,8 @@ fn test_integration_usdc_to_eurc_swap() {
 
     client.withdraw(
         &recipient,
-        &eurc_addr,
+        &0,
+        &1,
         &proof,
         &nullifier_hash,
         &expected_root,
@@ -78,7 +86,8 @@ fn test_integration_usdc_to_eurc_swap() {
 
     let res = client.try_withdraw(
         &recipient,
-        &eurc_addr,
+        &0,
+        &1,
         &proof,
         &nullifier_hash,
         &expected_root,
@@ -104,7 +113,7 @@ fn test_integration_eurc_to_usdc_swap() {
     let initial_pool_eurc = eurc_client.balance(&contract_id);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::EURC_TO_USDC_COMMITMENT);
-    client.deposit(&depositor, &eurc_addr, &500, &commitment);
+    client.deposit(&depositor, &1, &500, &commitment);
 
     let expected_root = BytesN::from_array(&env, &test_fixtures::EURC_TO_USDC_ROOT);
     assert_eq!(client.get_root(), expected_root);
@@ -115,7 +124,8 @@ fn test_integration_eurc_to_usdc_swap() {
 
     client.withdraw(
         &recipient,
-        &usdc_addr,
+        &1,
+        &0,
         &proof,
         &nullifier_hash,
         &expected_root,
@@ -129,7 +139,8 @@ fn test_integration_eurc_to_usdc_swap() {
 
     let res = client.try_withdraw(
         &recipient,
-        &usdc_addr,
+        &1,
+        &0,
         &proof,
         &nullifier_hash,
         &expected_root,
@@ -151,7 +162,7 @@ fn test_integration_multiple_users_isolation() {
     let admin_b = Address::generate(&env);
     let contract_b = env.register(ZendSwapPool, ());
     let client_b = ZendSwapPoolClient::new(&env, &contract_b);
-    client_b.initialize(&admin_b, &usdc_addr, &eurc_addr, &verifier, &9200000, &10000000);
+    let mut assets_b = Vec::new(&env);\n    assets_b.push_back(usdc_addr.clone());\n    assets_b.push_back(eurc_addr.clone());\n    client_b.initialize(&admin_b, &assets_b, &verifier);\n    client_b.set_rate(&admin_b, &0, &1, &9200000, &10000000);\n    client_b.set_rate(&admin_b, &1, &0, &10869565, &10000000);
     
     let depositor_b = Address::generate(&env);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor_b, &1_000_000_000);
@@ -160,11 +171,11 @@ fn test_integration_multiple_users_isolation() {
     soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&contract_b, &10_000_000);
 
     let commitment_a = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
-    client_a.deposit(&depositor_a, &usdc_addr, &500, &commitment_a);
+    client_a.deposit(&depositor_a, &0, &500, &commitment_a);
     let root_a = client_a.get_root();
 
     let commitment_b = BytesN::from_array(&env, &test_fixtures::EURC_TO_USDC_COMMITMENT);
-    client_b.deposit(&depositor_b, &eurc_addr, &500, &commitment_b);
+    client_b.deposit(&depositor_b, &1, &500, &commitment_b);
     let root_b = client_b.get_root();
 
     let proof_a = Bytes::from_slice(&env, test_fixtures::USDC_TO_EURC_PROOF);
@@ -173,7 +184,8 @@ fn test_integration_multiple_users_isolation() {
 
     client_a.withdraw(
         &recipient_a,
-        &eurc_addr,
+        &0,
+        &1,
         &proof_a,
         &nullifier_a,
         &root_a,
@@ -186,7 +198,8 @@ fn test_integration_multiple_users_isolation() {
 
     client_b.withdraw(
         &recipient_b,
-        &usdc_addr,
+        &1,
+        &0,
         &proof_b,
         &nullifier_b,
         &root_b,
@@ -208,16 +221,22 @@ fn test_integration_double_spend_fails() {
     let (client, usdc_addr, eurc_addr, depositor, _, _) = setup_integration_test(&env);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
-    client.deposit(&depositor, &usdc_addr, &500, &commitment);
+    client.deposit(&depositor, &0, &500, &commitment);
     let root = client.get_root();
 
     let proof = Bytes::from_slice(&env, test_fixtures::USDC_TO_EURC_PROOF);
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient = Address::generate(&env);
 
-    client.withdraw(&recipient, &eurc_addr, &proof, &nullifier_hash, &root, &460);
+    client.withdraw(
+        &recipient,
+        &0,
+        &1, &proof, &nullifier_hash, &root, &460);
 
-    let res = client.try_withdraw(&recipient, &eurc_addr, &proof, &nullifier_hash, &root, &460);
+    let res = client.try_withdraw(
+        &recipient,
+        &0,
+        &1, &proof, &nullifier_hash, &root, &460);
     assert!(res.is_err());
 }
 
@@ -230,7 +249,7 @@ fn test_integration_wrong_merkle_root_fails() {
     let (client, usdc_addr, eurc_addr, depositor, _, _) = setup_integration_test(&env);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
-    client.deposit(&depositor, &usdc_addr, &500, &commitment);
+    client.deposit(&depositor, &0, &500, &commitment);
 
     let proof = Bytes::from_slice(&env, test_fixtures::USDC_TO_EURC_PROOF);
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
@@ -238,7 +257,10 @@ fn test_integration_wrong_merkle_root_fails() {
     
     let fake_root = BytesN::from_array(&env, &[0xAA; 32]);
 
-    let res = client.try_withdraw(&recipient, &eurc_addr, &proof, &nullifier_hash, &fake_root, &460);
+    let res = client.try_withdraw(
+        &recipient,
+        &0,
+        &1, &proof, &nullifier_hash, &fake_root, &460);
     assert!(res.is_err());
 }
 
@@ -251,17 +273,17 @@ fn test_integration_wrong_rate_fails() {
     let (client, usdc_addr, eurc_addr, depositor, _, admin) = setup_integration_test(&env);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
-    client.deposit(&depositor, &usdc_addr, &500, &commitment);
+    client.deposit(&depositor, &0, &500, &commitment);
     let root = client.get_root();
 
-    client.set_rate(&admin, &10_000_000, &10_000_000);
+    client.set_rate(&admin, &0, &1, &10_000_000, &10_000_000);
     
     for _ in 0..11 {
-        client.set_rate(&admin, &10_000_000, &10_000_000);
+        client.set_rate(&admin, &0, &1, &10_000_000, &10_000_000);
     }
 
     let current_rates: Vec<u64> = env.as_contract(&client.address, || {
-        env.storage().instance().get(&DataKey::RecentRates).unwrap()
+        env.storage().instance().get(&DataKey::RecentRates(0, 1)).unwrap()
     });
     std::println!("current_rates in test: {:?}", current_rates);
 
@@ -269,7 +291,10 @@ fn test_integration_wrong_rate_fails() {
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient = Address::generate(&env);
 
-    let res = client.try_withdraw(&recipient, &eurc_addr, &proof, &nullifier_hash, &root, &460);
+    let res = client.try_withdraw(
+        &recipient,
+        &0,
+        &1, &proof, &nullifier_hash, &root, &460);
     assert!(res.is_err());
 }
 
@@ -304,21 +329,24 @@ fn test_integration_wrong_verification_key_fails() {
     
     let contract_id = env.register(ZendSwapPool, ());
     let client = ZendSwapPoolClient::new(&env, &contract_id);
-    client.initialize(&admin, &usdc_addr, &eurc_addr, &wrong_verifier, &9200000, &10000000);
+    let mut assets = Vec::new(&env);\n    assets.push_back(usdc_addr.clone());\n    assets.push_back(eurc_addr.clone());\n    client.initialize(&admin, &assets, &wrong_verifier);\n    client.set_rate(&admin, &0, &1, &9200000, &10000000);\n    client.set_rate(&admin, &1, &0, &10869565, &10000000);
     
     soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&depositor, &1_000_000_000);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor, &1_000_000_000);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_id, &10_000_000);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
-    client.deposit(&depositor, &usdc_addr, &500, &commitment);
+    client.deposit(&depositor, &0, &500, &commitment);
     let root = client.get_root();
 
     let proof = Bytes::from_slice(&env, test_fixtures::USDC_TO_EURC_PROOF);
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient = Address::generate(&env);
 
-    let res = client.try_withdraw(&recipient, &eurc_addr, &proof, &nullifier_hash, &root, &460);
+    let res = client.try_withdraw(
+        &recipient,
+        &0,
+        &1, &proof, &nullifier_hash, &root, &460);
     assert!(res.is_err());
 }
 
@@ -339,7 +367,7 @@ fn test_integration_insufficient_pool_reserves_fails() {
     
     let contract_id = env.register(ZendSwapPool, ());
     let client = ZendSwapPoolClient::new(&env, &contract_id);
-    client.initialize(&admin, &usdc_addr, &eurc_addr, &verifier, &9200000, &10000000);
+    let mut assets = Vec::new(&env);\n    assets.push_back(usdc_addr.clone());\n    assets.push_back(eurc_addr.clone());\n    client.initialize(&admin, &assets, &verifier);\n    client.set_rate(&admin, &0, &1, &9200000, &10000000);\n    client.set_rate(&admin, &1, &0, &10869565, &10000000);
     
     soroban_sdk::token::StellarAssetClient::new(&env, &usdc_addr).mint(&depositor, &1_000_000_000);
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&depositor, &1_000_000_000);
@@ -347,14 +375,17 @@ fn test_integration_insufficient_pool_reserves_fails() {
     soroban_sdk::token::StellarAssetClient::new(&env, &eurc_addr).mint(&contract_id, &400);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
-    client.deposit(&depositor, &usdc_addr, &500, &commitment);
+    client.deposit(&depositor, &0, &500, &commitment);
     let root = client.get_root();
 
     let proof = Bytes::from_slice(&env, test_fixtures::USDC_TO_EURC_PROOF);
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient = Address::generate(&env);
 
-    let res = client.try_withdraw(&recipient, &eurc_addr, &proof, &nullifier_hash, &root, &460);
+    let res = client.try_withdraw(
+        &recipient,
+        &0,
+        &1, &proof, &nullifier_hash, &root, &460);
     assert!(res.is_err());
 }
 
@@ -369,7 +400,7 @@ fn test_integration_deposit_unsupported_token_fails() {
     let fake_token = Address::generate(&env);
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
     
-    client.deposit(&depositor, &fake_token, &500, &commitment);
+    client.deposit(&depositor, &99, &500, &commitment);
 }
 
 #[test]
@@ -381,13 +412,16 @@ fn test_integration_garbage_proof_fails_no_panic() {
     let (client, usdc_addr, eurc_addr, depositor, _, _) = setup_integration_test(&env);
 
     let commitment = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_COMMITMENT);
-    client.deposit(&depositor, &usdc_addr, &500, &commitment);
+    client.deposit(&depositor, &0, &500, &commitment);
     let root = client.get_root();
 
     let garbage_proof = Bytes::from_slice(&env, &[0u8; 14592]);
     let nullifier_hash = BytesN::from_array(&env, &test_fixtures::USDC_TO_EURC_NULLIFIER);
     let recipient = Address::generate(&env);
 
-    let res = client.try_withdraw(&recipient, &eurc_addr, &garbage_proof, &nullifier_hash, &root, &460);
+    let res = client.try_withdraw(
+        &recipient,
+        &0,
+        &1, &garbage_proof, &nullifier_hash, &root, &460);
     assert!(res.is_err());
 }

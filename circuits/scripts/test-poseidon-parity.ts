@@ -59,6 +59,36 @@ const VECTORS: { label: string; inputs: bigint[]; expectedHex: string }[] = [
       '0x299c867db6c1fdd79dcefa40e4510b9837e60ebb1ce0663dbaa525df65250465',
   },
   {
+    label: 'MGUSD commitment [500, 2, secret]',
+    inputs: [500n, 2n, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn],
+    expectedHex:
+      '0x29790b48185494a7aa4f14cff9064c883939b701b044d5977b3ed1267124478e',
+  },
+  {
+    label: 'YLDS commitment [500, 3, secret]',
+    inputs: [500n, 3n, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn],
+    expectedHex:
+      '0x1210d83a150ac85128527745adf80798e54e44eda10cdbeec31fa78f46945828',
+  },
+  {
+    label: 'XLM commitment [500, 4, secret]',
+    inputs: [500n, 4n, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn],
+    expectedHex:
+      '0x125d865f76d4ae0ea2a5a902afab83b8ef40c32dec20ffe47e4f7d22698bbe4a',
+  },
+  {
+    label: 'MGUSD nullifier [c2, secret]',
+    inputs: [0x29790b48185494a7aa4f14cff9064c883939b701b044d5977b3ed1267124478en, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn],
+    expectedHex:
+      '0x16556a634d1aa9f7237c14a9cbbb62485540533de57588e39d0930d7b570a1b5',
+  },
+  {
+    label: 'XLM nullifier [c4, secret]',
+    inputs: [0x125d865f76d4ae0ea2a5a902afab83b8ef40c32dec20ffe47e4f7d22698bbe4an, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdefn],
+    expectedHex:
+      '0x0949a79b290e13dba7e447b1648fbff0b9a5d0499a56d8f8993b7a618335cf5',
+  },
+  {
     label: 'Edge: zero [0]',
     inputs: [0n],
     expectedHex:

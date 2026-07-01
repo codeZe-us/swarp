@@ -41,6 +41,31 @@ The following inputs are hashed using both implementations. The expected outputs
 *   **Expected Hex:** `0x2693f54c370d174aae1942f40015c61862f0ed7022bcb6dd59ccc70d631f9055`
 *   **Expected Decimal:** `17449307747295017006142981453320720946812828330895590310359634430146721583189`
 
+### 7. MGUSD Commitment
+*   **Input:** `[500, 2, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef]`
+*   **Expected Hex:** `0x29790b48185494a7aa4f14cff9064c883939b701b044d5977b3ed1267124478e`
+
+### 8. YLDS Commitment
+*   **Input:** `[500, 3, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef]`
+*   **Expected Hex:** `0x1210d83a150ac85128527745adf80798e54e44eda10cdbeec31fa78f46945828`
+
+### 9. XLM Commitment
+*   **Input:** `[500, 4, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef]`
+*   **Expected Hex:** `0x125d865f76d4ae0ea2a5a902afab83b8ef40c32dec20ffe47e4f7d22698bbe4a`
+
+### 10. MGUSD Nullifier
+*   **Input:** `[0x29790b48185494a7aa4f14cff9064c883939b701b044d5977b3ed1267124478e, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef]`
+*   **Expected Hex:** `0x16556a634d1aa9f7237c14a9cbbb62485540533de57588e39d0930d7b570a1b5`
+
+### 11. XLM Nullifier
+*   **Input:** `[0x125d865f76d4ae0ea2a5a902afab83b8ef40c32dec20ffe47e4f7d22698bbe4a, 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef]`
+*   **Expected Hex:** `0x0949a79b290e13dba7e447b1648fbff0b9a5d0499a56d8f8993b7a618335cf5`
+
+### 6. Edge Case: Max 64-bit Integer
+*   **Input:** `[18446744073709551615]` (or `0xffffffffffffffff`)
+*   **Expected Hex:** `0x2693f54c370d174aae1942f40015c61862f0ed7022bcb6dd59ccc70d631f9055`
+*   **Expected Decimal:** `17449307747295017006142981453320720946812828330895590310359634430146721583189`
+
 ---
 
 ## How to Run the Tests
