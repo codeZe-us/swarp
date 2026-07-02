@@ -14,6 +14,7 @@ import { getRate, getReserves, getMerkleRoot } from '../../lib/contracts';
 import { formatProofForContract } from '../../lib/proof-formatter';
 import { ZendSwapError, handleError } from '../../lib/errors';
 import { ErrorDisplay } from '../../components/ui/ErrorDisplay';
+import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 
 export default function SwapPage() {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit');
@@ -76,6 +77,7 @@ export default function SwapPage() {
   });
 
   const [currentRate, setCurrentRate] = useState<{ numerator: number; denominator: number }>({ numerator: 9200000, denominator: 10000000 });
+  const [isFetchingData, setIsFetchingData] = useState(true);
 
   // Fetch pool state on mount
   useEffect(() => {
@@ -131,6 +133,7 @@ export default function SwapPage() {
         YLDS: 0,
         XLM: 0,
       });
+      setIsFetchingData(false);
     }
   }, [isConnected, address]);
 
@@ -611,7 +614,13 @@ export default function SwapPage() {
       </div>
 
       {/* Main swap container */}
-      {activeTab === 'deposit' ? (
+      {isFetchingData && isConnected ? (
+        <div className="flex flex-col gap-6 items-center w-full">
+          <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] relative overflow-hidden min-h-[400px]">
+            <ShimmerLoader className="w-full h-full min-h-[400px]" borderRadius={13} />
+          </div>
+        </div>
+      ) : activeTab === 'deposit' ? (
         <div className="flex flex-col gap-6 items-center">
           {/* Deposit Card */}
           <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6 relative">

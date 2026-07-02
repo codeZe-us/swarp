@@ -10,6 +10,7 @@ import { formatCurrency } from '../lib/utils';
 import { getAssetByCode } from '../lib/assets';
 import { ZendSwapError, handleError } from '../lib/errors';
 import { ErrorDisplay } from '../components/ui/ErrorDisplay';
+import { ShimmerLoader } from '../components/ui/ShimmerLoader';
 
 export default function Home() {
   const [filter, setFilter] = useState<'all' | 'swaps' | 'payroll'>('all');
@@ -187,8 +188,19 @@ export default function Home() {
       <div className="flex flex-col gap-6">
         
         {/* Row 1: Portfolio Value & Balances */}
-        <div className="bg-[#141419] border border-white/5 rounded-xl flex flex-col md:flex-row overflow-hidden">
-          <div className="p-6 md:p-8 flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+        {isLoading ? (
+          <div className="bg-[#141419] border border-white/5 rounded-xl flex flex-col md:flex-row overflow-hidden min-h-[140px]">
+            <ShimmerLoader className="flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 h-full min-h-[140px]" borderRadius={0} />
+            <ShimmerLoader className="flex-1 border-b md:border-b-0 md:border-r border-white/5 h-full min-h-[140px]" borderRadius={0} />
+            <ShimmerLoader className="flex-1 border-b md:border-b-0 md:border-r border-white/5 h-full min-h-[140px]" borderRadius={0} />
+            <ShimmerLoader className="flex-1 border-b md:border-b-0 md:border-r border-white/5 h-full min-h-[140px]" borderRadius={0} />
+            <ShimmerLoader className="flex-1 border-b md:border-b-0 md:border-r border-white/5 h-full min-h-[140px]" borderRadius={0} />
+            <ShimmerLoader className="flex-1 border-b md:border-b-0 md:border-r border-white/5 h-full min-h-[140px]" borderRadius={0} />
+            <ShimmerLoader className="flex-1 h-full min-h-[140px]" borderRadius={0} />
+          </div>
+        ) : (
+          <div className="bg-[#141419] border border-white/5 rounded-xl flex flex-col md:flex-row overflow-hidden">
+            <div className="p-6 md:p-8 flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">PORTFOLIO VALUE</span>
             <div className="flex flex-col items-start gap-4">
               <div className="flex items-baseline font-display">
@@ -246,7 +258,8 @@ export default function Home() {
               <div className="text-[13px] text-gray-500">pending withdrawal</div>
             </div>
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Row 2: Shielded Pool */}
         <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">

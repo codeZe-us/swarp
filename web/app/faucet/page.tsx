@@ -5,6 +5,9 @@ import { useStore } from '../../store/useStore';
 import { getTokenBalance } from '../../lib/contracts';
 import { formatCurrency } from '../../lib/utils';
 import { addTrustline } from '../../lib/stellar';
+import { ProgressBar } from '../../components/ui/ProgressBar';
+import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
+import { CircularProgress } from '../../components/ui/CircularProgress';
 
 export default function FaucetPage() {
   const address = useStore((state) => state.address);
@@ -15,6 +18,8 @@ export default function FaucetPage() {
   const [mintAmount, setMintAmount] = useState<string>('100');
   
   const [isMinting, setIsMinting] = useState(false);
+  const [mintProgress, setMintProgress] = useState(0);
+  const [mintStep, setMintStep] = useState('');
   const [mintSuccess, setMintSuccess] = useState<string | null>(null);
   const [mintError, setMintError] = useState<string | null>(null);
 
@@ -25,9 +30,14 @@ export default function FaucetPage() {
   const [balances, setBalances] = useState<Record<string, string>>({
     USDC: '0.00', EURC: '0.00', MGUSD: '0.00', YLDS: '0.00', XLM: '0.00'
   });
+  const [isFetchingBalances, setIsFetchingBalances] = useState(true);
 
   const fetchBalances = async () => {
-    if (status !== 'connected' || !address || !config) return;
+    if (status !== 'connected' || !address || !config) {
+      setIsFetchingBalances(false);
+      return;
+    }
+    setIsFetchingBalances(true);
     try {
       const usdc = await getTokenBalance(address, config.USDC_SAC_ID);
       const eurc = await getTokenBalance(address, config.EURC_SAC_ID);
@@ -44,6 +54,8 @@ export default function FaucetPage() {
       });
     } catch (err) {
       console.warn("Failed to fetch balances", err);
+    } finally {
+      setIsFetchingBalances(false);
     }
   };
 
@@ -62,10 +74,14 @@ export default function FaucetPage() {
     }
 
     setIsMinting(true);
+    setMintProgress(10);
+    setMintStep('Initializing request...');
     setMintError(null);
     setMintSuccess(null);
 
     const performMint = async () => {
+      setMintProgress(40);
+      setMintStep('Simulating and submitting transaction...');
       const res = await fetch('/api/faucet/mint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -80,11 +96,17 @@ export default function FaucetPage() {
 
     try {
       const data = await performMint();
+      setMintProgress(80);
+      setMintStep('Refreshing balances...');
       setMintSuccess(`Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`);
       await fetchBalances();
+      setMintProgress(100);
+      setMintStep('Complete');
     } catch (err: any) {
       if (err.message?.includes('op_no_trust')) {
         try {
+          setMintProgress(30);
+          setMintStep('Trustline required. Please approve in wallet...');
           setMintError(`Trustline required for ${activeAsset}. Please approve the transaction in your wallet...`);
           const issuerKey = `${activeAsset}_ISSUER_ADDRESS` as keyof typeof config;
           const issuerAddress = config[issuerKey];
@@ -92,14 +114,20 @@ export default function FaucetPage() {
           
           await addTrustline(activeAsset, issuerAddress as string);
           
+          setMintProgress(50);
+          setMintStep('Waiting for network sync...');
           setMintError(`Trustline added! Waiting for network sync...`);
           await new Promise(resolve => setTimeout(resolve, 3000));
           
           setMintError(`Retrying mint...`);
           const data = await performMint();
+          setMintProgress(80);
+          setMintStep('Refreshing balances...');
           setMintSuccess(`Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`);
           setMintError(null);
           await fetchBalances();
+          setMintProgress(100);
+          setMintStep('Complete');
         } catch (trustErr: any) {
           setMintError(trustErr.message === 'The user closed the modal.' ? 'Trustline creation was rejected.' : `Failed to add trustline: ${trustErr.message}`);
         }
@@ -107,7 +135,9 @@ export default function FaucetPage() {
         setMintError(err.message || `Failed to mint ${activeAsset}`);
       }
     } finally {
-      setIsMinting(false);
+      setTimeout(() => {
+        setIsMinting(false);
+      }, 1500);
     }
   };
 
@@ -163,9 +193,9 @@ export default function FaucetPage() {
             <button 
               onClick={handleFundXlm}
               disabled={isFundingXlm || status !== 'connected'}
-              className="bg-transparent border border-white/10 hover:bg-white/5 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-transparent border border-white/10 hover:bg-white/5 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[100px]"
             >
-              {isFundingXlm ? 'Funding...' : 'Fund XLM'}
+              {isFundingXlm ? <CircularProgress size={16} /> : 'Fund XLM'}
             </button>
           </div>
 
@@ -181,7 +211,9 @@ export default function FaucetPage() {
                   MGUSD: { name: 'Multi-asset' },
                   YLDS: { name: 'Yield' }
                 };
-                return (
+                return isFetchingBalances ? (
+                  <ShimmerLoader key={asset} height={100} borderRadius={12} />
+                ) : (
                   <button
                     key={asset}
                     onClick={() => setActiveAsset(asset)}
@@ -215,13 +247,17 @@ export default function FaucetPage() {
               </div>
             </div>
 
-            <button 
-              onClick={handleMintAsset}
-              disabled={isMinting || status !== 'connected'}
-              className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white py-4 rounded-xl text-[15px] font-bold transition-all shadow-[0_0_15px_rgba(124,58,237,0.3)] disabled:opacity-50 disabled:cursor-not-allowed mb-4"
-            >
-              {isMinting ? 'Minting...' : `Mint ${activeAsset}`}
-            </button>
+            {isMinting ? (
+              <ProgressBar progress={mintProgress} label={mintStep} className="mb-4" />
+            ) : (
+              <button 
+                onClick={handleMintAsset}
+                disabled={status !== 'connected'}
+                className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white py-4 rounded-xl text-[15px] font-bold transition-all shadow-[0_0_15px_rgba(124,58,237,0.3)] disabled:opacity-50 disabled:cursor-not-allowed mb-4 flex items-center justify-center"
+              >
+                {`Mint ${activeAsset}`}
+              </button>
+            )}
 
             {mintSuccess && (
               <div className="flex items-center gap-2 text-[#34D399] bg-[#064E3B]/30 border border-[#059669]/30 rounded-lg p-4 text-[13px]">

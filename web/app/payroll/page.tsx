@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
+import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 import { Badge } from '../../components/ui/Badge';
 import { isValidPublicKey } from '../../lib/stellar';
 import { submitPayment } from '../../lib/contracts';
@@ -33,6 +34,14 @@ export default function PayrollPage() {
   const [executionProgress, setExecutionProgress] = useState(0);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [editingRecipient, setEditingRecipient] = useState<Recipient | null>(null);
+
+  const [isFetchingData, setIsFetchingData] = useState(true);
+
+  // Simulate data fetch
+  useEffect(() => {
+    const timer = setTimeout(() => setIsFetchingData(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -248,6 +257,13 @@ export default function PayrollPage() {
       </div>
 
       {/* Stats Cards Section */}
+      {isFetchingData ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
+          <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
+          <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Card 1: This run total (Gradient highlighted) */}
@@ -291,9 +307,14 @@ export default function PayrollPage() {
         </div>
 
       </div>
+      )}
 
       {/* Connection Warning Banner */}
-      {!isConnected && (
+      {isFetchingData ? (
+        <div className="w-full bg-[#0B0B0C] border border-borderSubtle rounded-[13px] overflow-hidden min-h-[300px]">
+          <ShimmerLoader className="w-full h-full min-h-[300px]" borderRadius={13} />
+        </div>
+      ) : !isConnected ? (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
           <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -311,10 +332,7 @@ export default function PayrollPage() {
             Connect Wallet
           </button>
         </div>
-      )}
-
-      {/* Recipient Card Table Container */}
-      {isConnected && (
+      ) : (
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col gap-6">
           
           {/* Header of Table */}
