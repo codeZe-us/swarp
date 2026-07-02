@@ -122,6 +122,8 @@ export default function SwapPage() {
           setBalances(prev => ({...prev, ...newBalances}));
         } catch (e) {
           console.warn('Failed to fetch real balances, using fallback mock values:', e);
+        } finally {
+          setIsFetchingData(false);
         }
       };
       fetchRealBalances();
@@ -614,13 +616,7 @@ export default function SwapPage() {
       </div>
 
       {/* Main swap container */}
-      {isFetchingData && isConnected ? (
-        <div className="flex flex-col gap-6 items-center w-full">
-          <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] relative overflow-hidden min-h-[400px]">
-            <ShimmerLoader className="w-full h-full min-h-[400px]" borderRadius={13} />
-          </div>
-        </div>
-      ) : activeTab === 'deposit' ? (
+      {activeTab === 'deposit' ? (
         <div className="flex flex-col gap-6 items-center">
           {/* Deposit Card */}
           <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6 relative">
@@ -641,14 +637,20 @@ export default function SwapPage() {
                 <div className="flex items-center justify-between text-xs text-mutedText font-semibold">
                   <span>You deposit</span>
                   <div className="flex items-center gap-1.5 font-mono">
-                    <span>Balance {balances[assetInCode].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    {isConnected && (
-                      <button 
-                        onClick={handleMaxClick}
-                        className="text-[#B488DC] hover:text-[#D6C2EC] font-bold uppercase transition duration-150 font-display text-[11px]"
-                      >
-                        Max
-                      </button>
+                    {isFetchingData && isConnected ? (
+                      <ShimmerLoader className="w-24 h-4" borderRadius={4} />
+                    ) : (
+                      <>
+                        <span>Balance {balances[assetInCode].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        {isConnected && (
+                          <button 
+                            onClick={handleMaxClick}
+                            className="text-[#B488DC] hover:text-[#D6C2EC] font-bold uppercase transition duration-150 font-display text-[11px]"
+                          >
+                            Max
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -882,7 +884,12 @@ export default function SwapPage() {
                   <label className="text-xs font-bold text-mutedText uppercase tracking-wider">
                     Select Active Shielded Note
                   </label>
-                  {withdrawableNotes.length === 0 ? (
+                  {isFetchingData && isConnected ? (
+                    <div className="flex flex-col gap-2">
+                      <ShimmerLoader className="w-full h-[72px]" borderRadius={12} />
+                      <ShimmerLoader className="w-full h-[72px]" borderRadius={12} />
+                    </div>
+                  ) : withdrawableNotes.length === 0 ? (
                     <div className="bg-[#000000] border border-[#1D1D1F] rounded-[12px] p-6 text-center text-xs text-mutedText font-semibold flex flex-col items-center justify-center gap-2 min-h-[120px] font-display">
                       <svg className="w-8 h-8 text-mutedText/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0V9a2 2 0 00-2-2H6a2 2 0 00-2 2v4m16 4H4" />
