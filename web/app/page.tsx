@@ -11,6 +11,7 @@ import { getAssetByCode } from '../lib/assets';
 import { ZendSwapError, handleError } from '../lib/errors';
 import { ErrorDisplay } from '../components/ui/ErrorDisplay';
 import { ShimmerLoader } from '../components/ui/ShimmerLoader';
+import { useToastStore } from '../store/useToast';
 
 export default function Home() {
   const [filter, setFilter] = useState<'all' | 'swaps' | 'payroll'>('all');
@@ -32,7 +33,6 @@ export default function Home() {
   // Balances state
   const [balances, setBalances] = useState({ USDC: 0, EURC: 0, MGUSD: 0, YLDS: 0, XLM: 0 });
   const [isLoading, setIsLoading] = useState(false);
-  const [fetchError, setFetchError] = useState<ZendSwapError | null>(null);
 
   // Fetch balances and pool state on connection
   useEffect(() => {
@@ -55,11 +55,10 @@ export default function Home() {
             YLDS: Number(yldsBal) / 10_000_000,
             XLM: Number(xlmBal) / 10_000_000,
           });
-          setFetchError(null);
         } catch (e: unknown) {
           console.warn('Failed to load live data:', e);
-          const zError = handleError(e, 'api', false); // don't toast, we show banner
-          setFetchError(zError);
+          const zError = handleError(e, 'api', false);
+          useToastStore.getState().addToast({ title: 'Warning', message: `Showing stale data. ${zError.message}`, severity: 'warning' });
         } finally {
           setIsLoading(false);
         }
@@ -171,19 +170,6 @@ export default function Home() {
           </Link>
         </div>
       </div>
-
-      {fetchError && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <svg className="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <div className="text-xs font-semibold text-amber-400">
-              <span className="text-white">Warning: Showing stale data.</span> {fetchError.message}
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-col gap-6">
         

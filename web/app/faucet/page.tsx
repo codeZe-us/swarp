@@ -8,6 +8,7 @@ import { addTrustline } from '../../lib/stellar';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 import { CircularProgress } from '../../components/ui/CircularProgress';
+import { useToastStore } from '../../store/useToast';
 
 export default function FaucetPage() {
   const address = useStore((state) => state.address);
@@ -20,12 +21,8 @@ export default function FaucetPage() {
   const [isMinting, setIsMinting] = useState(false);
   const [mintProgress, setMintProgress] = useState(0);
   const [mintStep, setMintStep] = useState('');
-  const [mintSuccess, setMintSuccess] = useState<string | null>(null);
-  const [mintError, setMintError] = useState<string | null>(null);
 
   const [isFundingXlm, setIsFundingXlm] = useState(false);
-  const [xlmSuccess, setXlmSuccess] = useState<string | null>(null);
-  const [xlmError, setXlmError] = useState<string | null>(null);
 
   const [balances, setBalances] = useState<Record<string, string>>({
     USDC: '0.00', EURC: '0.00', MGUSD: '0.00', YLDS: '0.00', XLM: '0.00'
@@ -65,19 +62,17 @@ export default function FaucetPage() {
 
   const handleMintAsset = async () => {
     if (!address || !config) {
-      setMintError('Please connect your wallet first.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Please connect your wallet first.', severity: 'error' });
       return;
     }
     if (!mintAmount || parseFloat(mintAmount) <= 0) {
-      setMintError('Please enter a valid amount.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Please enter a valid amount.', severity: 'error' });
       return;
     }
 
     setIsMinting(true);
     setMintProgress(10);
     setMintStep('Initializing request...');
-    setMintError(null);
-    setMintSuccess(null);
 
     const performMint = async () => {
       setMintProgress(40);
@@ -98,7 +93,7 @@ export default function FaucetPage() {
       const data = await performMint();
       setMintProgress(80);
       setMintStep('Refreshing balances...');
-      setMintSuccess(`Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`);
+      useToastStore.getState().addToast({ title: 'Success', message: `Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`, severity: 'success' });
       await fetchBalances();
       setMintProgress(100);
       setMintStep('Complete');
@@ -107,7 +102,7 @@ export default function FaucetPage() {
         try {
           setMintProgress(30);
           setMintStep('Trustline required. Please approve in wallet...');
-          setMintError(`Trustline required for ${activeAsset}. Please approve the transaction in your wallet...`);
+          useToastStore.getState().addToast({ title: 'Info', message: `Trustline required for ${activeAsset}. Please approve the transaction in your wallet...`, severity: 'info' });
           const issuerKey = `${activeAsset}_ISSUER_ADDRESS` as keyof typeof config;
           const issuerAddress = config[issuerKey];
           if (!issuerAddress) throw new Error(`Issuer address not configured for ${activeAsset}`);
@@ -116,23 +111,21 @@ export default function FaucetPage() {
           
           setMintProgress(50);
           setMintStep('Waiting for network sync...');
-          setMintError(`Trustline added! Waiting for network sync...`);
+          useToastStore.getState().addToast({ title: 'Success', message: `Trustline added! Waiting for network sync...`, severity: 'success' });
           await new Promise(resolve => setTimeout(resolve, 3000));
           
-          setMintError(`Retrying mint...`);
           const data = await performMint();
           setMintProgress(80);
           setMintStep('Refreshing balances...');
-          setMintSuccess(`Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`);
-          setMintError(null);
+          useToastStore.getState().addToast({ title: 'Success', message: `Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`, severity: 'success' });
           await fetchBalances();
           setMintProgress(100);
           setMintStep('Complete');
         } catch (trustErr: any) {
-          setMintError(trustErr.message === 'The user closed the modal.' ? 'Trustline creation was rejected.' : `Failed to add trustline: ${trustErr.message}`);
+          useToastStore.getState().addToast({ title: 'Error', message: trustErr.message === 'The user closed the modal.' ? 'Trustline creation was rejected.' : `Failed to add trustline: ${trustErr.message}`, severity: 'error' });
         }
       } else {
-        setMintError(err.message || `Failed to mint ${activeAsset}`);
+        useToastStore.getState().addToast({ title: 'Error', message: err.message || `Failed to mint ${activeAsset}`, severity: 'error' });
       }
     } finally {
       setTimeout(() => {
@@ -143,23 +136,21 @@ export default function FaucetPage() {
 
   const handleFundXlm = async () => {
     if (!address) {
-      setXlmError('Please connect your wallet first.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Please connect your wallet first.', severity: 'error' });
       return;
     }
 
     setIsFundingXlm(true);
-    setXlmError(null);
-    setXlmSuccess(null);
 
     try {
       const res = await fetch(`https://friendbot.stellar.org?addr=${address}`);
       if (!res.ok) {
         throw new Error('Friendbot funding failed or account is already funded.');
       }
-      setXlmSuccess(`Successfully funded 10,000 testnet XLM via Friendbot!`);
+      useToastStore.getState().addToast({ title: 'Success', message: `Successfully funded 10,000 testnet XLM via Friendbot!`, severity: 'success' });
       await fetchBalances();
     } catch (err: any) {
-      setXlmError(err.message || 'Failed to fund XLM.');
+      useToastStore.getState().addToast({ title: 'Error', message: err.message || 'Failed to fund XLM.', severity: 'error' });
     } finally {
       setIsFundingXlm(false);
     }
@@ -187,8 +178,6 @@ export default function FaucetPage() {
                 <span className="text-gray-500">·</span>
                 <span className="text-gray-400 font-mono ml-1">{balances.XLM} XLM</span>
               </div>
-              {xlmSuccess && <p className="text-emerald-400 text-xs mt-2">{xlmSuccess}</p>}
-              {xlmError && <p className="text-red-400 text-xs mt-2">{xlmError}</p>}
             </div>
             <button 
               onClick={handleFundXlm}
@@ -257,23 +246,6 @@ export default function FaucetPage() {
               >
                 {`Mint ${activeAsset}`}
               </button>
-            )}
-
-            {mintSuccess && (
-              <div className="flex items-center gap-2 text-[#34D399] bg-[#064E3B]/30 border border-[#059669]/30 rounded-lg p-4 text-[13px]">
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                {mintSuccess}
-              </div>
-            )}
-            {mintError && (
-              <div className="flex items-center gap-2 text-[#F87171] bg-[#7F1D1D]/30 border border-[#DC2626]/30 rounded-lg p-4 text-[13px]">
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {mintError}
-              </div>
             )}
           </div>
         </div>

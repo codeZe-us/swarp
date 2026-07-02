@@ -12,9 +12,9 @@ import { generateSwapProof, SwapProofInput } from '../../lib/prover';
 import { ASSETS, getAssetByCode, getAssetById } from '../../lib/assets';
 import { getRate, getReserves, getMerkleRoot } from '../../lib/contracts';
 import { formatProofForContract } from '../../lib/proof-formatter';
-import { ZendSwapError, handleError } from '../../lib/errors';
-import { ErrorDisplay } from '../../components/ui/ErrorDisplay';
+import { handleError } from '../../lib/errors';
 import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
+import { useToastStore } from '../../store/useToast';
 
 export default function SwapPage() {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit');
@@ -48,21 +48,17 @@ export default function SwapPage() {
 
   // Transaction execution states (Deposit)
   const [depositTxStatus, setDepositTxStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [depositTxError, setDepositTxError] = useState<ZendSwapError | null>(null);
   const [depositTxHash, setDepositTxHash] = useState<string | null>(null);
   const [depositLeafIndex, setDepositLeafIndex] = useState<number | null>(null);
 
   // Funding state
   const [isFunding, setIsFunding] = useState(false);
-  const [fundSuccess, setFundSuccess] = useState<string | null>(null);
-  const [fundError, setFundError] = useState<string | null>(null);
 
   // Withdraw flow states
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [recipientAddress, setRecipientAddress] = useState<string>('');
   const [withdrawStep, setWithdrawStep] = useState<number>(0); // 0: idle, 1: fetching, 2: building, 3: proving, 4: submitting, 5: success
   const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [withdrawError, setWithdrawError] = useState<ZendSwapError | null>(null);
   const [workerStage, setWorkerStage] = useState<'loading' | 'computing' | 'proving' | null>(null);
   const [provingSeconds, setProvingSeconds] = useState<number>(0);
   const [withdrawTxHash, setWithdrawTxHash] = useState<string | null>(null);
@@ -252,7 +248,6 @@ export default function SwapPage() {
     if (!depositValidation.isValid || !address) return;
 
     setDepositTxStatus('loading');
-    setDepositTxError(null);
     setDepositTxHash(null);
     setDepositLeafIndex(null);
 
@@ -302,11 +297,12 @@ export default function SwapPage() {
       setDepositTxHash(result.txHash);
       setDepositTxStatus('success');
       setAmountIn('');
+      useToastStore.getState().addToast({ title: 'Success', message: `Deposit Completed Successfully! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
     } catch (error: unknown) {
       console.error('Deposit flow failed:', error);
       const zError = handleError(error, 'transaction');
-      setDepositTxError(zError);
       setDepositTxStatus('error');
+      useToastStore.getState().addToast({ title: 'Error', message: zError.message || 'Deposit failed.', severity: 'error' });
     }
   };
 
@@ -364,7 +360,6 @@ export default function SwapPage() {
     if (!note || !address || !recipientAddress) return;
 
     setWithdrawStatus('loading');
-    setWithdrawError(null);
     setWithdrawTxHash(null);
     setWorkerStage(null);
 
@@ -544,11 +539,13 @@ export default function SwapPage() {
       setWithdrawTxHash(result.txHash);
       setWithdrawStatus('success');
       setSelectedNoteId(null);
+      useToastStore.getState().addToast({ title: 'Success', message: `Withdrawal Successful! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
     } catch (error: unknown) {
       console.error('Withdraw flow failed:', error);
       const zError = handleError(error, 'transaction');
-      setWithdrawError(zError);
-      setWithdrawStatus('error');
+      setWithdrawStatus('idle');
+      setWithdrawStep(0);
+      useToastStore.getState().addToast({ title: 'Error', message: zError.message || 'Withdrawal failed.', severity: 'error' });
     } finally {
       // Safeguard: make sure memory references to secrets are wiped
       activeSecret = null;
@@ -573,11 +570,6 @@ export default function SwapPage() {
               >
                 Fund Testnet
               </Link>
-              {fundError && (
-                <div className="text-red-400 text-[9px] font-bold max-w-[150px] text-right">
-                  {fundError}
-                </div>
-              )}
             </div>
           )}
           <Link
@@ -824,45 +816,6 @@ export default function SwapPage() {
             </p>
           </div>
 
-          {/* Tx State Alerts */}
-          {depositTxStatus === 'success' && depositTxHash && (
-            <div className="w-full max-w-[500px] bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex flex-col gap-2.5">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-sm font-bold text-emerald-400">Deposit Completed Successfully</span>
-              </div>
-              <div className="text-xs text-slate-300 flex flex-col gap-1.5 font-medium leading-relaxed">
-                <div>
-                  <span className="text-mutedText">Transaction Hash:</span>{' '}
-                  <a
-                    href={`https://stellar.expert/explorer/testnet/tx/${depositTxHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-white font-bold text-emerald-400"
-                  >
-                    {depositTxHash.slice(0, 12)}...{depositTxHash.slice(-12)}
-                  </a>
-                </div>
-                {depositLeafIndex !== null && (
-                  <div>
-                    <span className="text-mutedText">Leaf Index:</span>{' '}
-                    <span className="font-bold text-white">{depositLeafIndex}</span>
-                  </div>
-                )}
-                <div className="mt-2 bg-[#000000]/40 border border-amber-500/20 p-3 rounded-lg text-amber-300 font-semibold text-[11px]">
-                  ⚠️ Your swap note has been saved securely. If you clear browser data, you will lose access to these funds.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {depositTxStatus === 'error' && depositTxError && (
-            <div className="w-full max-w-[500px]">
-              <ErrorDisplay error={depositTxError} variant="inline" />
-            </div>
-          )}
         </div>
       ) : (
         /* Replaced Withdraw Tab with full ZK implementation */
@@ -1021,12 +974,6 @@ export default function SwapPage() {
                   </button>
                 </div>
 
-                {/* Error Box */}
-                {withdrawStatus === 'error' && withdrawError && (
-                  <div className="mt-4">
-                    <ErrorDisplay error={withdrawError} variant="inline" onRetry={() => setWithdrawStatus('idle')} />
-                  </div>
-                )}
               </div>
             ) : (
               /* Execution Multi-step Progress Screen */
@@ -1095,70 +1042,6 @@ export default function SwapPage() {
                     );
                   })}
                 </div>
-
-                {/* Final transaction hash result / action rows */}
-                {withdrawStatus === 'success' && withdrawTxHash && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex flex-col gap-3 mt-2">
-                    <div className="text-xs text-slate-300 flex flex-col gap-1.5 font-medium leading-relaxed">
-                      <div className="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Withdrawal Completed
-                      </div>
-                      <div className="mt-1">
-                        <span className="text-mutedText">Transaction Hash:</span>{' '}
-                        <a
-                          href={`https://stellar.expert/explorer/testnet/tx/${withdrawTxHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline hover:text-white font-bold text-emerald-400"
-                        >
-                          {withdrawTxHash.slice(0, 12)}...{withdrawTxHash.slice(-12)}
-                        </a>
-                      </div>
-                      <p className="text-[10px] text-mutedText mt-1.5">
-                        The note secret has been successfully zeroed out in memory and stored state. Note spent.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWithdrawStatus('idle');
-                        setWithdrawStep(0);
-                        setWithdrawTxHash(null);
-                      }}
-                      className="w-full mt-2 py-2 bg-emerald-500/20 border border-emerald-500/30 hover:bg-emerald-500/30 text-emerald-400 font-bold rounded-xl text-xs uppercase tracking-wider transition duration-150"
-                    >
-                      Done
-                    </button>
-                  </div>
-                )}
-
-                {withdrawStatus === 'error' && withdrawError && (
-                  <div className="flex flex-col gap-3 mt-2">
-                    <ErrorDisplay error={withdrawError} variant="inline" />
-                    <div className="flex gap-2 font-display">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setWithdrawStatus('idle');
-                          setWithdrawStep(0);
-                        }}
-                        className="flex-1 py-3 border border-[rgba(94,42,140,0.4)] text-white hover:bg-[#5E2A8C]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 bg-transparent"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleWithdraw}
-                        className="flex-1 py-3 bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white font-bold rounded-[12px] text-xs uppercase tracking-wider transition duration-150 shadow-[0_0_28px_rgba(123,55,168,0.3)] border-none"
-                      >
-                        Retry Step
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
