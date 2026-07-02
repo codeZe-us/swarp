@@ -8,6 +8,10 @@ import { TransactionDetailModal } from '../components/ui/TransactionDetailModal'
 import { getTokenBalance } from '../lib/contracts';
 import { formatCurrency } from '../lib/utils';
 import { getAssetByCode } from '../lib/assets';
+import { ZendSwapError, handleError } from '../lib/errors';
+import { ErrorDisplay } from '../components/ui/ErrorDisplay';
+import { ShimmerLoader } from '../components/ui/ShimmerLoader';
+import { useToastStore } from '../store/useToast';
 
 export default function Home() {
   const [filter, setFilter] = useState<'all' | 'swaps' | 'payroll'>('all');
@@ -38,21 +42,24 @@ export default function Home() {
         try {
           await fetchPoolState();
 
-          const usdcBal = await getTokenBalance(address, config?.USDC_SAC_ID || '');
-          const eurcBal = await getTokenBalance(address, config?.EURC_SAC_ID || '');
-          const mgusdBal = await getTokenBalance(address, config?.MGUSD_SAC_ID || '');
-          const yldsBal = await getTokenBalance(address, config?.YLDS_SAC_ID || '');
-          const xlmBal = await getTokenBalance(address, config?.XLM_SAC_ID || '');
+          const balancePromises = [
+            getTokenBalance(address, config?.USDC_SAC_ID || '').then(b => ({ code: 'USDC', bal: b })).catch(() => ({ code: 'USDC', bal: BigInt(0) })),
+            getTokenBalance(address, config?.EURC_SAC_ID || '').then(b => ({ code: 'EURC', bal: b })).catch(() => ({ code: 'EURC', bal: BigInt(0) })),
+            getTokenBalance(address, config?.MGUSD_SAC_ID || '').then(b => ({ code: 'MGUSD', bal: b })).catch(() => ({ code: 'MGUSD', bal: BigInt(0) })),
+            getTokenBalance(address, config?.YLDS_SAC_ID || '').then(b => ({ code: 'YLDS', bal: b })).catch(() => ({ code: 'YLDS', bal: BigInt(0) })),
+            getTokenBalance(address, config?.XLM_SAC_ID || '').then(b => ({ code: 'XLM', bal: b })).catch(() => ({ code: 'XLM', bal: BigInt(0) })),
+          ];
           
-          setBalances({
-            USDC: Number(usdcBal) / 10_000_000,
-            EURC: Number(eurcBal) / 10_000_000,
-            MGUSD: Number(mgusdBal) / 10_000_000,
-            YLDS: Number(yldsBal) / 10_000_000,
-            XLM: Number(xlmBal) / 10_000_000,
-          });
-        } catch (e) {
+          const results = await Promise.all(balancePromises);
+          const newBalances: Record<string, number> = {};
+          for (const res of results) {
+            newBalances[res.code] = Number(res.bal) / 10_000_000;
+          }
+          setBalances(newBalances as any);
+        } catch (e: unknown) {
           console.warn('Failed to load live data:', e);
+          const zError = handleError(e, 'api', false);
+          useToastStore.getState().addToast({ title: 'Warning', message: `Showing stale data. ${zError.message}`, severity: 'warning' });
         } finally {
           setIsLoading(false);
         }
@@ -168,18 +175,22 @@ export default function Home() {
       <div className="flex flex-col gap-6">
         
         {/* Row 1: Portfolio Value & Balances */}
-        <div className="bg-[#141419] border border-white/5 rounded-xl flex flex-col md:flex-row overflow-hidden">
-          <div className="p-6 md:p-8 flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+          <div className="bg-[#141419] border border-white/5 rounded-xl flex flex-col md:flex-row overflow-hidden">
+            <div className="p-6 md:p-8 flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">PORTFOLIO VALUE</span>
             <div className="flex flex-col items-start gap-4">
-              <div className="flex items-baseline font-display">
-                <h2 className="text-[40px] text-white tracking-tight leading-none">
-                  ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split('.')[0]}
-                </h2>
-                <span className="text-[20px] text-gray-400 ml-0.5">
-                  .{totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split('.')[1]}
-                </span>
-              </div>
+              {isLoading ? (
+                <ShimmerLoader className="w-[200px] h-[48px]" borderRadius={8} />
+              ) : (
+                <div className="flex items-baseline font-display">
+                  <h2 className="text-[40px] text-white tracking-tight leading-none">
+                    ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split('.')[0]}
+                  </h2>
+                  <span className="text-[20px] text-gray-400 ml-0.5">
+                    .{totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split('.')[1]}
+                  </span>
+                </div>
+              )}
               <span className="inline-flex bg-[#3B1C5F]/40 text-[#A874F5] px-2.5 py-1 rounded-[6px] text-[11px] font-bold border border-[#A874F5]/10">
                 +12.4% 30d
               </span>
@@ -187,31 +198,69 @@ export default function Home() {
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">USDC</span>
-            <div>
-              <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-              <div className="text-[13px] text-gray-500">≈ ${balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-            </div>
+            {isLoading ? (
+              <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
+            ) : (
+              <div>
+                <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                <div className="text-[13px] text-gray-500">≈ ${balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+              </div>
+            )}
+          </div>
+          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">EURC</span>
+            {isLoading ? (
+              <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
+            ) : (
+              <div>
+                <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.EURC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                <div className="text-[13px] text-gray-500">≈ ${(balances.EURC / decimalRate).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+              </div>
+            )}
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">MGUSD</span>
-            <div>
-              <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-              <div className="text-[13px] text-gray-500">≈ ${balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-            </div>
+            {isLoading ? (
+              <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
+            ) : (
+              <div>
+                <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                <div className="text-[13px] text-gray-500">≈ ${balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+              </div>
+            )}
+          </div>
+          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">YLDS</span>
+            {isLoading ? (
+              <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
+            ) : (
+              <div>
+                <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.YLDS.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                <div className="text-[13px] text-gray-500">≈ ${balances.YLDS.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+              </div>
+            )}
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">XLM</span>
-            <div>
-              <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.XLM.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-              <div className="text-[13px] text-gray-500">≈ ${(balances.XLM * 0.08).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-            </div>
+            {isLoading ? (
+              <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
+            ) : (
+              <div>
+                <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.XLM.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+                <div className="text-[13px] text-gray-500">≈ ${(balances.XLM * 0.08).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+              </div>
+            )}
           </div>
           <div className="p-6 md:p-8 flex-1 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED NOTES</span>
-            <div>
-              <div className="text-[26px] font-display text-white mb-1 leading-none">{activeNotes.length}</div>
-              <div className="text-[13px] text-gray-500">pending withdrawal</div>
-            </div>
+            {isLoading ? (
+              <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
+            ) : (
+              <div>
+                <div className="text-[26px] font-display text-white mb-1 leading-none">{activeNotes.length}</div>
+                <div className="text-[13px] text-gray-500">pending withdrawal</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -220,9 +269,13 @@ export default function Home() {
           <div className="flex items-start justify-between mb-8">
             <div>
               <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED POOL</span>
-              <div className="text-[32px] font-display text-white leading-none">
-                ${shieldedPoolValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
+              {isLoading ? (
+                <ShimmerLoader className="w-[150px] h-[36px]" borderRadius={8} />
+              ) : (
+                <div className="text-[32px] font-display text-white leading-none">
+                  ${shieldedPoolValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              )}
             </div>
             <div className="border border-white/10 bg-transparent text-gray-300 px-4 py-2 rounded-lg text-sm font-bold">
               {activeNotes.length} notes
@@ -230,17 +283,23 @@ export default function Home() {
           </div>
 
           <div className="space-y-6 pt-2">
-            {poolBreakdown.length === 0 && (
+            {isLoading ? (
+              <div className="space-y-4">
+                <ShimmerLoader className="w-full h-[60px]" borderRadius={12} />
+                <ShimmerLoader className="w-full h-[60px]" borderRadius={12} />
+                <ShimmerLoader className="w-full h-[60px]" borderRadius={12} />
+              </div>
+            ) : poolBreakdown.length === 0 ? (
               <div className="text-center text-sm text-gray-500 py-4">No assets in shielded pool</div>
-            )}
-            {poolBreakdown.map((item) => {
+            ) : poolBreakdown.map((item) => {
               const def = getAssetByCode(item.asset);
               
               const hexColors: Record<string, string> = {
                 USDC: '#FFFFFF',
                 EURC: '#7C3AED',
                 MGUSD: '#A874F5',
-                YLDS: '#06B6D4'
+                YLDS: '#06B6D4',
+                XLM: '#10B981'
               };
               
               const color = hexColors[item.asset] || '#6B7280';
@@ -316,7 +375,7 @@ export default function Home() {
           </div>
           
           <div className="space-y-1">
-            {filteredTransactions.slice(0, 5).map((tx) => {
+            {!isLoading && filteredTransactions.slice(0, 5).map((tx) => {
               const isDeposit = tx.type === 'deposit';
               const isPrivate = tx.privacy === 'private';
               
@@ -381,9 +440,15 @@ export default function Home() {
               );
             })}
             
-            {filteredTransactions.length === 0 && (
+            {isLoading ? (
+              <div className="space-y-4">
+                <ShimmerLoader className="w-full h-[80px]" borderRadius={12} />
+                <ShimmerLoader className="w-full h-[80px]" borderRadius={12} />
+                <ShimmerLoader className="w-full h-[80px]" borderRadius={12} />
+              </div>
+            ) : filteredTransactions.length === 0 ? (
               <div className="text-center text-sm text-gray-500 py-8">No transactions</div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

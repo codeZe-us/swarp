@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
+import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 import { Badge } from '../../components/ui/Badge';
 import { isValidPublicKey } from '../../lib/stellar';
 import { TeamMember } from '../../store/types';
+import { useToastStore } from '../../store/useToast';
 
 export default function TeamPage() {
   // Zustand Store variables
@@ -27,10 +29,14 @@ export default function TeamPage() {
   const [inviteName, setInviteName] = useState('');
   const [inviteAddress, setInviteAddress] = useState('');
   const [inviteRole, setInviteRole] = useState<'Admin' | 'Member'>('Member');
-  const [formError, setFormError] = useState<string | null>(null);
 
-  // Success save notice for multisig setting
-  const [showSavedNotice, setShowSavedNotice] = useState(false);
+  const [isFetchingData, setIsFetchingData] = useState(true);
+
+  // Simulate data fetch
+  useEffect(() => {
+    const timer = setTimeout(() => setIsFetchingData(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Compute active signers (status === Active)
   const activeMembersCount = useMemo(() => {
@@ -45,15 +51,14 @@ export default function TeamPage() {
   // Invite form submit handler
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError(null);
 
     if (!inviteAddress.trim()) {
-      setFormError('Please enter a wallet address.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Please enter a wallet address.', severity: 'error' });
       return;
     }
 
     if (!isValidPublicKey(inviteAddress.trim())) {
-      setFormError('Invalid Stellar address. Must be a valid public key (G...).');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Invalid Stellar address. Must be a valid public key (G...).', severity: 'error' });
       return;
     }
 
@@ -62,7 +67,7 @@ export default function TeamPage() {
       (m) => m.address.toLowerCase() === inviteAddress.trim().toLowerCase()
     );
     if (isDuplicate) {
-      setFormError('This address is already a member or has a pending invitation.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'This address is already a member or has a pending invitation.', severity: 'error' });
       return;
     }
 
@@ -76,16 +81,16 @@ export default function TeamPage() {
       setInviteName('');
       setInviteAddress('');
       setInviteRole('Member');
+      useToastStore.getState().addToast({ title: 'Success', message: 'Team invitation sent.', severity: 'success' });
     } catch (err: any) {
-      setFormError(err?.message || 'Failed to send team invitation.');
+      useToastStore.getState().addToast({ title: 'Error', message: err?.message || 'Failed to send team invitation.', severity: 'error' });
     }
   };
 
   // Change signers required threshold
   const handleSignersThresholdChange = async (count: number) => {
     await updateSignersRequired(count);
-    setShowSavedNotice(true);
-    setTimeout(() => setShowSavedNotice(false), 2000);
+    useToastStore.getState().addToast({ title: 'Success', message: 'Multisig threshold updated.', severity: 'success' });
   };
 
   // Generate Initials Avatar
@@ -123,7 +128,14 @@ export default function TeamPage() {
       </div>
 
       {/* Stats Cards Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {isFetchingData ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
+          <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
+          <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Card 1: Members */}
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between min-h-[148px]">
@@ -159,11 +171,16 @@ export default function TeamPage() {
         </div>
 
       </div>
+      )}
 
       {/* Connection Warning Banner */}
-      {!isConnected && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400">
+      {isFetchingData ? (
+        <div className="w-full bg-[#0B0B0C] border border-borderSubtle rounded-[13px] overflow-hidden min-h-[300px]">
+          <ShimmerLoader className="w-full h-full min-h-[300px]" borderRadius={13} />
+        </div>
+      ) : !isConnected ? (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -179,10 +196,7 @@ export default function TeamPage() {
             Connect Wallet
           </button>
         </div>
-      )}
-
-      {/* Members List Table Container */}
-      {isConnected && (
+      ) : (
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col gap-6">
           
           <div className="overflow-x-auto">
@@ -318,15 +332,6 @@ export default function TeamPage() {
                   of <span className="text-white font-mono font-bold">{activeMembersCount}</span> active members required
                 </span>
               </div>
-
-              {showSavedNotice && (
-                <span className="text-xs text-emerald-400 font-bold font-display animate-pulse flex items-center gap-1">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Settings Saved
-                </span>
-              )}
             </div>
 
             <div className="mt-5 pt-4 border-t border-[#1D1D1F] text-[10px] text-mutedText/70 font-semibold leading-normal">
@@ -413,16 +418,6 @@ export default function TeamPage() {
                   <option value="Member">Member (read-only viewer)</option>
                 </select>
               </div>
-
-              {/* Error log alert */}
-              {formError && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-[9px] p-3 text-red-400 font-semibold leading-relaxed text-[11px] flex items-start gap-2 mt-1">
-                  <svg className="w-4.5 h-4.5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <span>{formError}</span>
-                </div>
-              )}
 
               {/* Footer controls */}
               <div className="flex gap-3 mt-4">

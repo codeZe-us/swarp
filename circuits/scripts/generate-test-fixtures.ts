@@ -18,7 +18,7 @@ function toField(n: bigint): string {
 
 function runCommandInWsl(cmd: string): string {
   try {
-    return execSync(`export PATH="$HOME/.nargo/bin:$HOME/.bb:$PATH" && ${cmd}`, { encoding: 'utf-8' });
+    return execSync(`wsl.exe -d Ubuntu -e sh -c "cd /mnt/c/projetcs/swarp/circuits && export PATH=\\"$HOME/.nargo/bin:$HOME/.bb:$PATH\\" && ${cmd}"`, { encoding: 'utf-8' });
   } catch (error: any) {
     throw new Error(error.stdout || error.stderr || error.message);
   }
@@ -55,24 +55,16 @@ interface SwapConfig {
 
 async function main() {
   const configs: SwapConfig[] = [
-    {
-      name: 'USDC_TO_EURC',
-      assetIn: 0n, // USDC
-      assetOut: 1n, // EURC
-      depositAmount: 500n,
-      withdrawalAmount: 460n,
-      exchangeRate: 9200000n,
-      rateDenominator: 10000000n
-    },
-    {
-      name: 'EURC_TO_USDC',
-      assetIn: 1n, // EURC
-      assetOut: 0n, // USDC
-      depositAmount: 500n,
-      withdrawalAmount: 460n,
-      exchangeRate: 9200000n,
-      rateDenominator: 10000000n
-    }
+    { name: 'USDC_TO_EURC', assetIn: 0n, assetOut: 1n, depositAmount: 500n, withdrawalAmount: 460n, exchangeRate: 9200000n, rateDenominator: 10000000n },
+    { name: 'EURC_TO_USDC', assetIn: 1n, assetOut: 0n, depositAmount: 500n, withdrawalAmount: 543n, exchangeRate: 10860000n, rateDenominator: 10000000n },
+    { name: 'USDC_TO_MGUSD', assetIn: 0n, assetOut: 2n, depositAmount: 500n, withdrawalAmount: 500n, exchangeRate: 10000000n, rateDenominator: 10000000n },
+    { name: 'MGUSD_TO_USDC', assetIn: 2n, assetOut: 0n, depositAmount: 500n, withdrawalAmount: 500n, exchangeRate: 10000000n, rateDenominator: 10000000n },
+    { name: 'USDC_TO_YLDS', assetIn: 0n, assetOut: 3n, depositAmount: 500n, withdrawalAmount: 475n, exchangeRate: 9500000n, rateDenominator: 10000000n },
+    { name: 'YLDS_TO_USDC', assetIn: 3n, assetOut: 0n, depositAmount: 500n, withdrawalAmount: 526n, exchangeRate: 10520000n, rateDenominator: 10000000n },
+    { name: 'USDC_TO_XLM', assetIn: 0n, assetOut: 4n, depositAmount: 500n, withdrawalAmount: 625n, exchangeRate: 12500000n, rateDenominator: 10000000n },
+    { name: 'XLM_TO_USDC', assetIn: 4n, assetOut: 0n, depositAmount: 500n, withdrawalAmount: 40n, exchangeRate: 800000n, rateDenominator: 10000000n },
+    { name: 'MGUSD_TO_XLM', assetIn: 2n, assetOut: 4n, depositAmount: 500n, withdrawalAmount: 625n, exchangeRate: 12500000n, rateDenominator: 10000000n },
+    { name: 'XLM_TO_MGUSD', assetIn: 4n, assetOut: 2n, depositAmount: 500n, withdrawalAmount: 40n, exchangeRate: 800000n, rateDenominator: 10000000n }
   ];
 
   let rustFixtures = `// =============================================================================

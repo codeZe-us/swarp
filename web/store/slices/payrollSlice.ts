@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { Recipient } from '../types';
 import { StoreState } from '../useStore';
 import { encryptRecipients, decryptRecipients } from '../../lib/crypto';
+import { ZendSwapError, handleError } from '../../lib/errors';
 
 export interface PayrollSlice {
   recipients: Recipient[];
@@ -44,8 +45,16 @@ export const createPayrollSlice: StateCreator<
     try {
       const decrypted = await decryptRecipients(savedRecipients, address);
       set({ recipients: decrypted });
-    } catch (error) {
-      console.warn('Recipients decryption failed, initializing with empty recipients:', error);
+    } catch (error: unknown) {
+      console.warn('Recipients decryption failed:', error);
+      handleError(new ZendSwapError({
+        code: 'PAYROLL_DECRYPTION_FAILED',
+        title: 'Unable to decrypt payroll list',
+        message: 'Your browser storage seems to be corrupted or the wallet key has changed. Your payroll list could not be loaded.',
+        severity: 'error',
+        source: 'browser',
+        rawError: error
+      }), 'browser');
       set({ recipients: [] });
     }
   },

@@ -6,6 +6,7 @@ export interface PoolConfig {
   SOROBAN_RPC_URL: string;
   STELLAR_NETWORK_PASSPHRASE: string;
   POOL_CONTRACT_ID: string;
+  LEGACY_POOL_CONTRACT_ID?: string;
   VERIFIER_CONTRACT_ID: string;
   USDC_SAC_ID: string;
   EURC_SAC_ID: string;

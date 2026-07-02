@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
+import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 import { Badge } from '../../components/ui/Badge';
 import { isValidPublicKey } from '../../lib/stellar';
 import { submitPayment } from '../../lib/contracts';
 import { Recipient } from '../../store/types';
+import { useToastStore } from '../../store/useToast';
 
 export default function PayrollPage() {
   // Zustand Store variables
@@ -31,8 +33,15 @@ export default function PayrollPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionProgress, setExecutionProgress] = useState(0);
-  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [editingRecipient, setEditingRecipient] = useState<Recipient | null>(null);
+
+  const [isFetchingData, setIsFetchingData] = useState(true);
+
+  // Simulate data fetch
+  useEffect(() => {
+    const timer = setTimeout(() => setIsFetchingData(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Form states
   const [formName, setFormName] = useState('');
@@ -40,7 +49,6 @@ export default function PayrollPage() {
   const [formAddress, setFormAddress] = useState('');
   const [formAmount, setFormAmount] = useState('');
   const [formAsset, setFormAsset] = useState<string>('USDC');
-  const [formError, setFormError] = useState<string | null>(null);
 
   // Exchange rate helpers
   const rateNum = exchangeRate?.numerator || 9200000;
@@ -86,7 +94,6 @@ export default function PayrollPage() {
     setFormAddress('');
     setFormAmount('');
     setFormAsset('USDC');
-    setFormError(null);
     setIsFormOpen(true);
   };
 
@@ -98,42 +105,40 @@ export default function PayrollPage() {
     setFormAddress(recipient.address);
     setFormAmount(recipient.amount);
     setFormAsset(recipient.asset);
-    setFormError(null);
     setIsFormOpen(true);
   };
 
   // Form submit handler
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError(null);
 
     // Validations
     if (!formName.trim()) {
-      setFormError('Please enter a recipient name.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Please enter a recipient name.', severity: 'error' });
       return;
     }
     if (!formDept.trim()) {
-      setFormError('Please enter a department name.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Please enter a department name.', severity: 'error' });
       return;
     }
     if (!formAddress.trim()) {
-      setFormError('Please enter a destination address.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Please enter a destination address.', severity: 'error' });
       return;
     }
     if (!isValidPublicKey(formAddress.trim())) {
-      setFormError('Invalid Stellar public key format. Address must start with G and be 56 characters.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Invalid Stellar public key format. Address must start with G and be 56 characters.', severity: 'error' });
       return;
     }
     const amtVal = parseFloat(formAmount);
     if (isNaN(amtVal) || amtVal <= 0) {
-      setFormError('Amount must be a positive number greater than 0.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Amount must be a positive number greater than 0.', severity: 'error' });
       return;
     }
 
     // Amount precision check (max 7 decimals for Stellar)
     const decimalsPart = formAmount.split('.')[1];
     if (decimalsPart && decimalsPart.length > 7) {
-      setFormError('Amount precision cannot exceed 7 decimal places.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Amount precision cannot exceed 7 decimal places.', severity: 'error' });
       return;
     }
 
@@ -153,8 +158,9 @@ export default function PayrollPage() {
       }
 
       setIsFormOpen(false);
+      useToastStore.getState().addToast({ title: 'Success', message: 'Recipient saved.', severity: 'success' });
     } catch (err: any) {
-      setFormError(err?.message || 'Failed to save recipient details.');
+      useToastStore.getState().addToast({ title: 'Error', message: err?.message || 'Failed to save recipient details.', severity: 'error' });
     }
   };
 
@@ -207,7 +213,7 @@ export default function PayrollPage() {
     
     await runPayroll();
     setIsExecuting(false);
-    setIsSuccessOpen(true);
+    useToastStore.getState().addToast({ title: 'Success', message: `Private Payroll Successful! Executed ${recipients.length} transfers. Total: $${totals.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, severity: 'success' });
   };
 
   // Generate Initials Avatar
@@ -248,6 +254,13 @@ export default function PayrollPage() {
       </div>
 
       {/* Stats Cards Section */}
+      {isFetchingData ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
+          <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
+          <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Card 1: This run total (Gradient highlighted) */}
@@ -284,18 +297,23 @@ export default function PayrollPage() {
           <div>
             <span className="text-[10px] font-bold text-mutedText uppercase tracking-wider font-display">Last run</span>
             <h2 className="text-4xl font-extrabold text-white mt-3 font-mono">
-              {lastRunDate || 'Never'}
+              {lastRunDate || 'None'}
             </h2>
           </div>
           <p className="text-[10px] text-mutedText mt-2">Timestamp of last local execution trigger.</p>
         </div>
 
       </div>
+      )}
 
       {/* Connection Warning Banner */}
-      {!isConnected && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400">
+      {isFetchingData ? (
+        <div className="w-full bg-[#0B0B0C] border border-borderSubtle rounded-[13px] overflow-hidden min-h-[300px]">
+          <ShimmerLoader className="w-full h-full min-h-[300px]" borderRadius={13} />
+        </div>
+      ) : !isConnected ? (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -311,10 +329,7 @@ export default function PayrollPage() {
             Connect Wallet
           </button>
         </div>
-      )}
-
-      {/* Recipient Card Table Container */}
-      {isConnected && (
+      ) : (
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col gap-6">
           
           {/* Header of Table */}
@@ -554,16 +569,6 @@ export default function PayrollPage() {
                 </div>
               </div>
 
-              {/* Error log alert */}
-              {formError && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-[9px] p-3 text-red-400 font-semibold leading-relaxed text-[11px] flex items-start gap-2 mt-1">
-                  <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <span>{formError}</span>
-                </div>
-              )}
-
               {/* Footer controls */}
               <div className="flex gap-3 mt-4">
                 <button
@@ -616,47 +621,6 @@ export default function PayrollPage() {
               <p className="text-[11px] text-mutedText mt-2 font-mono font-bold">
                 {executionProgress} / {recipients.length} Completed
               </p>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* Success Modal */}
-      {isSuccessOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 transition-opacity duration-300">
-          <div className="w-full max-w-md bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] shadow-2xl relative flex flex-col font-sans p-6 overflow-hidden">
-            
-            {/* Success Logo highlight */}
-            <div className="w-14 h-14 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center text-green-400 mx-auto mb-4">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-
-            <div className="text-center flex flex-col gap-2">
-              <span className="text-[10px] font-bold text-green-400 tracking-wider uppercase font-display">Execution Complete</span>
-              <h2 className="text-xl font-extrabold text-white font-display">
-                Private Payroll Successful
-              </h2>
-              <p className="text-xs text-mutedText mt-2 leading-relaxed font-semibold">
-                Successfully executed {recipients.length} shielded transfers. 
-                <br/>Total payout: ${totals.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
-              <div className="bg-[#000000] border border-[#1D1D1F] rounded-lg p-3 text-left text-[11px] text-slate-300 font-medium leading-relaxed mt-2 flex flex-col gap-1.5">
-                <p>✅ **Proofs Verified**: The verifier contract validated the sum-check without revealing individual amounts.</p>
-                <p>✅ **Transfers Settled**: On-chain ledger accounts now reflect separate unlinkable withdrawals.</p>
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setIsSuccessOpen(false)}
-                className="w-full py-2.5 bg-[#1D1D1F] hover:bg-[#2A2A2D] text-white font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 border border-[#333336]"
-              >
-                Close
-              </button>
             </div>
 
           </div>

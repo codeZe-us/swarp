@@ -67,8 +67,8 @@ step "Verifying proof locally..."
 bb verify --scheme ultra_honk --oracle_hash keccak -k target/vk/vk -p target/proof/proof -i target/proof/public_inputs
 # ── 6. Deploy artifacts ─────────────────────────────────────────────────────
 step "Deploying VK to contract..."
-cp target/vk/vk ../contracts/ultrahonk-verifier/vk
-ok "VK copied to contracts/ultrahonk-verifier/vk ✓"
+cp target/vk/vk ../contracts/ultrahonk-verifier-multi/vk
+ok "VK copied to contracts/ultrahonk-verifier-multi/vk ✓"
 
 step "Deploying swap.json to web app..."
 cp target/swap.json ../web/public/swap.json

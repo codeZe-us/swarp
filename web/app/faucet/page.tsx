@@ -5,6 +5,10 @@ import { useStore } from '../../store/useStore';
 import { getTokenBalance } from '../../lib/contracts';
 import { formatCurrency } from '../../lib/utils';
 import { addTrustline } from '../../lib/stellar';
+import { ProgressBar } from '../../components/ui/ProgressBar';
+import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
+import { CircularProgress } from '../../components/ui/CircularProgress';
+import { useToastStore } from '../../store/useToast';
 
 export default function FaucetPage() {
   const address = useStore((state) => state.address);
@@ -15,35 +19,41 @@ export default function FaucetPage() {
   const [mintAmount, setMintAmount] = useState<string>('100');
   
   const [isMinting, setIsMinting] = useState(false);
-  const [mintSuccess, setMintSuccess] = useState<string | null>(null);
-  const [mintError, setMintError] = useState<string | null>(null);
+  const [mintProgress, setMintProgress] = useState(0);
+  const [mintStep, setMintStep] = useState('');
 
   const [isFundingXlm, setIsFundingXlm] = useState(false);
-  const [xlmSuccess, setXlmSuccess] = useState<string | null>(null);
-  const [xlmError, setXlmError] = useState<string | null>(null);
 
   const [balances, setBalances] = useState<Record<string, string>>({
     USDC: '0.00', EURC: '0.00', MGUSD: '0.00', YLDS: '0.00', XLM: '0.00'
   });
+  const [isFetchingBalances, setIsFetchingBalances] = useState(true);
 
   const fetchBalances = async () => {
-    if (status !== 'connected' || !address || !config) return;
+    if (status !== 'connected' || !address || !config) {
+      setIsFetchingBalances(false);
+      return;
+    }
+    setIsFetchingBalances(true);
     try {
-      const usdc = await getTokenBalance(address, config.USDC_SAC_ID);
-      const eurc = await getTokenBalance(address, config.EURC_SAC_ID);
-      const mgusd = await getTokenBalance(address, config.MGUSD_SAC_ID);
-      const ylds = await getTokenBalance(address, config.YLDS_SAC_ID);
-      const xlm = await getTokenBalance(address, config.XLM_SAC_ID);
+      const balancePromises = [
+        getTokenBalance(address, config.USDC_SAC_ID).then(b => ({ code: 'USDC', bal: b })).catch(() => ({ code: 'USDC', bal: BigInt(0) })),
+        getTokenBalance(address, config.EURC_SAC_ID).then(b => ({ code: 'EURC', bal: b })).catch(() => ({ code: 'EURC', bal: BigInt(0) })),
+        getTokenBalance(address, config.MGUSD_SAC_ID).then(b => ({ code: 'MGUSD', bal: b })).catch(() => ({ code: 'MGUSD', bal: BigInt(0) })),
+        getTokenBalance(address, config.YLDS_SAC_ID).then(b => ({ code: 'YLDS', bal: b })).catch(() => ({ code: 'YLDS', bal: BigInt(0) })),
+        getTokenBalance(address, config.XLM_SAC_ID).then(b => ({ code: 'XLM', bal: b })).catch(() => ({ code: 'XLM', bal: BigInt(0) })),
+      ];
       
-      setBalances({
-        USDC: (Number(usdc) / 10_000_000).toFixed(2),
-        EURC: (Number(eurc) / 10_000_000).toFixed(2),
-        MGUSD: (Number(mgusd) / 10_000_000).toFixed(2),
-        YLDS: (Number(ylds) / 10_000_000).toFixed(2),
-        XLM: (Number(xlm) / 10_000_000).toFixed(2)
-      });
+      const results = await Promise.all(balancePromises);
+      const newBalances: any = {};
+      for (const res of results) {
+        newBalances[res.code] = (Number(res.bal) / 10_000_000).toFixed(2);
+      }
+      setBalances(newBalances);
     } catch (err) {
       console.warn("Failed to fetch balances", err);
+    } finally {
+      setIsFetchingBalances(false);
     }
   };
 
@@ -53,19 +63,21 @@ export default function FaucetPage() {
 
   const handleMintAsset = async () => {
     if (!address || !config) {
-      setMintError('Please connect your wallet first.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Please connect your wallet first.', severity: 'error' });
       return;
     }
     if (!mintAmount || parseFloat(mintAmount) <= 0) {
-      setMintError('Please enter a valid amount.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Please enter a valid amount.', severity: 'error' });
       return;
     }
 
     setIsMinting(true);
-    setMintError(null);
-    setMintSuccess(null);
+    setMintProgress(10);
+    setMintStep('Initializing request...');
 
     const performMint = async () => {
+      setMintProgress(40);
+      setMintStep('Simulating and submitting transaction...');
       const res = await fetch('/api/faucet/mint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -80,56 +92,66 @@ export default function FaucetPage() {
 
     try {
       const data = await performMint();
-      setMintSuccess(`Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`);
+      setMintProgress(80);
+      setMintStep('Refreshing balances...');
+      useToastStore.getState().addToast({ title: 'Success', message: `Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`, severity: 'success' });
       await fetchBalances();
+      setMintProgress(100);
+      setMintStep('Complete');
     } catch (err: any) {
       if (err.message?.includes('op_no_trust')) {
         try {
-          setMintError(`Trustline required for ${activeAsset}. Please approve the transaction in your wallet...`);
+          setMintProgress(30);
+          setMintStep('Trustline required. Please approve in wallet...');
+          useToastStore.getState().addToast({ title: 'Info', message: `Trustline required for ${activeAsset}. Please approve the transaction in your wallet...`, severity: 'info' });
           const issuerKey = `${activeAsset}_ISSUER_ADDRESS` as keyof typeof config;
           const issuerAddress = config[issuerKey];
           if (!issuerAddress) throw new Error(`Issuer address not configured for ${activeAsset}`);
           
           await addTrustline(activeAsset, issuerAddress as string);
           
-          setMintError(`Trustline added! Waiting for network sync...`);
+          setMintProgress(50);
+          setMintStep('Waiting for network sync...');
+          useToastStore.getState().addToast({ title: 'Success', message: `Trustline added! Waiting for network sync...`, severity: 'success' });
           await new Promise(resolve => setTimeout(resolve, 3000));
           
-          setMintError(`Retrying mint...`);
           const data = await performMint();
-          setMintSuccess(`Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`);
-          setMintError(null);
+          setMintProgress(80);
+          setMintStep('Refreshing balances...');
+          useToastStore.getState().addToast({ title: 'Success', message: `Successfully minted ${mintAmount} ${activeAsset}! Tx: ${data.txHash.slice(0, 10)}...`, severity: 'success' });
           await fetchBalances();
+          setMintProgress(100);
+          setMintStep('Complete');
         } catch (trustErr: any) {
-          setMintError(trustErr.message === 'The user closed the modal.' ? 'Trustline creation was rejected.' : `Failed to add trustline: ${trustErr.message}`);
+          useToastStore.getState().addToast({ title: 'Error', message: trustErr.message === 'The user closed the modal.' ? 'Trustline creation was rejected.' : `Failed to add trustline: ${trustErr.message}`, severity: 'error' });
         }
       } else {
-        setMintError(err.message || `Failed to mint ${activeAsset}`);
+        useToastStore.getState().addToast({ title: 'Error', message: err.message || `Failed to mint ${activeAsset}`, severity: 'error' });
       }
     } finally {
-      setIsMinting(false);
+      setTimeout(() => {
+        setIsMinting(false);
+      }, 1500);
     }
   };
 
   const handleFundXlm = async () => {
     if (!address) {
-      setXlmError('Please connect your wallet first.');
+      useToastStore.getState().addToast({ title: 'Error', message: 'Please connect your wallet first.', severity: 'error' });
       return;
     }
 
     setIsFundingXlm(true);
-    setXlmError(null);
-    setXlmSuccess(null);
 
     try {
       const res = await fetch(`https://friendbot.stellar.org?addr=${address}`);
       if (!res.ok) {
         throw new Error('Friendbot funding failed or account is already funded.');
       }
-      setXlmSuccess(`Successfully funded 10,000 testnet XLM via Friendbot!`);
+      useToastStore.getState().addToast({ title: 'Success', message: `Successfully funded 10,000 testnet XLM via Friendbot!`, severity: 'success' });
       await fetchBalances();
     } catch (err: any) {
-      setXlmError(err.message || 'Failed to fund XLM.');
+      useToastStore.getState().addToast({ title: 'Error', message: err.message || 'Failed to fund XLM.', severity: 'error' });
     } finally {
       setIsFundingXlm(false);
     }
@@ -157,15 +179,13 @@ export default function FaucetPage() {
                 <span className="text-gray-500">·</span>
                 <span className="text-gray-400 font-mono ml-1">{balances.XLM} XLM</span>
               </div>
-              {xlmSuccess && <p className="text-emerald-400 text-xs mt-2">{xlmSuccess}</p>}
-              {xlmError && <p className="text-red-400 text-xs mt-2">{xlmError}</p>}
             </div>
             <button 
               onClick={handleFundXlm}
               disabled={isFundingXlm || status !== 'connected'}
-              className="bg-transparent border border-white/10 hover:bg-white/5 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-transparent border border-white/10 hover:bg-white/5 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[100px]"
             >
-              {isFundingXlm ? 'Funding...' : 'Fund XLM'}
+              {isFundingXlm ? <CircularProgress size={16} /> : 'Fund XLM'}
             </button>
           </div>
 
@@ -181,7 +201,9 @@ export default function FaucetPage() {
                   MGUSD: { name: 'Multi-asset' },
                   YLDS: { name: 'Yield' }
                 };
-                return (
+                return isFetchingBalances ? (
+                  <ShimmerLoader key={asset} height={100} borderRadius={12} />
+                ) : (
                   <button
                     key={asset}
                     onClick={() => setActiveAsset(asset)}
@@ -215,29 +237,16 @@ export default function FaucetPage() {
               </div>
             </div>
 
-            <button 
-              onClick={handleMintAsset}
-              disabled={isMinting || status !== 'connected'}
-              className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white py-4 rounded-xl text-[15px] font-bold transition-all shadow-[0_0_15px_rgba(124,58,237,0.3)] disabled:opacity-50 disabled:cursor-not-allowed mb-4"
-            >
-              {isMinting ? 'Minting...' : `Mint ${activeAsset}`}
-            </button>
-
-            {mintSuccess && (
-              <div className="flex items-center gap-2 text-[#34D399] bg-[#064E3B]/30 border border-[#059669]/30 rounded-lg p-4 text-[13px]">
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                {mintSuccess}
-              </div>
-            )}
-            {mintError && (
-              <div className="flex items-center gap-2 text-[#F87171] bg-[#7F1D1D]/30 border border-[#DC2626]/30 rounded-lg p-4 text-[13px]">
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {mintError}
-              </div>
+            {isMinting ? (
+              <ProgressBar progress={mintProgress} label={mintStep} className="mb-4" />
+            ) : (
+              <button 
+                onClick={handleMintAsset}
+                disabled={status !== 'connected'}
+                className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white py-4 rounded-xl text-[15px] font-bold transition-all shadow-[0_0_15px_rgba(124,58,237,0.3)] disabled:opacity-50 disabled:cursor-not-allowed mb-4 flex items-center justify-center"
+              >
+                {`Mint ${activeAsset}`}
+              </button>
             )}
           </div>
         </div>

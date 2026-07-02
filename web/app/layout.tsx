@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
+import { Toaster } from "@/components/ui/Toaster";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -31,7 +33,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${hankenGrotesk.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body className="antialiased font-sans" suppressHydrationWarning>
-        <AppShell>{children}</AppShell>
+        <ErrorBoundary>
+          <AppShell>{children}</AppShell>
+        </ErrorBoundary>
+        <Toaster />
       </body>
     </html>
   );

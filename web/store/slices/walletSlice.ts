@@ -1,15 +1,17 @@
 import { StateCreator } from 'zustand';
 import { StellarWalletsKit } from '@creit.tech/stellar-wallets-kit/sdk';
 import { Networks } from '@creit.tech/stellar-wallets-kit';
-import { isConnected } from '@stellar/freighter-api';
+import { getNetworkDetails, isConnected } from '@stellar/freighter-api';
 import { StoreState } from '../useStore';
 import { connectWallet, disconnectWallet, initKit, isValidPublicKey } from '../../lib/stellar';
+import { ZendSwapError, handleError } from '../../lib/errors';
+import { useToastStore } from '../useToast';
 
 export interface WalletSlice {
   address: string | null;
   network: 'testnet' | 'mainnet';
   status: 'disconnected' | 'connecting' | 'connected' | 'error';
-  error: string | null;
+  error: ZendSwapError | null;
   kit: typeof StellarWalletsKit | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
@@ -31,17 +33,41 @@ export const createWalletSlice: StateCreator<
   connect: async () => {
     set({ status: 'connecting', error: null });
     try {
-      const { address } = await connectWallet();
+      const { address, walletId } = await connectWallet();
+      
+      if (typeof window !== 'undefined' && walletId === 'freighter') {
+        try {
+          const networkDetails = await getNetworkDetails();
+          if (networkDetails.network === 'PUBLIC' || networkDetails.network.toLowerCase().includes('mainnet')) {
+            useToastStore.getState().addToast({
+              title: 'Mainnet Detected',
+              message: 'You are currently connected to the Stellar Mainnet. We are currently working with Testnet. Please switch your wallet network to Testnet.',
+              severity: 'error',
+              duration: 10000,
+            });
+          } else {
+             useToastStore.getState().addToast({
+              title: 'Wallet Connected',
+              message: 'Successfully connected to Testnet.',
+              severity: 'success',
+              duration: 3000,
+            });
+          }
+        } catch (e) {
+          console.warn('Could not fetch network details', e);
+        }
+      }
+
       set({ address, status: 'connected', error: null, kit: StellarWalletsKit });
       
       await get().loadNotes(address);
       get().loadTransactions(address);
       await get().loadPayroll(address);
       await get().loadTeam(address);
-    } catch (err: any) {
-      const errorMsg = err?.message || 'Failed to connect wallet';
-      set({ status: 'error', error: errorMsg });
-      throw err;
+    } catch (err: unknown) {
+      const zError = handleError(err, 'wallet_connect');
+      set({ status: 'error', error: zError });
+      throw zError;
     }
   },
   disconnect: async () => {

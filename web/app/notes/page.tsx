@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
+import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 import { formatCurrency } from '../../lib/utils';
 import { getAssetByCode } from '../../lib/assets';
 import Link from 'next/link';
@@ -12,6 +13,14 @@ export default function NotesPage() {
   // Filter active vs spent
   const availableNotes = useMemo(() => notes.filter(n => n.status === 'deposited'), [notes]);
   const usedNotes = useMemo(() => notes.filter(n => n.status === 'withdrawn'), [notes]);
+
+  const [isFetchingData, setIsFetchingData] = useState(true);
+
+  // Simulate data fetch
+  useEffect(() => {
+    const timer = setTimeout(() => setIsFetchingData(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="max-w-[860px] mx-auto pt-8 pb-12 animate-fade-in px-4">
@@ -30,6 +39,11 @@ export default function NotesPage() {
       </div>
 
       {/* Stats Row */}
+      {isFetchingData ? (
+        <div className="bg-[#141419] border border-white/5 rounded-xl flex overflow-hidden mb-6 min-h-[120px]">
+          <ShimmerLoader className="w-full h-full min-h-[120px]" borderRadius={12} />
+        </div>
+      ) : (
       <div className="bg-[#141419] border border-white/5 rounded-xl flex overflow-hidden mb-6">
         <div className="p-6 flex-1 border-r border-white/5">
           <span className="text-[11px] font-bold text-mutedText uppercase tracking-widest block mb-4">TOTAL NOTES</span>
@@ -44,10 +58,15 @@ export default function NotesPage() {
           <div className="text-[32px] font-extrabold text-mutedText leading-none font-display">{usedNotes.length}</div>
         </div>
       </div>
+      )}
 
       {/* Notes List */}
       <div className="space-y-4">
-        {availableNotes.length === 0 ? (
+        {isFetchingData ? (
+          <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] overflow-hidden min-h-[180px]">
+            <ShimmerLoader className="w-full h-full min-h-[180px]" borderRadius={13} />
+          </div>
+        ) : availableNotes.length === 0 ? (
           <div className="bg-[#141419] border border-white/5 rounded-xl p-8 text-center text-mutedText">
             No available shielded notes found.
           </div>

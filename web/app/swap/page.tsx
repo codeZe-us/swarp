@@ -10,8 +10,11 @@ import { reconstructCommitments } from '../../lib/events';
 import { buildTree, getProof, verifyProof, computeRootFromPath } from '../../lib/merkle';
 import { generateSwapProof, SwapProofInput } from '../../lib/prover';
 import { ASSETS, getAssetByCode, getAssetById } from '../../lib/assets';
-import { getRate } from '../../lib/contracts';
+import { getRate, getReserves, getMerkleRoot } from '../../lib/contracts';
 import { formatProofForContract } from '../../lib/proof-formatter';
+import { handleError } from '../../lib/errors';
+import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
+import { useToastStore } from '../../store/useToast';
 
 export default function SwapPage() {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit');
@@ -45,21 +48,17 @@ export default function SwapPage() {
 
   // Transaction execution states (Deposit)
   const [depositTxStatus, setDepositTxStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [depositTxError, setDepositTxError] = useState<string | null>(null);
   const [depositTxHash, setDepositTxHash] = useState<string | null>(null);
   const [depositLeafIndex, setDepositLeafIndex] = useState<number | null>(null);
 
   // Funding state
   const [isFunding, setIsFunding] = useState(false);
-  const [fundSuccess, setFundSuccess] = useState<string | null>(null);
-  const [fundError, setFundError] = useState<string | null>(null);
 
   // Withdraw flow states
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [recipientAddress, setRecipientAddress] = useState<string>('');
   const [withdrawStep, setWithdrawStep] = useState<number>(0); // 0: idle, 1: fetching, 2: building, 3: proving, 4: submitting, 5: success
   const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [workerStage, setWorkerStage] = useState<'loading' | 'computing' | 'proving' | null>(null);
   const [provingSeconds, setProvingSeconds] = useState<number>(0);
   const [withdrawTxHash, setWithdrawTxHash] = useState<string | null>(null);
@@ -74,6 +73,7 @@ export default function SwapPage() {
   });
 
   const [currentRate, setCurrentRate] = useState<{ numerator: number; denominator: number }>({ numerator: 9200000, denominator: 10000000 });
+  const [isFetchingData, setIsFetchingData] = useState(true);
 
   // Fetch pool state on mount
   useEffect(() => {
@@ -105,19 +105,30 @@ export default function SwapPage() {
       const fetchRealBalances = async () => {
         try {
           // In mock mode, getTokenBalance handles undefined SAC IDs
-          const newBalances: Record<string, number> = {};
-          for (const asset of ASSETS) {
+          const balancePromises = ASSETS.map(async (asset) => {
             const sacId = (config as any)[`${asset.code}_SAC_ID`];
             if (sacId) {
-              const bal = await getTokenBalance(address, sacId);
-              newBalances[asset.code] = Number(bal) / 10_000_000;
-            } else {
-              newBalances[asset.code] = 0;
+              try {
+                const bal = await getTokenBalance(address, sacId);
+                return { code: asset.code, bal: Number(bal) / 10_000_000 };
+              } catch (e) {
+                console.warn(`Failed to fetch balance for ${asset.code}`, e);
+                return { code: asset.code, bal: 0 };
+              }
             }
+            return { code: asset.code, bal: 0 };
+          });
+          
+          const results = await Promise.all(balancePromises);
+          const newBalances: Record<string, number> = {};
+          for (const res of results) {
+            newBalances[res.code] = res.bal;
           }
           setBalances(prev => ({...prev, ...newBalances}));
         } catch (e) {
           console.warn('Failed to fetch real balances, using fallback mock values:', e);
+        } finally {
+          setIsFetchingData(false);
         }
       };
       fetchRealBalances();
@@ -129,6 +140,7 @@ export default function SwapPage() {
         YLDS: 0,
         XLM: 0,
       });
+      setIsFetchingData(false);
     }
   }, [isConnected, address]);
 
@@ -245,7 +257,6 @@ export default function SwapPage() {
     if (!depositValidation.isValid || !address) return;
 
     setDepositTxStatus('loading');
-    setDepositTxError(null);
     setDepositTxHash(null);
     setDepositLeafIndex(null);
 
@@ -259,7 +270,8 @@ export default function SwapPage() {
         console.warn(`MOCK MODE: Token contract for ${assetInCode} is not configured.`);
       }
 
-      const note = createNote(amountBigInt, assetId);
+      const poolContractId = (config as any)?.POOL_CONTRACT_ID;
+      const note = createNote(amountBigInt, assetId, poolContractId);
 
       // note.commitment is stored as a decimal BigInt string from poseidon2Hash.
       // submitDeposit() expects a 64-char hex string for encoding as bytes32.
@@ -294,10 +306,12 @@ export default function SwapPage() {
       setDepositTxHash(result.txHash);
       setDepositTxStatus('success');
       setAmountIn('');
-    } catch (error: any) {
+      useToastStore.getState().addToast({ title: 'Success', message: `Deposit Completed Successfully! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
+    } catch (error: unknown) {
       console.error('Deposit flow failed:', error);
-      setDepositTxError(error?.message || 'Transaction submission failed. Please try again.');
+      const zError = handleError(error, 'transaction');
       setDepositTxStatus('error');
+      useToastStore.getState().addToast({ title: 'Error', message: zError.message || 'Deposit failed.', severity: 'error' });
     }
   };
 
@@ -355,7 +369,6 @@ export default function SwapPage() {
     if (!note || !address || !recipientAddress) return;
 
     setWithdrawStatus('loading');
-    setWithdrawError(null);
     setWithdrawTxHash(null);
     setWorkerStage(null);
 
@@ -374,13 +387,16 @@ export default function SwapPage() {
       const withdrawAsset = getAssetByCode(withdrawAssetOutCode);
       if (!depositAsset || !withdrawAsset) throw new Error('Invalid asset');
       
-      const withdrawRate = await getRate(depositAsset.id, withdrawAsset.id);
+      if (depositAsset.id === withdrawAsset.id) {
+        throw new Error('Deposit and withdrawal assets cannot be the same (no same-asset swaps). Please select a different asset to receive.');
+      }
+      
+      const withdrawRate = await getRate(depositAsset.id, withdrawAsset.id, note.poolContractId);
       const withdrawAmountBig = (depositAmountBig * BigInt(withdrawRate.numerator)) / BigInt(withdrawRate.denominator);
 
-      // Read reserves from Zanzibar pool state
-      const reservesStr = useStore.getState().reserves || [];
-      const reserveAvailableStr = reservesStr[withdrawAsset.id] || '0';
-      const reserveAvailable = BigInt(reserveAvailableStr);
+      // Read reserves directly for the pool
+      const poolReserves = await getReserves(note.poolContractId);
+      const reserveAvailable = poolReserves.length > withdrawAsset.id ? poolReserves[withdrawAsset.id] : BigInt(0);
 
       if (reserveAvailable < withdrawAmountBig) {
         throw new Error(
@@ -399,9 +415,9 @@ export default function SwapPage() {
       // Step 1: Fetching pool state
       // -------------------------------------------------------------
       setWithdrawStep(1);
-      // Fetch latest roots and leaves from contract
-      await fetchPoolState();
-      const currentRoot = useStore.getState().merkleRoot;
+      // We don't call fetchPoolState() here as it updates the global store, 
+      // instead we just query the root directly for the specific pool.
+      const currentRoot = await getMerkleRoot(note.poolContractId);
       // merkleRoot is plain 64-char hex (no 0x). Empty string or all-zeros means not initialized.
       if (!currentRoot || /^0+$/.test(currentRoot)) {
         throw new Error('Could not fetch active Merkle root from chain.');
@@ -411,8 +427,8 @@ export default function SwapPage() {
       // Step 2: Building Merkle proof
       // -------------------------------------------------------------
       setWithdrawStep(2);
-      // Reconstruct leaf array from historical commitment events
-      const leaves = await reconstructCommitments();
+      // Reconstruct leaf array from historical commitment events for the specific pool
+      const leaves = await reconstructCommitments(note.poolContractId);
       
       const commitmentBig = BigInt(note.commitment);
       // Always look up commitment in event-reconstructed leaves — the stored
@@ -507,7 +523,8 @@ export default function SwapPage() {
         proofHex,
         nullifierBig.toString(16).padStart(64, '0'),
         rootBigInt.toString(16).padStart(64, '0'),
-        withdrawAmountBig.toString()
+        withdrawAmountBig.toString(),
+        note.poolContractId
       );
 
       // -------------------------------------------------------------
@@ -535,20 +552,13 @@ export default function SwapPage() {
       setWithdrawTxHash(result.txHash);
       setWithdrawStatus('success');
       setSelectedNoteId(null);
-    } catch (error: any) {
+      useToastStore.getState().addToast({ title: 'Success', message: `Withdrawal Successful! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
+    } catch (error: unknown) {
       console.error('Withdraw flow failed:', error);
-      
-      let failMessage = error?.message || 'Withdrawal transaction failed.';
-      
-      // Enforce edge case error messaging
-      if (failMessage.includes('Contract, #6') || failMessage.includes('InvalidMerkleRoot')) {
-        failMessage = 'The Merkle root expired because another transaction was confirmed. Please try again.';
-      } else if (failMessage.includes('Contract, #5') || failMessage.includes('NullifierSpent')) {
-        failMessage = 'This deposit note has already been withdrawn (nullifier spent).';
-      }
-
-      setWithdrawError(failMessage);
-      setWithdrawStatus('error');
+      const zError = handleError(error, 'transaction');
+      setWithdrawStatus('idle');
+      setWithdrawStep(0);
+      useToastStore.getState().addToast({ title: 'Error', message: zError.message || 'Withdrawal failed.', severity: 'error' });
     } finally {
       // Safeguard: make sure memory references to secrets are wiped
       activeSecret = null;
@@ -573,11 +583,6 @@ export default function SwapPage() {
               >
                 Fund Testnet
               </Link>
-              {fundError && (
-                <div className="text-red-400 text-[9px] font-bold max-w-[150px] text-right">
-                  {fundError}
-                </div>
-              )}
             </div>
           )}
           <Link
@@ -637,14 +642,20 @@ export default function SwapPage() {
                 <div className="flex items-center justify-between text-xs text-mutedText font-semibold">
                   <span>You deposit</span>
                   <div className="flex items-center gap-1.5 font-mono">
-                    <span>Balance {balances[assetInCode].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    {isConnected && (
-                      <button 
-                        onClick={handleMaxClick}
-                        className="text-[#B488DC] hover:text-[#D6C2EC] font-bold uppercase transition duration-150 font-display text-[11px]"
-                      >
-                        Max
-                      </button>
+                    {isFetchingData && isConnected ? (
+                      <ShimmerLoader className="w-24 h-4" borderRadius={4} />
+                    ) : (
+                      <>
+                        <span>Balance {balances[assetInCode].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        {isConnected && (
+                          <button 
+                            onClick={handleMaxClick}
+                            className="text-[#B488DC] hover:text-[#D6C2EC] font-bold uppercase transition duration-150 font-display text-[11px]"
+                          >
+                            Max
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -818,50 +829,6 @@ export default function SwapPage() {
             </p>
           </div>
 
-          {/* Tx State Alerts */}
-          {depositTxStatus === 'success' && depositTxHash && (
-            <div className="w-full max-w-[500px] bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex flex-col gap-2.5">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-sm font-bold text-emerald-400">Deposit Completed Successfully</span>
-              </div>
-              <div className="text-xs text-slate-300 flex flex-col gap-1.5 font-medium leading-relaxed">
-                <div>
-                  <span className="text-mutedText">Transaction Hash:</span>{' '}
-                  <a
-                    href={`https://stellar.expert/explorer/testnet/tx/${depositTxHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-white font-bold text-emerald-400"
-                  >
-                    {depositTxHash.slice(0, 12)}...{depositTxHash.slice(-12)}
-                  </a>
-                </div>
-                {depositLeafIndex !== null && (
-                  <div>
-                    <span className="text-mutedText">Leaf Index:</span>{' '}
-                    <span className="font-bold text-white">{depositLeafIndex}</span>
-                  </div>
-                )}
-                <div className="mt-2 bg-[#000000]/40 border border-amber-500/20 p-3 rounded-lg text-amber-300 font-semibold text-[11px]">
-                  ⚠️ Your swap note has been saved securely. If you clear browser data, you will lose access to these funds.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {depositTxStatus === 'error' && depositTxError && (
-            <div className="w-full max-w-[500px] bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
-              <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div className="text-xs font-semibold text-red-400 leading-relaxed">
-                {depositTxError}
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         /* Replaced Withdraw Tab with full ZK implementation */
@@ -883,7 +850,12 @@ export default function SwapPage() {
                   <label className="text-xs font-bold text-mutedText uppercase tracking-wider">
                     Select Active Shielded Note
                   </label>
-                  {withdrawableNotes.length === 0 ? (
+                  {isFetchingData && isConnected ? (
+                    <div className="flex flex-col gap-2">
+                      <ShimmerLoader className="w-full h-[72px]" borderRadius={12} />
+                      <ShimmerLoader className="w-full h-[72px]" borderRadius={12} />
+                    </div>
+                  ) : withdrawableNotes.length === 0 ? (
                     <div className="bg-[#000000] border border-[#1D1D1F] rounded-[12px] p-6 text-center text-xs text-mutedText font-semibold flex flex-col items-center justify-center gap-2 min-h-[120px] font-display">
                       <svg className="w-8 h-8 text-mutedText/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0V9a2 2 0 00-2-2H6a2 2 0 00-2 2v4m16 4H4" />
@@ -952,7 +924,14 @@ export default function SwapPage() {
 
                       {isWithdrawDropdownOpen && (
                         <div className="absolute left-0 right-0 mt-2 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display max-h-48 overflow-y-auto">
-                          {ASSETS.map((asset) => (
+                          {ASSETS.filter((asset) => {
+                            const note = notes.find(n => n.id === selectedNoteId);
+                            const legacyPoolId = (config as any)?.LEGACY_POOL_CONTRACT_ID;
+                            if (note && note.poolContractId === legacyPoolId) {
+                              return asset.code === 'USDC' || asset.code === 'EURC';
+                            }
+                            return true;
+                          }).map((asset) => (
                             <button
                               key={asset.code}
                               onClick={() => {
@@ -1008,17 +987,6 @@ export default function SwapPage() {
                   </button>
                 </div>
 
-                {/* Error Box */}
-                {withdrawStatus === 'error' && withdrawError && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
-                    <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div className="text-xs font-semibold text-red-400 leading-relaxed">
-                      {withdrawError}
-                    </div>
-                  </div>
-                )}
               </div>
             ) : (
               /* Execution Multi-step Progress Screen */
@@ -1087,77 +1055,6 @@ export default function SwapPage() {
                     );
                   })}
                 </div>
-
-                {/* Final transaction hash result / action rows */}
-                {withdrawStatus === 'success' && withdrawTxHash && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex flex-col gap-3 mt-2">
-                    <div className="text-xs text-slate-300 flex flex-col gap-1.5 font-medium leading-relaxed">
-                      <div className="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Withdrawal Completed
-                      </div>
-                      <div className="mt-1">
-                        <span className="text-mutedText">Transaction Hash:</span>{' '}
-                        <a
-                          href={`https://stellar.expert/explorer/testnet/tx/${withdrawTxHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline hover:text-white font-bold text-emerald-400"
-                        >
-                          {withdrawTxHash.slice(0, 12)}...{withdrawTxHash.slice(-12)}
-                        </a>
-                      </div>
-                      <p className="text-[10px] text-mutedText mt-1.5">
-                        The note secret has been successfully zeroed out in memory and stored state. Note spent.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWithdrawStatus('idle');
-                        setWithdrawStep(0);
-                        setWithdrawTxHash(null);
-                      }}
-                      className="w-full mt-2 py-2 bg-emerald-500/20 border border-emerald-500/30 hover:bg-emerald-500/30 text-emerald-400 font-bold rounded-xl text-xs uppercase tracking-wider transition duration-150"
-                    >
-                      Done
-                    </button>
-                  </div>
-                )}
-
-                {withdrawStatus === 'error' && (
-                  <div className="flex flex-col gap-3 mt-2">
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3">
-                      <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <div className="text-xs font-semibold text-red-400 leading-relaxed">
-                        {withdrawError || 'Prover or submission failed.'}
-                      </div>
-                    </div>
-                    <div className="flex gap-2 font-display">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setWithdrawStatus('idle');
-                          setWithdrawStep(0);
-                        }}
-                        className="flex-1 py-3 border border-[rgba(94,42,140,0.4)] text-white hover:bg-[#5E2A8C]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 bg-transparent"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleWithdraw}
-                        className="flex-1 py-3 bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white font-bold rounded-[12px] text-xs uppercase tracking-wider transition duration-150 shadow-[0_0_28px_rgba(123,55,168,0.3)] border-none"
-                      >
-                        Retry Step
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 

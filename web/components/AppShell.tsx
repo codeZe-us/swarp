@@ -8,6 +8,7 @@ import { useStore } from '../store/useStore';
 import { WalletConnect } from './WalletConnect';
 import { TruncatedAddress } from './ui/TruncatedAddress';
 import { Badge } from './ui/Badge';
+import { FreighterBanner } from './FreighterBanner';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -111,7 +112,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-darkBackground text-white">
+    <div className="flex flex-col min-h-screen bg-appBackground text-primaryText selection:bg-primaryAccent/30 selection:text-white">
+      <FreighterBanner />
       {/* Top Banner */}
       <WalletConnect />
 

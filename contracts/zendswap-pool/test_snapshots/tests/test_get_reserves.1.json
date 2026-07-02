@@ -305,42 +305,6 @@
                       "key": {
                         "vec": [
                           {
-                            "symbol": "Eurc"
-                          }
-                        ]
-                      },
-                      "val": {
-                        "address": "CBUSYNQKASUYFWYC3M2GUEDMX4AIVWPALDBYJPNK6554BREHTGZ2IUNF"
-                      }
-                    },
-                    {
-                      "key": {
-                        "vec": [
-                          {
-                            "symbol": "ExchangeRateDenominator"
-                          }
-                        ]
-                      },
-                      "val": {
-                        "u64": "10000000"
-                      }
-                    },
-                    {
-                      "key": {
-                        "vec": [
-                          {
-                            "symbol": "ExchangeRateNumerator"
-                          }
-                        ]
-                      },
-                      "val": {
-                        "u64": "9200000"
-                      }
-                    },
-                    {
-                      "key": {
-                        "vec": [
-                          {
                             "symbol": "FilledSubtrees"
                           }
                         ]
@@ -426,7 +390,85 @@
                       "key": {
                         "vec": [
                           {
+                            "symbol": "RateTable"
+                          },
+                          {
+                            "u64": "0"
+                          },
+                          {
+                            "u64": "1"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "vec": [
+                          {
+                            "u64": "9200000"
+                          },
+                          {
+                            "u64": "10000000"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "RateTable"
+                          },
+                          {
+                            "u64": "1"
+                          },
+                          {
+                            "u64": "0"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "vec": [
+                          {
+                            "u64": "9200000"
+                          },
+                          {
+                            "u64": "10000000"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
                             "symbol": "RecentRates"
+                          },
+                          {
+                            "u64": "0"
+                          },
+                          {
+                            "u64": "1"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "vec": [
+                          {
+                            "u64": "9200000"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "RecentRates"
+                          },
+                          {
+                            "u64": "1"
+                          },
+                          {
+                            "u64": "0"
                           }
                         ]
                       },
@@ -458,12 +500,30 @@
                       "key": {
                         "vec": [
                           {
-                            "symbol": "Usdc"
+                            "symbol": "TokenRegistry"
+                          },
+                          {
+                            "u64": "0"
                           }
                         ]
                       },
                       "val": {
                         "address": "CBEPDNVYXQGWB5YUBXKJWYJA7OXTZW5LFLNO5JRRGE6Z6C5OSUZPCCEL"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "TokenRegistry"
+                          },
+                          {
+                            "u64": "1"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "address": "CBUSYNQKASUYFWYC3M2GUEDMX4AIVWPALDBYJPNK6554BREHTGZ2IUNF"
                       }
                     },
                     {
