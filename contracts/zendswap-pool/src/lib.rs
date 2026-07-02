@@ -51,6 +51,16 @@ pub enum DataKey {
     TokenRegistry(u64),    // asset_id -> Address
     RateTable(u64, u64),   // (asset_in_id, asset_out_id) -> (u64, u64)
     RecentRates(u64, u64), // (asset_in_id, asset_out_id) -> Vec<u64>
+    PendingWithdrawal(BytesN<32>),
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct PendingWithdrawalRecord {
+    pub amount: i128,
+    pub asset_out: Address,
+    pub recipient: Address,
+    pub timestamp: u64,
 }
 
 // Amount is excluded from the event intentionally: the token transfer is already
@@ -566,6 +576,160 @@ impl ZendSwapPool {
             &recipient,
             &withdrawal_amount,
         );
+
+        env.events()
+            .publish((Symbol::new(&env, "withdraw"),), nullifier_hash);
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn verify_withdrawal(
+        env: Env,
+        caller: Address,
+        asset_in_id: u64,
+        asset_out_id: u64,
+        proof: Bytes,
+        nullifier_hash: BytesN<32>,
+        merkle_root: BytesN<32>,
+        withdrawal_amount: i128,
+    ) -> Result<(), Error> {
+        extend_ttl(&env);
+        caller.require_auth();
+
+        let asset_out: Address = match env
+            .storage()
+            .instance()
+            .get(&DataKey::TokenRegistry(asset_out_id))
+        {
+            Some(addr) => addr,
+            None => return Err(Error::UnsupportedToken),
+        };
+
+        if withdrawal_amount <= 0 || withdrawal_amount > MAX_DEPOSIT_AMOUNT {
+            return Err(Error::InvalidAmount);
+        }
+
+        let nullifier_key = DataKey::Nullifier(nullifier_hash.clone());
+        if env.storage().persistent().has(&nullifier_key) {
+            return Err(Error::NullifierSpent);
+        }
+
+        if !Self::verify_merkle_root(env.clone(), merkle_root.clone()) {
+            return Err(Error::InvalidMerkleRoot);
+        }
+
+        fn u64_to_bytes32(env: &Env, val: u64) -> BytesN<32> {
+            let mut bytes = [0u8; 32];
+            bytes[24..32].copy_from_slice(&val.to_be_bytes());
+            BytesN::from_array(env, &bytes)
+        }
+
+        let (_, rate_denom): (u64, u64) = env
+            .storage()
+            .instance()
+            .get(&DataKey::RateTable(asset_in_id, asset_out_id))
+            .unwrap();
+
+        let recent_rates: Vec<u64> = env
+            .storage()
+            .instance()
+            .get(&DataKey::RecentRates(asset_in_id, asset_out_id))
+            .unwrap_or_else(|| Vec::new(&env));
+
+        let mut unique_rates = Vec::new(&env);
+        for rate in recent_rates.iter() {
+            let mut duplicate = false;
+            for r in unique_rates.iter() {
+                if r == rate {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if !duplicate {
+                unique_rates.push_back(rate);
+            }
+        }
+
+        let mut verified = false;
+        let verifier: Address = env.storage().instance().get(&DataKey::Verifier).unwrap();
+
+        for rate in unique_rates.iter() {
+            let mut public_inputs = Vec::new(&env);
+            public_inputs.push_back(u64_to_bytes32(&env, asset_in_id));
+            public_inputs.push_back(u64_to_bytes32(&env, rate));
+            public_inputs.push_back(u64_to_bytes32(&env, rate_denom));
+            public_inputs.push_back(nullifier_hash.clone());
+            public_inputs.push_back(u64_to_bytes32(&env, asset_out_id));
+            public_inputs.push_back(merkle_root.clone());
+
+            let args = soroban_sdk::vec![
+                &env,
+                proof.clone().into_val(&env),
+                public_inputs.into_val(&env)
+            ];
+            let invoke_res =
+                env.try_invoke_contract::<bool, Val>(&verifier, &Symbol::new(&env, "verify"), args);
+
+            if let Ok(Ok(true)) = invoke_res {
+                verified = true;
+                break;
+            }
+        }
+
+        if !verified {
+            return Err(Error::VerificationFailed);
+        }
+
+        let pending_key = DataKey::PendingWithdrawal(nullifier_hash.clone());
+        let record = PendingWithdrawalRecord {
+            amount: withdrawal_amount,
+            asset_out: asset_out.clone(),
+            recipient: caller.clone(),
+            timestamp: env.ledger().timestamp(),
+        };
+
+        env.storage().temporary().set(&pending_key, &record);
+        env.storage().temporary().extend_ttl(&pending_key, 200, 200);
+
+        Ok(())
+    }
+
+    pub fn execute_withdrawal(
+        env: Env,
+        recipient: Address,
+        nullifier_hash: BytesN<32>,
+    ) -> Result<(), Error> {
+        extend_ttl(&env);
+        recipient.require_auth();
+
+        let pending_key = DataKey::PendingWithdrawal(nullifier_hash.clone());
+        let record: PendingWithdrawalRecord = match env.storage().temporary().get(&pending_key) {
+            Some(r) => r,
+            None => return Err(Error::VerificationFailed), // Or a specific error
+        };
+
+        if record.recipient != recipient {
+            return Err(Error::Unauthorized);
+        }
+
+        let nullifier_key = DataKey::Nullifier(nullifier_hash.clone());
+        if env.storage().persistent().has(&nullifier_key) {
+            return Err(Error::NullifierSpent);
+        }
+
+        env.storage().persistent().set(&nullifier_key, &true);
+        env.storage()
+            .persistent()
+            .extend_ttl(&nullifier_key, 17280, 518400);
+
+        TokenClient::new(&env, &record.asset_out).transfer(
+            &env.current_contract_address(),
+            &recipient,
+            &record.amount,
+        );
+
+        env.storage().temporary().remove(&pending_key);
 
         env.events()
             .publish((Symbol::new(&env, "withdraw"),), nullifier_hash);

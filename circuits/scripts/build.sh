@@ -40,6 +40,7 @@ step "Using bb   : ${BB_VER}"
 
 # ── 1. Compile ─────────────────────────────────────────────────────────────
 step "Compiling circuit..."
+nargo info
 nargo compile
 ok "Compiled → target/swap.json"
 

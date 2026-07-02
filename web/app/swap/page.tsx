@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useStore } from '../../store/useStore';
 import { createNote, computeNullifier } from '../../lib/note';
-import { submitDeposit, submitWithdraw, getTokenBalance, establishTrustline } from '../../lib/contracts';
+import { submitDeposit, submitVerifyWithdrawal, submitExecuteWithdrawal, getTokenBalance, establishTrustline } from '../../lib/contracts';
 import { Badge } from '../../components/ui/Badge';
 import { reconstructCommitments, fetchDepositEvents } from '../../lib/events';
 import { buildTree, getProof, verifyProof, computeRootFromPath } from '../../lib/merkle';
@@ -43,6 +43,7 @@ export default function SwapPage() {
   const dropdownInRef = useRef<HTMLDivElement>(null);
   const dropdownOutRef = useRef<HTMLDivElement>(null);
   const [withdrawAssetOutCode, setWithdrawAssetOutCode] = useState<string>('EURC');
+  const [canResumeNoteId, setCanResumeNoteId] = useState<string | null>(null);
   const [isWithdrawDropdownOpen, setIsWithdrawDropdownOpen] = useState(false);
   const withdrawDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -152,7 +153,9 @@ export default function SwapPage() {
       if (withdrawDropdownRef.current && !withdrawDropdownRef.current.contains(event.target as Node)) setIsWithdrawDropdownOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+  // Add any additional states or refs if necessary
+
+  return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Filter notes that are withdrawable (deposited)
@@ -519,7 +522,7 @@ export default function SwapPage() {
       }
 
       // -------------------------------------------------------------
-      // Step 4: Submitting to Stellar
+      // Step 4: Verifying proof on-chain
       // -------------------------------------------------------------
       setWithdrawStep(4);
       setWorkerStage(null);
@@ -527,22 +530,45 @@ export default function SwapPage() {
       // Slice prepended public inputs and format for verifier contract
       const { proofHex } = formatProofForContract(proofResult.proof, proofResult.publicInputs);
 
-      // Submit transaction via contracts.ts
-      const result = await submitWithdraw(
-        recipientAddress,
-        depositAsset.id,
-        withdrawAsset.id,
-        proofHex,
-        nullifierBig.toString(16).padStart(64, '0'),
-        rootBigInt.toString(16).padStart(64, '0'),
-        withdrawAmountBig.toString(),
-        note.poolContractId
-      );
+      // Submit verification transaction
+      try {
+        await submitVerifyWithdrawal(
+          recipientAddress,
+          depositAsset.id,
+          withdrawAsset.id,
+          proofHex,
+          nullifierBig.toString(16).padStart(64, '0'),
+          rootBigInt.toString(16).padStart(64, '0'),
+          withdrawAmountBig.toString(),
+          note.poolContractId
+        );
+      } catch (err: any) {
+        console.error("Verification failed", err);
+        throw new Error("Proof verification failed: " + (err.message || err));
+      }
 
       // -------------------------------------------------------------
-      // Step 5: Success & State updates
+      // Step 5: Executing withdrawal
       // -------------------------------------------------------------
       setWithdrawStep(5);
+      
+      let result;
+      try {
+        result = await submitExecuteWithdrawal(
+          recipientAddress,
+          nullifierBig.toString(16).padStart(64, '0'),
+          note.poolContractId
+        );
+      } catch (err: any) {
+        console.error("Execution failed", err);
+        setCanResumeNoteId(note.id);
+        throw new Error("Execution failed. Verification completed, so you can resume withdrawal. " + (err.message || err));
+      }
+
+      // -------------------------------------------------------------
+      // Step 6: Success & State updates
+      // -------------------------------------------------------------
+      setWithdrawStep(6);
 
       // Zero out active secret in local memory immediately
       activeSecret = null;
@@ -564,6 +590,7 @@ export default function SwapPage() {
       setWithdrawTxHash(result.txHash);
       setWithdrawStatus('success');
       setSelectedNoteId(null);
+      setCanResumeNoteId(null);
       useToastStore.getState().addToast({ title: 'Success', message: `Withdrawal Successful! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
     } catch (error: unknown) {
       console.error('Withdraw flow failed:', error);
@@ -573,7 +600,61 @@ export default function SwapPage() {
       useToastStore.getState().addToast({ title: 'Error', message: zError.message || 'Withdrawal failed.', severity: 'error' });
     } finally {
       // Safeguard: make sure memory references to secrets are wiped
-      activeSecret = null;
+      if (withdrawStatus === 'success') activeSecret = null;
+    }
+  };
+
+  const handleResumeWithdraw = async () => {
+    if (!selectedNoteId || !recipientAddress) return;
+    try {
+      setWithdrawStatus('loading');
+      setWithdrawStep(5); // Start at execute step
+      const note = notes.find((n) => n.id === selectedNoteId);
+      if (!note) throw new Error('Note not found.');
+      const depositAsset = getAssetByCode(note.asset);
+      if (!depositAsset) throw new Error('Unknown asset.');
+      
+      // Need activeSecret to compute nullifier again.
+      // Wait, we shouldn't wipe activeSecret if we fail in execution, but the prompt says:
+      // "If Transaction 1 succeeds but Transaction 2 fails... Show a 'Resume withdrawal' button that just resubmits execute_withdrawal with the same nullifier."
+      // Let's compute it.
+      if (!note.secret) {
+        throw new Error('Secret not found in local memory. Please re-enter it to continue.');
+      }
+      const activeSecret = BigInt(note.secret);
+      const nullifierBig = computeNullifier(depositAsset.id.toString(), activeSecret);
+
+      const result = await submitExecuteWithdrawal(
+          recipientAddress,
+          nullifierBig.toString(16).padStart(64, '0'),
+          note.poolContractId
+      );
+      
+      setWithdrawStep(6);
+      await updateNote(note.id, { secret: '0' });
+      await markWithdrawn(note.id, result.txHash);
+      
+      const withdrawAmountBig = BigInt(note.amount);
+      
+      addTransaction({
+        type: 'withdrawal',
+        amount: (Number(withdrawAmountBig) / 10_000_000).toString(),
+        asset: withdrawAssetOutCode,
+        txHash: result.txHash,
+        timestamp: Date.now(),
+        privacy: 'private',
+      });
+      setWithdrawTxHash(result.txHash);
+      setWithdrawStatus('success');
+      setSelectedNoteId(null);
+      setCanResumeNoteId(null);
+      useToastStore.getState().addToast({ title: 'Success', message: `Withdrawal Resumed & Successful! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
+    } catch (error: any) {
+      console.error('Resume flow failed:', error);
+      const zError = handleError(error, 'transaction');
+      setWithdrawStatus('idle');
+      setWithdrawStep(0);
+      useToastStore.getState().addToast({ title: 'Error', message: zError.message || 'Resume failed.', severity: 'error' });
     }
   };
 
@@ -985,9 +1066,9 @@ export default function SwapPage() {
                 )}
 
                 {/* Withdraw Submit CTA */}
-                <div className="mt-2 font-display">
+                <div className="mt-2 font-display flex gap-2">
                   <button
-                    onClick={handleWithdraw}
+                    onClick={() => { setCanResumeNoteId(null); handleWithdraw(); }}
                     disabled={!selectedNoteId || !recipientAddress || withdrawStatus === 'loading'}
                     className={`w-full py-3.5 rounded-[12px] font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
                       !selectedNoteId || !recipientAddress
@@ -997,6 +1078,15 @@ export default function SwapPage() {
                   >
                     Withdraw
                   </button>
+                  {canResumeNoteId === selectedNoteId && (
+                    <button
+                      onClick={handleResumeWithdraw}
+                      disabled={!recipientAddress || withdrawStatus === 'loading'}
+                      className="w-full py-3.5 rounded-[12px] font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 bg-[#1D1D1F] hover:bg-[#333336] text-white border border-[#333336]"
+                    >
+                      Resume
+                    </button>
+                  )}
                 </div>
 
               </div>
@@ -1008,11 +1098,12 @@ export default function SwapPage() {
                     { id: 1, label: "Fetching pool state..." },
                     { id: 2, label: "Building Merkle proof..." },
                     { id: 3, label: "Generating ZK proof..." },
-                    { id: 4, label: "Submitting to Stellar..." },
-                    { id: 5, label: "Swap complete!" }
+                    { id: 4, label: "Verifying proof on-chain..." },
+                    { id: 5, label: "Executing withdrawal..." },
+                    { id: 6, label: "Swap complete!" }
                   ].map((step) => {
                     const isActive = withdrawStep === step.id && withdrawStatus === 'loading';
-                    const isCompleted = withdrawStep > step.id || (step.id === 5 && withdrawStep === 5 && withdrawStatus === 'success');
+                    const isCompleted = withdrawStep > step.id || (step.id === 6 && withdrawStep === 6 && withdrawStatus === 'success');
                     const isFailed = withdrawStep === step.id && withdrawStatus === 'error';
                     
                     return (

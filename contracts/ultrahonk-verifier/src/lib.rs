@@ -4,7 +4,7 @@ extern crate alloc;
 #[cfg(test)]
 extern crate std;
 
-use soroban_sdk::{contract, contractimpl, Bytes, BytesN, Env, Vec};
+use soroban_sdk::{contract, contractimpl, Bytes, BytesN, Env, Vec, U256};
 use ultrahonk_soroban_verifier::{UltraHonkVerifier, PROOF_BYTES};
 
 // ── Verification Key ─────────────────────────────────────────────────────────
@@ -13,7 +13,7 @@ use ultrahonk_soroban_verifier::{UltraHonkVerifier, PROOF_BYTES};
 // library strictly expects 1760 bytes, so it is sliced accordingly at load.
 const VK_BYTES: &[u8] = include_bytes!("../vk");
 
-// ── Point Validation Helpers Removed ──────────────────────────────────────────
+
 
 // ── Contract ─────────────────────────────────────────────────────────────────
 
@@ -26,15 +26,19 @@ impl UltraHonkVerifierContract {
     /// Verify an UltraHonk proof for the ZendSwap swap circuit.
     ///
     /// # Arguments
-    ///
+    /// 
     /// * `proof`         – raw proof bytes (must be exactly PROOF_BYTES = 14592 bytes)
-    /// * `public_inputs` – 6 public inputs, in the order:
-    ///                     [merkle_root, nullifier_hash, exchange_rate,
-    ///                      rate_denominator, asset_out_public, asset_in]
+    /// * `public_inputs` – 6 public inputs, in the Noir declaration order:
+    ///                     [asset_in, exchange_rate, rate_denominator,
+    ///                      nullifier_hash, asset_out_public, merkle_root]
     ///
     /// # Returns
     /// `true` on valid proof, `false` on any failure or invalid inputs.
-    pub fn verify(env: Env, proof: Bytes, public_inputs: Vec<BytesN<32>>) -> bool {
+    pub fn verify(
+        env: Env,
+        proof: Bytes,
+        public_inputs: Vec<BytesN<32>>,
+    ) -> bool {
         if proof.len() as usize != PROOF_BYTES {
             return false;
         }
@@ -43,23 +47,16 @@ impl UltraHonkVerifierContract {
             return false;
         }
 
-        // 4. Reorder public inputs to match the Noir circuit declaration order:
-        // Input `public_inputs` has order:
-        //   [0] merkle_root
-        //   [1] nullifier_hash
-        //   [2] exchange_rate
-        //   [3] rate_denominator
-        //   [4] asset_out_public
-        //   [5] asset_in
-        //
-        // Noir circuit expects declaration order in main.nr:
+
+
+        // The public inputs are passed in Noir declaration order:
         //   asset_in, exchange_rate, rate_denominator, nullifier_hash, asset_out_public, merkle_root
-        let merkle_root = public_inputs.get(0).unwrap();
-        let nullifier_hash = public_inputs.get(1).unwrap();
-        let exchange_rate = public_inputs.get(2).unwrap();
-        let rate_denominator = public_inputs.get(3).unwrap();
+        let asset_in = public_inputs.get(0).unwrap();
+        let exchange_rate = public_inputs.get(1).unwrap();
+        let rate_denominator = public_inputs.get(2).unwrap();
+        let nullifier_hash = public_inputs.get(3).unwrap();
         let asset_out_public = public_inputs.get(4).unwrap();
-        let asset_in = public_inputs.get(5).unwrap();
+        let merkle_root = public_inputs.get(5).unwrap();
 
         let mut pi_bytes = Bytes::new(&env);
         pi_bytes.append(&Bytes::from_array(&env, &asset_in.to_array()));
@@ -136,17 +133,19 @@ mod test {
 
         // 1. merkle_root: 0x13d5a5935821225211517d91c3b202470ed10537de8b8d7aa765c0f163ab8288
         let merkle_root_bytes: [u8; 32] = [
-            0x13, 0xd5, 0xa5, 0x93, 0x58, 0x21, 0x22, 0x52, 0x11, 0x51, 0x7d, 0x91, 0xc3, 0xb2,
-            0x02, 0x47, 0x0e, 0xd1, 0x05, 0x37, 0xde, 0x8b, 0x8d, 0x7a, 0xa7, 0x65, 0xc0, 0xf1,
-            0x63, 0xab, 0x82, 0x88,
+            0x13, 0xd5, 0xa5, 0x93, 0x58, 0x21, 0x22, 0x52,
+            0x11, 0x51, 0x7d, 0x91, 0xc3, 0xb2, 0x02, 0x47,
+            0x0e, 0xd1, 0x05, 0x37, 0xde, 0x8b, 0x8d, 0x7a,
+            0xa7, 0x65, 0xc0, 0xf1, 0x63, 0xab, 0x82, 0x88,
         ];
         public_inputs.push_back(BytesN::from_array(&env, &merkle_root_bytes));
 
         // 2. nullifier_hash: 0x045e9cf13d3ab92cc27bc4ce8111d4c3278ce84764812648e69113b43507daf8
         let nullifier_hash_bytes: [u8; 32] = [
-            0x04, 0x5e, 0x9c, 0xf1, 0x3d, 0x3a, 0xb9, 0x2c, 0xc2, 0x7b, 0xc4, 0xce, 0x81, 0x11,
-            0xd4, 0xc3, 0x27, 0x8c, 0xe8, 0x47, 0x64, 0x81, 0x26, 0x48, 0xe6, 0x91, 0x13, 0xb4,
-            0x35, 0x07, 0xda, 0xf8,
+            0x04, 0x5e, 0x9c, 0xf1, 0x3d, 0x3a, 0xb9, 0x2c,
+            0xc2, 0x7b, 0xc4, 0xce, 0x81, 0x11, 0xd4, 0xc3,
+            0x27, 0x8c, 0xe8, 0x47, 0x64, 0x81, 0x26, 0x48,
+            0xe6, 0x91, 0x13, 0xb4, 0x35, 0x07, 0xda, 0xf8,
         ];
         public_inputs.push_back(BytesN::from_array(&env, &nullifier_hash_bytes));
 
@@ -170,7 +169,7 @@ mod test {
         public_inputs.push_back(BytesN::from_array(&env, &asset_out_public_bytes));
 
         // 6. asset_in: 0
-        let asset_in_bytes = [0u8; 32];
+        let mut asset_in_bytes = [0u8; 32];
         // asset_in is 0 in Prover.toml, so it's all zeros
         public_inputs.push_back(BytesN::from_array(&env, &asset_in_bytes));
 
@@ -191,16 +190,18 @@ mod test {
         let mut public_inputs = Vec::new(&env);
 
         let merkle_root_bytes: [u8; 32] = [
-            0x13, 0xd5, 0xa5, 0x93, 0x58, 0x21, 0x22, 0x52, 0x11, 0x51, 0x7d, 0x91, 0xc3, 0xb2,
-            0x02, 0x47, 0x0e, 0xd1, 0x05, 0x37, 0xde, 0x8b, 0x8d, 0x7a, 0xa7, 0x65, 0xc0, 0xf1,
-            0x63, 0xab, 0x82, 0x88,
+            0x13, 0xd5, 0xa5, 0x93, 0x58, 0x21, 0x22, 0x52,
+            0x11, 0x51, 0x7d, 0x91, 0xc3, 0xb2, 0x02, 0x47,
+            0x0e, 0xd1, 0x05, 0x37, 0xde, 0x8b, 0x8d, 0x7a,
+            0xa7, 0x65, 0xc0, 0xf1, 0x63, 0xab, 0x82, 0x88,
         ];
         public_inputs.push_back(BytesN::from_array(&env, &merkle_root_bytes));
 
         let nullifier_hash_bytes: [u8; 32] = [
-            0x04, 0x5e, 0x9c, 0xf1, 0x3d, 0x3a, 0xb9, 0x2c, 0xc2, 0x7b, 0xc4, 0xce, 0x81, 0x11,
-            0xd4, 0xc3, 0x27, 0x8c, 0xe8, 0x47, 0x64, 0x81, 0x26, 0x48, 0xe6, 0x91, 0x13, 0xb4,
-            0x35, 0x07, 0xda, 0xf8,
+            0x04, 0x5e, 0x9c, 0xf1, 0x3d, 0x3a, 0xb9, 0x2c,
+            0xc2, 0x7b, 0xc4, 0xce, 0x81, 0x11, 0xd4, 0xc3,
+            0x27, 0x8c, 0xe8, 0x47, 0x64, 0x81, 0x26, 0x48,
+            0xe6, 0x91, 0x13, 0xb4, 0x35, 0x07, 0xda, 0xf8,
         ];
         public_inputs.push_back(BytesN::from_array(&env, &nullifier_hash_bytes));
 
@@ -221,7 +222,7 @@ mod test {
         asset_out_public_bytes[31] = 1;
         public_inputs.push_back(BytesN::from_array(&env, &asset_out_public_bytes));
 
-        let asset_in_bytes = [0u8; 32];
+        let mut asset_in_bytes = [0u8; 32];
         public_inputs.push_back(BytesN::from_array(&env, &asset_in_bytes));
 
         let verified = client.verify(&proof_bytes, &public_inputs);
