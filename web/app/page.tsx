@@ -42,19 +42,20 @@ export default function Home() {
         try {
           await fetchPoolState();
 
-          const usdcBal = await getTokenBalance(address, config?.USDC_SAC_ID || '');
-          const eurcBal = await getTokenBalance(address, config?.EURC_SAC_ID || '');
-          const mgusdBal = await getTokenBalance(address, config?.MGUSD_SAC_ID || '');
-          const yldsBal = await getTokenBalance(address, config?.YLDS_SAC_ID || '');
-          const xlmBal = await getTokenBalance(address, config?.XLM_SAC_ID || '');
+          const balancePromises = [
+            getTokenBalance(address, config?.USDC_SAC_ID || '').then(b => ({ code: 'USDC', bal: b })).catch(() => ({ code: 'USDC', bal: BigInt(0) })),
+            getTokenBalance(address, config?.EURC_SAC_ID || '').then(b => ({ code: 'EURC', bal: b })).catch(() => ({ code: 'EURC', bal: BigInt(0) })),
+            getTokenBalance(address, config?.MGUSD_SAC_ID || '').then(b => ({ code: 'MGUSD', bal: b })).catch(() => ({ code: 'MGUSD', bal: BigInt(0) })),
+            getTokenBalance(address, config?.YLDS_SAC_ID || '').then(b => ({ code: 'YLDS', bal: b })).catch(() => ({ code: 'YLDS', bal: BigInt(0) })),
+            getTokenBalance(address, config?.XLM_SAC_ID || '').then(b => ({ code: 'XLM', bal: b })).catch(() => ({ code: 'XLM', bal: BigInt(0) })),
+          ];
           
-          setBalances({
-            USDC: Number(usdcBal) / 10_000_000,
-            EURC: Number(eurcBal) / 10_000_000,
-            MGUSD: Number(mgusdBal) / 10_000_000,
-            YLDS: Number(yldsBal) / 10_000_000,
-            XLM: Number(xlmBal) / 10_000_000,
-          });
+          const results = await Promise.all(balancePromises);
+          const newBalances: Record<string, number> = {};
+          for (const res of results) {
+            newBalances[res.code] = Number(res.bal) / 10_000_000;
+          }
+          setBalances(newBalances as any);
         } catch (e: unknown) {
           console.warn('Failed to load live data:', e);
           const zError = handleError(e, 'api', false);

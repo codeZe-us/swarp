@@ -39,7 +39,15 @@ export class ZendSwapError extends Error {
 
 // Registry to map raw errors to user-friendly ZendSwapErrors
 export function mapError(error: unknown, context: string): ZendSwapError {
-  const errStr = error instanceof Error ? error.message : String(error);
+  let errStr = '';
+  if (error instanceof Error) {
+    errStr = error.message;
+  } else if (typeof error === 'object' && error !== null && 'message' in error) {
+    errStr = String((error as any).message);
+  } else {
+    errStr = String(error);
+  }
+
   const errObj = error as any;
 
   // --- E2: Wallet Connection Errors ---
@@ -60,13 +68,12 @@ export function mapError(error: unknown, context: string): ZendSwapError {
     });
   }
   
-  if (context === 'wallet_connect' && errStr.includes('cancelled')) {
+  if (context === 'wallet_connect' && (errStr.includes('cancelled') || errStr.includes('rejected') || errStr.includes('closed the modal'))) {
     return new ZendSwapError({
       code: 'WALLET_CONNECTION_CANCELLED',
       title: 'Connection cancelled',
-      message: 'You cancelled the wallet connection. Connect whenever you\'re ready.',
-      actionLabel: 'Try again',
-      severity: 'info',
+      message: 'You cancelled the wallet connection.',
+      severity: 'silent',
       source: 'wallet',
       rawError: error,
     });
@@ -79,7 +86,7 @@ export function mapError(error: unknown, context: string): ZendSwapError {
       title: 'Transaction cancelled',
       message: 'You cancelled the transaction in your wallet. No funds were moved.',
       actionLabel: 'Try again',
-      severity: 'info',
+      severity: 'silent',
       source: 'wallet',
       rawError: error,
     });

@@ -78,6 +78,10 @@ self.onmessage = async (event: MessageEvent<ProverWorkerMessage>) => {
       merkle_root:       input.merkle_root,
     };
 
+    console.log('=== CIRCUIT INPUTS ===');
+    console.log(JSON.stringify(witnessMap, null, 2));
+    console.log('======================');
+
     const { witness } = await noir.execute(witnessMap);
 
     (self as any).postMessage({ type: 'proving' } as ProverWorkerMessage);

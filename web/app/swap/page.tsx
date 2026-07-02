@@ -105,15 +105,24 @@ export default function SwapPage() {
       const fetchRealBalances = async () => {
         try {
           // In mock mode, getTokenBalance handles undefined SAC IDs
-          const newBalances: Record<string, number> = {};
-          for (const asset of ASSETS) {
+          const balancePromises = ASSETS.map(async (asset) => {
             const sacId = (config as any)[`${asset.code}_SAC_ID`];
             if (sacId) {
-              const bal = await getTokenBalance(address, sacId);
-              newBalances[asset.code] = Number(bal) / 10_000_000;
-            } else {
-              newBalances[asset.code] = 0;
+              try {
+                const bal = await getTokenBalance(address, sacId);
+                return { code: asset.code, bal: Number(bal) / 10_000_000 };
+              } catch (e) {
+                console.warn(`Failed to fetch balance for ${asset.code}`, e);
+                return { code: asset.code, bal: 0 };
+              }
             }
+            return { code: asset.code, bal: 0 };
+          });
+          
+          const results = await Promise.all(balancePromises);
+          const newBalances: Record<string, number> = {};
+          for (const res of results) {
+            newBalances[res.code] = res.bal;
           }
           setBalances(prev => ({...prev, ...newBalances}));
         } catch (e) {
@@ -377,6 +386,10 @@ export default function SwapPage() {
       const depositAsset = getAssetByCode(note.asset);
       const withdrawAsset = getAssetByCode(withdrawAssetOutCode);
       if (!depositAsset || !withdrawAsset) throw new Error('Invalid asset');
+      
+      if (depositAsset.id === withdrawAsset.id) {
+        throw new Error('Deposit and withdrawal assets cannot be the same (no same-asset swaps). Please select a different asset to receive.');
+      }
       
       const withdrawRate = await getRate(depositAsset.id, withdrawAsset.id, note.poolContractId);
       const withdrawAmountBig = (depositAmountBig * BigInt(withdrawRate.numerator)) / BigInt(withdrawRate.denominator);

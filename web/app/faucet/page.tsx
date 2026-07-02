@@ -36,19 +36,20 @@ export default function FaucetPage() {
     }
     setIsFetchingBalances(true);
     try {
-      const usdc = await getTokenBalance(address, config.USDC_SAC_ID);
-      const eurc = await getTokenBalance(address, config.EURC_SAC_ID);
-      const mgusd = await getTokenBalance(address, config.MGUSD_SAC_ID);
-      const ylds = await getTokenBalance(address, config.YLDS_SAC_ID);
-      const xlm = await getTokenBalance(address, config.XLM_SAC_ID);
+      const balancePromises = [
+        getTokenBalance(address, config.USDC_SAC_ID).then(b => ({ code: 'USDC', bal: b })).catch(() => ({ code: 'USDC', bal: BigInt(0) })),
+        getTokenBalance(address, config.EURC_SAC_ID).then(b => ({ code: 'EURC', bal: b })).catch(() => ({ code: 'EURC', bal: BigInt(0) })),
+        getTokenBalance(address, config.MGUSD_SAC_ID).then(b => ({ code: 'MGUSD', bal: b })).catch(() => ({ code: 'MGUSD', bal: BigInt(0) })),
+        getTokenBalance(address, config.YLDS_SAC_ID).then(b => ({ code: 'YLDS', bal: b })).catch(() => ({ code: 'YLDS', bal: BigInt(0) })),
+        getTokenBalance(address, config.XLM_SAC_ID).then(b => ({ code: 'XLM', bal: b })).catch(() => ({ code: 'XLM', bal: BigInt(0) })),
+      ];
       
-      setBalances({
-        USDC: (Number(usdc) / 10_000_000).toFixed(2),
-        EURC: (Number(eurc) / 10_000_000).toFixed(2),
-        MGUSD: (Number(mgusd) / 10_000_000).toFixed(2),
-        YLDS: (Number(ylds) / 10_000_000).toFixed(2),
-        XLM: (Number(xlm) / 10_000_000).toFixed(2)
-      });
+      const results = await Promise.all(balancePromises);
+      const newBalances: any = {};
+      for (const res of results) {
+        newBalances[res.code] = (Number(res.bal) / 10_000_000).toFixed(2);
+      }
+      setBalances(newBalances);
     } catch (err) {
       console.warn("Failed to fetch balances", err);
     } finally {
