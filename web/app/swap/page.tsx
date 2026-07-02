@@ -534,12 +534,14 @@ export default function SwapPage() {
       try {
         await submitVerifyWithdrawal(
           recipientAddress,
-          depositAsset.id,
-          withdrawAsset.id,
           proofHex,
           nullifierBig.toString(16).padStart(64, '0'),
           rootBigInt.toString(16).padStart(64, '0'),
+          withdrawAsset.id,
+          withdrawRate.numerator.toString(),
+          withdrawRate.denominator.toString(),
           withdrawAmountBig.toString(),
+          depositAsset.id,
           note.poolContractId
         );
       } catch (err: any) {

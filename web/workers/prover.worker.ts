@@ -85,7 +85,7 @@ self.onmessage = async (event: MessageEvent<ProverWorkerMessage>) => {
     const { witness } = await noir.execute(witnessMap);
 
     (self as any).postMessage({ type: 'proving' } as ProverWorkerMessage);
-    const { proof, publicInputs } = await backend.generateProof(witness);
+    const { proof, publicInputs } = await backend.generateProof(witness, { keccak: true });
 
     const formattedPublicInputs = Array.isArray(publicInputs)
       ? publicInputs.map((p) => {

@@ -739,12 +739,14 @@ async function executeTransaction(
 
 export async function submitVerifyWithdrawal(
   caller: string,
-  assetInId: number,
-  assetOutId: number,
   proof: string,
   nullifier: string,
   merkleRoot: string,
+  assetOutId: number,
+  exchangeRate: bigint | string | number,
+  rateDenominator: bigint | string | number,
   withdrawalAmount: bigint | string | number,
+  assetInId: number,
   poolContractIdOverride?: string
 ): Promise<{ txHash: string }> {
   const config = getConfig();
@@ -763,13 +765,19 @@ export async function submitVerifyWithdrawal(
   }
 
   const contract = new Contract(POOL_CONTRACT_ID);
+  
+  // Create ScVals according to contract signature:
+  // caller: Address, proof: Bytes, nullifier_hash: BytesN<32>, merkle_root: BytesN<32>, 
+  // asset_out: u32, exchange_rate: u64, rate_denominator: u64, withdrawal_amount: i128, asset_in: u32
   const callerVal = new Address(caller).toScVal();
-  const assetInIdVal = nativeToScVal(assetInId, { type: 'u64' });
-  const assetOutIdVal = nativeToScVal(assetOutId, { type: 'u64' });
   const proofVal = nativeToScVal(Buffer.from(proof, 'hex'));
   const nullifierVal = xdr.ScVal.scvBytes(Buffer.from(nullifier, 'hex'));
   const merkleRootVal = xdr.ScVal.scvBytes(Buffer.from(merkleRoot, 'hex'));
+  const assetOutIdVal = nativeToScVal(assetOutId, { type: 'u32' });
+  const exchangeRateVal = nativeToScVal(BigInt(exchangeRate), { type: 'u64' });
+  const rateDenominatorVal = nativeToScVal(BigInt(rateDenominator), { type: 'u64' });
   const withdrawalAmountVal = nativeToScVal(amountBig, { type: 'i128' });
+  const assetInIdVal = nativeToScVal(assetInId, { type: 'u32' });
 
   const transaction = new TransactionBuilder(account, {
     fee: '100000000',
@@ -779,12 +787,14 @@ export async function submitVerifyWithdrawal(
       contract.call(
         'verify_withdrawal',
         callerVal,
-        assetInIdVal,
-        assetOutIdVal,
         proofVal,
         nullifierVal,
         merkleRootVal,
-        withdrawalAmountVal
+        assetOutIdVal,
+        exchangeRateVal,
+        rateDenominatorVal,
+        withdrawalAmountVal,
+        assetInIdVal
       )
     )
     .setTimeout(300)

@@ -386,4 +386,60 @@ mod test {
         let verified = client.verify(&garbage_proof, &public_inputs);
         assert!(!verified, "Garbage proof should return false, not panic!");
     }
+
+    #[test]
+    fn test_verification_fresh_proof() {
+        let env = Env::default();
+        env.cost_estimate().budget().reset_unlimited();
+
+        let contract_id = env.register(UltraHonkVerifierContract, ());
+        let client = UltraHonkVerifierContractClient::new(&env, &contract_id);
+
+        let proof_hex_str = include_str!("../fresh_proof.hex");
+        let pi_hex_str = include_str!("../fresh_pi.hex");
+
+        let mut proof_bytes = alloc::vec::Vec::new();
+        for i in (0..proof_hex_str.len()).step_by(2) {
+            proof_bytes.push(u8::from_str_radix(&proof_hex_str[i..i+2], 16).unwrap());
+        }
+        let proof = Bytes::from_slice(&env, &proof_bytes);
+
+        let mut pi_bytes = alloc::vec::Vec::new();
+        for i in (0..pi_hex_str.len()).step_by(2) {
+            pi_bytes.push(u8::from_str_radix(&pi_hex_str[i..i+2], 16).unwrap());
+        }
+
+        let mut public_inputs = Vec::new(&env);
+        // The demo pass them raw. For our swarp verifier we need to extract 6 32-byte chunks!
+        // But our swarp verifier expects:
+        // [merkle_root, nullifier_hash, exchange_rate, rate_denominator, asset_out_public, asset_in]
+        // Which is NOT the order in fresh_pi.hex!
+        // Wait, what is the order in fresh_pi.hex? It's the order from Noir circuit declaration.
+        // main.nr declaration order:
+        // asset_in, exchange_rate, rate_denominator, nullifier_hash, asset_out_public, merkle_root
+        
+        let mut get_chunk = |idx: usize| {
+            let mut chunk = [0u8; 32];
+            chunk.copy_from_slice(&pi_bytes[idx*32..(idx+1)*32]);
+            BytesN::from_array(&env, &chunk)
+        };
+
+        // Reconstruct swarp's expected order from the fresh_pi.hex (which is in Noir order)
+        let asset_in = get_chunk(0);
+        let exchange_rate = get_chunk(1);
+        let rate_denominator = get_chunk(2);
+        let nullifier_hash = get_chunk(3);
+        let asset_out_public = get_chunk(4);
+        let merkle_root = get_chunk(5);
+
+        public_inputs.push_back(merkle_root);
+        public_inputs.push_back(nullifier_hash);
+        public_inputs.push_back(exchange_rate);
+        public_inputs.push_back(rate_denominator);
+        public_inputs.push_back(asset_out_public);
+        public_inputs.push_back(asset_in);
+
+        let verified = client.verify(&proof, &public_inputs);
+        assert!(verified, "Fresh proof should verify!");
+    }
 }
