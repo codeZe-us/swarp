@@ -25,7 +25,7 @@ export async function generateSwapProof(
   let timeoutId: any = null;
 
   try {
-    const response = await fetch('/circuits/circuit.json');
+    const response = await fetch('/swap.json');
     if (!response.ok) {
       throw new Error(`Failed to load circuit artifact: ${response.status} ${response.statusText}`);
     }

@@ -995,6 +995,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
+name = "oz-policy-engine"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "p256"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1703,7 +1710,7 @@ name = "ultrahonk-verifier"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
- "ultrahonk_soroban_verifier",
+ "ultrahonk_soroban_verifier 0.1.0 (git+https://github.com/NethermindEth/rs-soroban-ultrahonk?rev=661db07200f890b1bd9a7349ed787c70a706dd12)",
 ]
 
 [[package]]
@@ -1711,13 +1718,21 @@ name = "ultrahonk-verifier-multi"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
- "ultrahonk_soroban_verifier",
+ "ultrahonk_soroban_verifier 0.1.0 (git+https://github.com/NethermindEth/rs-soroban-ultrahonk?branch=main)",
 ]
 
 [[package]]
 name = "ultrahonk_soroban_verifier"
 version = "0.1.0"
 source = "git+https://github.com/NethermindEth/rs-soroban-ultrahonk?branch=main#661db07200f890b1bd9a7349ed787c70a706dd12"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "ultrahonk_soroban_verifier"
+version = "0.1.0"
+source = "git+https://github.com/NethermindEth/rs-soroban-ultrahonk?rev=661db07200f890b1bd9a7349ed787c70a706dd12#661db07200f890b1bd9a7349ed787c70a706dd12"
 dependencies = [
  "soroban-sdk",
 ]

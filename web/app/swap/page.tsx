@@ -6,7 +6,7 @@ import { useStore } from '../../store/useStore';
 import { createNote, computeNullifier } from '../../lib/note';
 import { submitDeposit, submitWithdraw, getTokenBalance, establishTrustline } from '../../lib/contracts';
 import { Badge } from '../../components/ui/Badge';
-import { reconstructCommitments } from '../../lib/events';
+import { reconstructCommitments, fetchDepositEvents } from '../../lib/events';
 import { buildTree, getProof, verifyProof, computeRootFromPath } from '../../lib/merkle';
 import { generateSwapProof, SwapProofInput } from '../../lib/prover';
 import { ASSETS, getAssetByCode, getAssetById } from '../../lib/assets';
@@ -431,6 +431,18 @@ export default function SwapPage() {
       const leaves = await reconstructCommitments(note.poolContractId);
       
       const commitmentBig = BigInt(note.commitment);
+      const commitmentHex = note.commitment;
+      
+      // Before the commitment search
+      const events = await fetchDepositEvents(undefined, note.poolContractId);
+      console.log('=== EVENT DEBUG ===');
+      console.log('Pool contract being queried:', note.poolContractId);
+      console.log('Total events found:', events.length);
+      console.log('Looking for commitment:', commitmentHex);
+      if (events.length > 0) {
+        console.log('First 3 event commitments:', events.slice(0, 3).map(e => e.commitment));
+      }
+      console.log('===================');
       // Always look up commitment in event-reconstructed leaves — the stored
       // leafIndex may have been incorrectly set to 0 for all deposits.
       let leafIdx: number = leaves.findIndex((l) => l === commitmentBig);

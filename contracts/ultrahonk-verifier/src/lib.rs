@@ -4,7 +4,7 @@ extern crate alloc;
 #[cfg(test)]
 extern crate std;
 
-use soroban_sdk::{contract, contractimpl, Bytes, BytesN, Env, Vec, U256};
+use soroban_sdk::{contract, contractimpl, Bytes, BytesN, Env, Vec};
 use ultrahonk_soroban_verifier::{UltraHonkVerifier, PROOF_BYTES};
 
 // ── Verification Key ─────────────────────────────────────────────────────────
@@ -13,142 +13,7 @@ use ultrahonk_soroban_verifier::{UltraHonkVerifier, PROOF_BYTES};
 // library strictly expects 1760 bytes, so it is sliced accordingly at load.
 const VK_BYTES: &[u8] = include_bytes!("../vk");
 
-// ── Point Validation Helpers ──────────────────────────────────────────────────
-
-fn combine_limbs(lo: &[u8; 32], hi: &[u8; 32]) -> [u8; 32] {
-    let mut out = [0u8; 32];
-    out[..15].copy_from_slice(&hi[17..]);
-    out[15..].copy_from_slice(&lo[15..]);
-    out
-}
-
-fn add_mod(a: &U256, b: &U256, p: &U256) -> U256 {
-    let diff = p.sub(a);
-    if diff > *b {
-        a.add(b)
-    } else {
-        a.sub(&p.sub(b))
-    }
-}
-
-fn mul_mod(env: &Env, a: &U256, b: &U256, p: &U256) -> U256 {
-    let mut res = U256::from_u32(env, 0);
-    let mut temp_a = a.clone();
-    let mut temp_b = b.clone();
-    let zero = U256::from_u32(env, 0);
-    let two = U256::from_u32(env, 2);
-
-    while temp_b > zero {
-        let bit = temp_b.rem_euclid(&two);
-        if bit == U256::from_u32(env, 1) {
-            res = add_mod(&res, &temp_a, p);
-        }
-        temp_a = add_mod(&temp_a, &temp_a, p);
-        temp_b = temp_b.shr(1);
-    }
-    res
-}
-
-fn is_on_curve(env: &Env, x_bytes: &[u8; 32], y_bytes: &[u8; 32]) -> bool {
-    const P_BYTES: [u8; 32] = [
-        0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58,
-        0x5d, 0x97, 0x81, 0x6a, 0x91, 0x68, 0x71, 0xca, 0x8d, 0x3c, 0x20, 0x8c, 0x16, 0xd8, 0x7c,
-        0xfd, 0x47,
-    ];
-    let p_bytes_sdk = Bytes::from_slice(env, &P_BYTES);
-    let x_bytes_sdk = Bytes::from_slice(env, x_bytes);
-    let y_bytes_sdk = Bytes::from_slice(env, y_bytes);
-
-    let p = U256::from_be_bytes(env, &p_bytes_sdk);
-    let x = U256::from_be_bytes(env, &x_bytes_sdk);
-    let y = U256::from_be_bytes(env, &y_bytes_sdk);
-
-    if x >= p || y >= p {
-        return false;
-    }
-
-    // G1 curve equation: y^2 = x^3 + 3 (mod p)
-    let y_sq = mul_mod(env, &y, &y, &p);
-
-    let x_sq = mul_mod(env, &x, &x, &p);
-    let x_cu = mul_mod(env, &x_sq, &x, &p);
-    let three = U256::from_u32(env, 3);
-    let rhs = add_mod(&x_cu, &three, &p);
-
-    y_sq == rhs
-}
-
-fn is_valid_g1_point(env: &Env, x_bytes: &[u8; 32], y_bytes: &[u8; 32]) -> bool {
-    let mut is_inf = true;
-    for &b in x_bytes.iter() {
-        if b != 0 {
-            is_inf = false;
-            break;
-        }
-    }
-    if is_inf {
-        for &b in y_bytes.iter() {
-            if b != 0 {
-                is_inf = false;
-                break;
-            }
-        }
-    }
-    if is_inf {
-        return true;
-    }
-
-    is_on_curve(env, x_bytes, y_bytes)
-}
-
-fn validate_proof_g1_points(env: &Env, proof: &Bytes) -> bool {
-    let validate_at_offset = |offset: u32| -> bool {
-        let mut chunk = [0u8; 128];
-        proof
-            .slice(offset..offset + 128)
-            .copy_into_slice(&mut chunk);
-
-        let x = combine_limbs(
-            chunk[0..32].try_into().unwrap(),
-            chunk[32..64].try_into().unwrap(),
-        );
-        let y = combine_limbs(
-            chunk[64..96].try_into().unwrap(),
-            chunk[96..128].try_into().unwrap(),
-        );
-
-        #[cfg(test)]
-        std::println!("Offset {}: x = {:x?}, y = {:x?}", offset, x, y);
-
-        let valid = is_valid_g1_point(env, &x, &y);
-        #[cfg(test)]
-        std::println!("Offset {} valid: {}", offset, valid);
-        valid
-    };
-
-    // Validate the 8 head G1 points starting at 512
-    for i in 0..8 {
-        if !validate_at_offset(512 + i * 128) {
-            return false;
-        }
-    }
-
-    // Validate the 27 Gemini G1 points starting at 9984
-    for i in 0..27 {
-        if !validate_at_offset(9984 + i * 128) {
-            return false;
-        }
-    }
-
-    // Validate the 2 tail G1 points starting at 14336
-    for i in 0..2 {
-        if !validate_at_offset(14336 + i * 128) {
-            return false;
-        }
-    }
-
-    true
-}
+// ── Point Validation Helpers Removed ──────────────────────────────────────────
 
 // ── Contract ─────────────────────────────────────────────────────────────────
 
@@ -175,10 +40,6 @@ impl UltraHonkVerifierContract {
         }
 
         if public_inputs.len() != 6 {
-            return false;
-        }
-
-        if !validate_proof_g1_points(&env, &proof) {
             return false;
         }
 

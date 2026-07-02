@@ -12,13 +12,20 @@ This project is organized as a pnpm monorepo workspace:
 
 ```
 swarp/
-├── circuits/      # Circom ZK circuits, proofs, and verification setups
-├── contracts/     # Rust/Soroban smart contracts
-├── scripts/       # Deployment, setup, and configuration scripts (TypeScript/Bash)
-├── web/           # Next.js frontend application (TypeScript + Vanilla CSS)
+├── circuits/      # Noir ZK circuits, proofs, and verification setups
+├── contracts/     # Rust/Soroban smart contracts (ZendSwap Pool, OZ Policy Engine)
+├── scripts/       # Deployment, setup, and configuration scripts
+├── web/           # Next.js frontend application (TypeScript + Tailwind CSS)
 ├── package.json   # Root workspace configurations and task triggers
 └── pnpm-workspace.yaml
 ```
+
+## Key Features
+
+1. **Confidential Swaps**: Users can deposit assets publicly and withdraw them anonymously through a shielding pool, breaking the on-chain link between the deposit and withdrawal using Zero-Knowledge proofs.
+2. **On-chain Compliance Engine**: Integrates OpenZeppelin's `PolicyClient` pattern. The ZendSwap Pool delegates deposit authorization to a centralized registry (`oz-policy-engine`), ensuring only whitelisted or verified users can interact with the pool without storing KYC data in the core protocol.
+3. **Selective Disclosure**: Users retain the ability to decrypt and share specific transaction details (deposit/withdrawal amounts, assets, and timestamps) with an authorized third party (e.g., an auditor) using Elliptic Curve Integrated Encryption Scheme (ECIES).
+4. **Nethermind UltraHonk Verifier**: On-chain verification of the withdrawal ZK proofs is performed natively in Soroban using Nethermind's `ultrahonk-verifier` to optimize for resource limits.
 
 ## How to run
 
@@ -89,6 +96,7 @@ pnpm deploy:testnet
 - **Next.js** - React application framework
 - **TypeScript** - Strongly typed programming language
 - **Soroban SDK** - Smart contract platform for the Stellar network
-- **Circom & SnarkJS** - ZK Snark compiler and javascript library
+- **Noir & UltraHonk** - ZK DSL compiler and Nethermind Soroban verifier
+- **OpenZeppelin** - Smart contract primitives for Stellar (Confidential Tokens, Policy Engine)
 - **pnpm** - Workspace package manager
 - **Cargo** - Rust build system and package manager

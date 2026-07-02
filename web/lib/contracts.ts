@@ -704,7 +704,7 @@ export async function submitWithdraw(
   const withdrawalAmountVal = nativeToScVal(amountBig, { type: 'i128' });
 
   let transaction = new TransactionBuilder(account, {
-    fee: BASE_FEE,
+    fee: '50000000', // 5 XLM base fee
     networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
   })
     .addOperation(
@@ -719,7 +719,7 @@ export async function submitWithdraw(
         withdrawalAmountVal
       )
     )
-    .setTimeout(60) // timeout: 60 seconds
+    .setTimeout(300) // timeout: 300 seconds
     .build();
 
   // 4. Simulate Transaction
@@ -738,6 +738,9 @@ export async function submitWithdraw(
   // 5. Assemble transaction footprint details
   try {
     transaction = rpc.assembleTransaction(transaction, simulation).build();
+    // Bump resource fee by adding 50000000 stroops (5 XLM) for headroom
+    const bumpedFee = (Number(transaction.fee) + 50000000).toString();
+    transaction = TransactionBuilder.cloneFrom(transaction, { fee: bumpedFee }).build() as Transaction;
   } catch (error) {
     throw new SorobanSimulationError('Failed to assemble transaction resources from simulation.', error);
   }

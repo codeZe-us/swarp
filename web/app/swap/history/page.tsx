@@ -6,6 +6,8 @@ import { useStore } from '../../../store/useStore';
 import { Badge } from '../../../components/ui/Badge';
 import { decryptNotes } from '../../../lib/crypto';
 import { Note } from '../../../store/types';
+import { generateDisclosure } from '../../../lib/disclosure';
+import { ASSETS, getAssetByCode } from '../../../lib/assets';
 
 export default function SwapHistoryPage() {
   // Zustand Store variables
@@ -21,6 +23,11 @@ export default function SwapHistoryPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [directionFilter, setDirectionFilter] = useState<'all' | 'usdc_eurc' | 'eurc_usdc'>('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+  // Disclosure State
+  const [disclosingSwapId, setDisclosingSwapId] = useState<string | null>(null);
+  const [disclosureTargetKey, setDisclosureTargetKey] = useState('');
+  const [disclosurePayloadStr, setDisclosurePayloadStr] = useState<string | null>(null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -137,6 +144,8 @@ export default function SwapHistoryPage() {
         date: note.createdAt,
         depositTxHash: note.depositTxHash,
         withdrawTxHash: note.withdrawTxHash,
+        assetInId: getAssetByCode(note.asset)?.id.toString() || '0',
+        assetOutId: getAssetByCode(outAsset)?.id.toString() || '1',
       };
     });
   }, [notes, isConnected, decimalRate]);
@@ -174,6 +183,27 @@ export default function SwapHistoryPage() {
   }, [filteredHistory, currentPage]);
 
   const totalPages = Math.ceil(filteredHistory.length / itemsPerPage) || 1;
+
+  const handleGenerateDisclosure = (swapId: string) => {
+    const swap = swapHistoryList.find(s => s.id === swapId);
+    if (!swap || !disclosureTargetKey) return;
+
+    try {
+      const payload = {
+        version: '1',
+        txHash: swap.withdrawTxHash || swap.depositTxHash || '',
+        depositAmount: (swap.depositAmount * 10_000_000).toString(),
+        withdrawAmount: (swap.withdrawalAmount * 10_000_000).toString(),
+        assetInId: swap.assetInId,
+        assetOutId: swap.assetOutId,
+        timestamp: swap.date,
+      };
+      const encrypted = generateDisclosure(disclosureTargetKey, payload);
+      setDisclosurePayloadStr(encrypted);
+    } catch (err: any) {
+      alert(`Failed to generate disclosure: ${err.message}`);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto font-sans">
@@ -411,14 +441,22 @@ export default function SwapHistoryPage() {
                     {/* Withdrawal TX Link */}
                     <td className="py-4 pr-4">
                       {swap.status === 'completed' && swap.withdrawTxHash ? (
-                        <a
-                          href={`https://stellar.expert/explorer/testnet/tx/${swap.withdrawTxHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#B488DC] hover:text-[#D6C2EC] underline font-bold"
-                        >
-                          {swap.withdrawTxHash.slice(0, 6)}...{swap.withdrawTxHash.slice(-6)}
-                        </a>
+                        <div className="flex items-center gap-4">
+                          <a
+                            href={`https://stellar.expert/explorer/testnet/tx/${swap.withdrawTxHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#B488DC] hover:text-[#D6C2EC] underline font-bold"
+                          >
+                            {swap.withdrawTxHash.slice(0, 6)}...{swap.withdrawTxHash.slice(-6)}
+                          </a>
+                          <button
+                            onClick={() => setDisclosingSwapId(swap.id)}
+                            className="text-[10px] bg-[#1D1D1F] hover:bg-[#333336] text-white px-2 py-1 rounded-[6px] font-bold border border-[#333336] transition-colors"
+                          >
+                            Disclose
+                          </button>
+                        </div>
                       ) : (
                         <Link
                           href={`/swap?noteId=${swap.id}`}
@@ -470,6 +508,72 @@ export default function SwapHistoryPage() {
             </div>
           )}
 
+        </div>
+      )}
+
+      {/* Selective Disclosure Modal */}
+      {disclosingSwapId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-display">
+          <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] w-full max-w-md flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-[#1D1D1F]">
+              <h3 className="font-bold text-white text-lg">Selective Disclosure</h3>
+              <button
+                onClick={() => {
+                  setDisclosingSwapId(null);
+                  setDisclosureTargetKey('');
+                  setDisclosurePayloadStr(null);
+                }}
+                className="text-mutedText hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-5 flex flex-col gap-4">
+              <p className="text-xs text-mutedText font-sans">
+                Encrypt this transaction's details to an Auditor's Stellar Public Key. Only they will be able to decrypt it.
+              </p>
+
+              {!disclosurePayloadStr ? (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-mutedText uppercase font-bold tracking-wider">Auditor Public Key</label>
+                    <input
+                      type="text"
+                      placeholder="G..."
+                      value={disclosureTargetKey}
+                      onChange={(e) => setDisclosureTargetKey(e.target.value)}
+                      className="bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2.5 text-xs text-white outline-none focus:border-[#5E2A8C] font-mono"
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleGenerateDisclosure(disclosingSwapId)}
+                    disabled={!disclosureTargetKey.startsWith('G')}
+                    className="w-full py-2.5 mt-2 bg-[#5E2A8C] hover:bg-[#4A1F70] text-white rounded-[9px] text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Generate Encrypted Payload
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div className="bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-3">
+                    <p className="text-xs text-[#B488DC] font-mono break-all max-h-40 overflow-y-auto">
+                      {disclosurePayloadStr}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(disclosurePayloadStr);
+                      alert('Copied to clipboard!');
+                    }}
+                    className="w-full py-2 border border-[#5E2A8C] text-[#B488DC] hover:bg-[#5E2A8C]/10 rounded-[9px] text-xs font-bold transition-colors"
+                  >
+                    Copy Payload
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
