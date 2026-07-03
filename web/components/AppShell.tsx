@@ -133,11 +133,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       {item.icon(active)}
                       <span>{item.name}</span>
                     </div>
-                    {item.soon && (
-                      <span className="text-[9px] bg-borderSubtle text-mutedText group-hover:text-white px-1.5 py-0.5 rounded font-bold tracking-wider">
-                        SOON
-                      </span>
-                    )}
                   </Link>
                 );
               })}
