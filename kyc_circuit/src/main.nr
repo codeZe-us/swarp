@@ -6,7 +6,6 @@ fn poseidon2_2(input: [Field; 2]) -> Field {
     permuted[0]
 }
 
-// Chained hashing to simulate 5-element poseidon while maintaining simple parity
 fn poseidon_5(a: Field, b: Field, c: Field, d: Field, e: Field) -> Field {
     let h1 = poseidon2_2([a, b]);
     let h2 = poseidon2_2([h1, c]);

@@ -28,7 +28,6 @@ pub enum Error {
     InvalidRate = 10,
 }
 
-
 const MAX_DEPOSIT_AMOUNT: i128 = i64::MAX as i128;
 
 const TREE_DEPTH: u32 = 20;
@@ -68,8 +67,6 @@ pub struct PendingWithdrawalRecord {
     pub recipient: Address,
     pub timestamp: u64,
 }
-
-
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
@@ -121,7 +118,6 @@ fn bytes_to_u256(env: &Env, b: &BytesN<32>) -> U256 {
     let bytes = Bytes::from_array(env, &arr);
     U256::from_be_bytes(env, &bytes)
 }
-
 
 fn get_zeros_bytes(env: &Env) -> Vec<BytesN<32>> {
     let mut zeros: Vec<BytesN<32>> = Vec::new(env);
@@ -191,7 +187,6 @@ impl ZendSwapPool {
                 .set(&DataKey::TokenRegistry(i as u64), &asset);
         }
 
-        
         for i in 0..assets.len() {
             for j in 0..assets.len() {
                 if i != j {
@@ -414,8 +409,6 @@ impl ZendSwapPool {
             &recent_rates,
         );
 
-        
-
         Ok(())
     }
 
@@ -547,12 +540,6 @@ impl ZendSwapPool {
 
         for rate in unique_rates.iter() {
             
-            
-            
-            
-            
-            
-            
             let mut public_inputs = Vec::new(&env);
             public_inputs.push_back(u64_to_bytes32(&env, asset_in_id));
             public_inputs.push_back(u64_to_bytes32(&env, rate));
@@ -579,7 +566,6 @@ impl ZendSwapPool {
             return Err(Error::VerificationFailed);
         }
 
-        
         env.storage().persistent().set(&nullifier_key, &true);
         env.storage()
             .persistent()
@@ -688,7 +674,6 @@ impl ZendSwapPool {
             env.try_invoke_contract::<bool, Val>(&verifier, &Symbol::new(&env, "verify"), args);
 
         if let Ok(Ok(true)) = invoke_res {
-            // Success
         } else {
             return Err(Error::VerificationFailed);
         }
@@ -831,8 +816,6 @@ impl ZendSwapPool {
     }
 }
 
-
-
 fn do_insert_leaf(env: &Env, commitment: BytesN<32>) -> (u32, BytesN<32>) {
     let leaf_index: u32 = env
         .storage()
@@ -901,8 +884,6 @@ fn do_insert_leaf(env: &Env, commitment: BytesN<32>) -> (u32, BytesN<32>) {
     (leaf_index, new_root)
 }
 
-
-
 #[cfg(test)]
 #[allow(clippy::ptr_arg)]
 fn compute_root_from_leaves(env: &Env, leaves: &alloc::vec::Vec<BytesN<32>>) -> BytesN<32> {
@@ -946,7 +927,6 @@ fn compute_root_from_leaves(env: &Env, leaves: &alloc::vec::Vec<BytesN<32>>) -> 
 
     layer.into_iter().next().unwrap()
 }
-
 
 #[cfg(test)]
 mod test_poseidon;
@@ -1000,7 +980,6 @@ mod tests {
         (client, usdc_addr, eurc_addr, depositor, contract_id)
     }
 
-    
     fn commitment(env: &Env, val: u32) -> BytesN<32> {
         let mut bytes = [0u8; 32];
         bytes[28..32].copy_from_slice(&val.to_be_bytes());
@@ -1102,7 +1081,6 @@ mod tests {
         env.cost_estimate().budget().reset_unlimited();
         let (client, _, _, _) = setup_pool(&env);
 
-        
         let commitment_a = BytesN::from_array(
             &env,
             &[
@@ -1187,7 +1165,6 @@ mod tests {
         let commitment = BytesN::from_array(&env, &leaf_bytes);
         let (_, new_root) = client.insert_leaf(&commitment);
 
-        
         let zeros = get_zeros_bytes(&env);
         let mut current = commitment;
         for level in 0..TREE_DEPTH {

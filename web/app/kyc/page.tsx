@@ -23,16 +23,12 @@ export default function KycPage() {
       setIsProving(true);
       addToast({ severity: 'info', message: 'Generating Zero-Knowledge KYC Proof locally...' });
 
-      // 1. Fetch circuit
       const circuitRes = await fetch('/kyc.json');
       const circuit = await circuitRes.json();
 
-      // 2. Fetch dummy KYC data for demo purposes from a new API route
-      // In a real app, this would be an encrypted credential decrypted in the browser
       const dataRes = await fetch(`/api/kyc-mock-data?wallet=${walletAddress}`);
       const kycInput = await dataRes.json();
       
-      // 3. Start worker
       const worker = new Worker('/kyc.worker.js', { type: 'module' });
       
       const { proof, publicInputs } = await new Promise<{ proof: Uint8Array, publicInputs: string[] }>((resolve, reject) => {
@@ -54,7 +50,6 @@ export default function KycPage() {
       setIsVerifying(true);
       addToast({ severity: 'info', message: 'Submitting proof to Soroban...' });
       
-      // Submit to smart contract
       const txRes = await submitVerifyKyc(walletAddress, proof, publicInputs);
       if (txRes.status !== 'SUCCESS') {
         throw new Error('Transaction failed on-chain');
