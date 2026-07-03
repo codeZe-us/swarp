@@ -1004,7 +1004,7 @@ export async function establishTrustline(userAddress: string, assetCode: string,
   }
   console.log('--------------------------------------');
   
-  try {
+    try {
     const response = await horizon.submitTransaction(signedTx as any);
     if (!response.successful) {
       throw new Error('Failed to establish trustline');
@@ -1017,4 +1017,64 @@ export async function establishTrustline(userAddress: string, assetCode: string,
     }
     throw err;
   }
+}
+
+export async function submitVerifyKyc(
+  caller: string,
+  proof: Uint8Array | string,
+  publicInputs: string[],
+  poolContractIdOverride?: string
+): Promise<{ status: string; txHash: string }> {
+  const config = getConfig();
+  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
+
+  const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
+  let account;
+  try {
+    account = await withRetry(() => rpcServer.getAccount(caller));
+  } catch (error) {
+    throw new SorobanNetworkError('Failed to fetch caller account details from RPC.', error);
+  }
+
+  const contract = new Contract(POOL_CONTRACT_ID);
+  
+  const callerVal = new Address(caller).toScVal();
+  
+  const proofBuffer = typeof proof === 'string' ? Buffer.from(proof, 'hex') : Buffer.from(proof);
+  const proofVal = nativeToScVal(proofBuffer);
+  
+  const publicInputsVal = xdr.ScVal.scvVec(
+    publicInputs.map((input) => {
+      let hexString = input;
+      if (hexString.startsWith('0x')) {
+        hexString = hexString.substring(2);
+      }
+      if (hexString.length % 2 !== 0) {
+        hexString = '0' + hexString;
+      }
+      const buf = Buffer.from(hexString, 'hex');
+      const paddedBuf = Buffer.alloc(32);
+      buf.copy(paddedBuf, 32 - buf.length);
+      return xdr.ScVal.scvBytes(paddedBuf);
+    })
+  );
+
+  const transaction = new TransactionBuilder(account, {
+    fee: '1000000',
+    networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+  })
+    .addOperation(
+      contract.call(
+        'verify_kyc',
+        callerVal,
+        proofVal,
+        publicInputsVal
+      )
+    )
+    .setTimeout(300)
+    .build();
+
+  const { txHash } = await executeTransaction(rpcServer, transaction, 0);
+  return { status: 'SUCCESS', txHash };
 }

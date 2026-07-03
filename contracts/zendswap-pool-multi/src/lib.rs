@@ -749,6 +749,86 @@ impl ZendSwapPool {
 
         Ok(())
     }
+    pub fn set_kyc_config(
+        env: Env,
+        admin: Address,
+        enabled: bool,
+        verifier: Address,
+        required_type: u64,
+        required_issuer: U256,
+    ) {
+        admin.require_auth();
+        if admin != env.storage().instance().get(&DataKey::Admin).unwrap() {
+            panic!("not admin");
+        }
+        env.storage().instance().set(&DataKey::KycEnabled, &enabled);
+        env.storage().instance().set(&DataKey::KycVerifier, &verifier);
+        env.storage().instance().set(&DataKey::RequiredCredentialType, &required_type);
+        env.storage().instance().set(&DataKey::RequiredIssuer, &required_issuer);
+    }
+
+    pub fn update_kyc_root(env: Env, admin: Address, new_root: BytesN<32>) {
+        admin.require_auth();
+        if admin != env.storage().instance().get(&DataKey::Admin).unwrap() {
+            panic!("not admin");
+        }
+        let mut recent_roots: Vec<BytesN<32>> = env
+            .storage()
+            .instance()
+            .get(&DataKey::KycRoots)
+            .unwrap_or_else(|| Vec::new(&env));
+        recent_roots.push_back(new_root);
+        if recent_roots.len() > MAX_RECENT_ROOTS {
+            recent_roots.pop_front();
+        }
+        env.storage().instance().set(&DataKey::KycRoots, &recent_roots);
+    }
+
+    pub fn verify_kyc(
+        env: Env,
+        caller: Address,
+        proof: Bytes,
+        public_inputs: Vec<BytesN<32>>,
+    ) -> bool {
+        caller.require_auth();
+        let kyc_enabled: bool = env.storage().instance().get(&DataKey::KycEnabled).unwrap_or(false);
+        if !kyc_enabled {
+            return true;
+        }
+
+        let root = public_inputs.get_unchecked(0);
+        let recent_roots: Vec<BytesN<32>> = env.storage().instance().get(&DataKey::KycRoots).unwrap_or_else(|| Vec::new(&env));
+        let mut valid_root = false;
+        for r in recent_roots.iter() {
+            if r == root {
+                valid_root = true;
+                break;
+            }
+        }
+        if !valid_root {
+            panic!("Invalid KYC root");
+        }
+        
+        let req_type: u64 = env.storage().instance().get(&DataKey::RequiredCredentialType).unwrap();
+        let p_type = bytes_to_u256(&env, &public_inputs.get_unchecked(2));
+        if p_type != U256::from_u32(&env, req_type as u32) {
+             panic!("Invalid required credential type");
+        }
+
+        let verifier: Address = env.storage().instance().get(&DataKey::KycVerifier).unwrap();
+        let mut invoke_args: Vec<Val> = Vec::new(&env);
+        invoke_args.push_back(proof.into_val(&env));
+        invoke_args.push_back(public_inputs.into_val(&env));
+
+        let verified: bool = env.invoke_contract(&verifier, &Symbol::new(&env, "verify"), invoke_args);
+        if !verified {
+            panic!("KYC proof failed");
+        }
+
+        env.storage().temporary().set(&DataKey::KycVerified(caller.clone()), &true);
+        env.storage().temporary().extend_ttl(&DataKey::KycVerified(caller), 100, 100);
+        true
+    }
 }
 
 
@@ -866,6 +946,7 @@ fn compute_root_from_leaves(env: &Env, leaves: &alloc::vec::Vec<BytesN<32>>) -> 
 
     layer.into_iter().next().unwrap()
 }
+
 
 #[cfg(test)]
 mod test_poseidon;

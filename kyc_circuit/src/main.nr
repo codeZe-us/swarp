@@ -86,6 +86,8 @@ fn test_kyc() {
         current_hash = merkle_hash(left, right);
     }
     let credentials_root = current_hash;
+    std::println("CREDENTIALS ROOT:");
+    std::println(credentials_root);
     let current_timestamp = 1000000000;
     
     main(

@@ -1,9 +1,9 @@
 const esbuild = require('esbuild');
 
 esbuild.build({
-  entryPoints: ['workers/prover.worker.ts'],
+  entryPoints: ['workers/prover.worker.ts', 'workers/kyc.worker.ts'],
   bundle: true,
-  outfile: 'public/prover.worker.js',
+  outdir: 'public',
   format: 'esm',
   target: 'esnext',
   platform: 'browser',
