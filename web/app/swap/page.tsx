@@ -63,7 +63,7 @@ export default function SwapPage() {
   const [workerStage, setWorkerStage] = useState<'loading' | 'computing' | 'proving' | null>(null);
   const [provingSeconds, setProvingSeconds] = useState<number>(0);
   const [withdrawTxHash, setWithdrawTxHash] = useState<string | null>(null);
-
+  const [liquidityError, setLiquidityError] = useState<string | null>(null);
   
   const [balances, setBalances] = useState<{ [key: string]: number }>({
     USDC: 18420.00,
@@ -312,9 +312,8 @@ export default function SwapPage() {
       useToastStore.getState().addToast({ title: 'Success', message: `Deposit Completed Successfully! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
     } catch (error: unknown) {
       console.error('Deposit flow failed:', error);
-      const zError = handleError(error, 'transaction');
-      setDepositTxStatus('error');
-      useToastStore.getState().addToast({ title: 'Error', message: zError.message || 'Deposit failed.', severity: 'error' });
+      handleError(error, 'transaction');
+      setDepositTxStatus('idle');
     }
   };
 
@@ -363,6 +362,7 @@ export default function SwapPage() {
 
   
   const handleWithdraw = async () => {
+    setLiquidityError(null);
     if (!isConnected) {
       connect();
       return;
@@ -596,10 +596,15 @@ export default function SwapPage() {
       useToastStore.getState().addToast({ title: 'Success', message: `Withdrawal Successful! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
     } catch (error: unknown) {
       console.error('Withdraw flow failed:', error);
-      const zError = handleError(error, 'transaction');
+      if (error instanceof Error && error.message.includes('Insufficient pool reserves')) {
+        setLiquidityError(error.message);
+        setWithdrawStatus('idle');
+        setWithdrawStep(0);
+        return;
+      }
+      handleError(error, 'transaction');
       setWithdrawStatus('idle');
       setWithdrawStep(0);
-      useToastStore.getState().addToast({ title: 'Error', message: zError.message || 'Withdrawal failed.', severity: 'error' });
     } finally {
       
       if (withdrawStatus === 'success') activeSecret = null;
@@ -653,10 +658,9 @@ export default function SwapPage() {
       useToastStore.getState().addToast({ title: 'Success', message: `Withdrawal Resumed & Successful! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
     } catch (error: any) {
       console.error('Resume flow failed:', error);
-      const zError = handleError(error, 'transaction');
+      handleError(error, 'transaction');
       setWithdrawStatus('idle');
       setWithdrawStep(0);
-      useToastStore.getState().addToast({ title: 'Error', message: zError.message || 'Resume failed.', severity: 'error' });
     }
   };
 
@@ -1064,6 +1068,36 @@ export default function SwapPage() {
                       onChange={(e) => setRecipientAddress(e.target.value)}
                       className="bg-[#000000] border border-[#1D1D1F] rounded-[12px] p-3.5 text-xs text-white focus:border-[#5E2A8C] focus:ring-0 placeholder-mutedText/30 w-full outline-none font-mono"
                     />
+                  </div>
+                )}
+
+                {liquidityError && (
+                  <div className="mt-3 bg-amber-900/40 border border-amber-500/50 rounded-xl p-4 text-amber-200 text-xs shadow-lg font-display">
+                    <div className="flex items-start gap-3">
+                      <svg className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div className="flex flex-col gap-2">
+                        <span className="font-bold text-sm text-amber-400">Pool Liquidity Too Low</span>
+                        <span className="leading-relaxed text-amber-100/90">{liquidityError}</span>
+                        <span className="text-amber-200/80 mt-1">
+                          <strong>Note:</strong> Your personal wallet balance is separate from the swap pool's reserves. To fix this, someone needs to provide liquidity to the pool by depositing {withdrawAssetOutCode} via the Deposit tab.
+                        </span>
+                        <button
+                          onClick={() => {
+                            setActiveTab('deposit');
+                            setAssetInCode(withdrawAssetOutCode);
+                            setLiquidityError(null);
+                          }}
+                          className="mt-2 w-fit px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded-lg transition-colors font-bold flex items-center gap-2"
+                        >
+                          Switch to Deposit Tab
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 

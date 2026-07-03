@@ -766,14 +766,12 @@ export async function submitVerifyWithdrawal(
   
   
   const callerVal = new Address(caller).toScVal();
+  const assetInIdVal = nativeToScVal(BigInt(assetInId), { type: 'u64' });
+  const assetOutIdVal = nativeToScVal(BigInt(assetOutId), { type: 'u64' });
   const proofVal = nativeToScVal(Buffer.from(proof, 'hex'));
   const nullifierVal = xdr.ScVal.scvBytes(Buffer.from(nullifier, 'hex'));
   const merkleRootVal = xdr.ScVal.scvBytes(Buffer.from(merkleRoot, 'hex'));
-  const assetOutIdVal = nativeToScVal(assetOutId, { type: 'u32' });
-  const exchangeRateVal = nativeToScVal(BigInt(exchangeRate), { type: 'u64' });
-  const rateDenominatorVal = nativeToScVal(BigInt(rateDenominator), { type: 'u64' });
   const withdrawalAmountVal = nativeToScVal(amountBig, { type: 'i128' });
-  const assetInIdVal = nativeToScVal(assetInId, { type: 'u32' });
 
   const transaction = new TransactionBuilder(account, {
     fee: '100000000',
@@ -783,14 +781,12 @@ export async function submitVerifyWithdrawal(
       contract.call(
         'verify_withdrawal',
         callerVal,
+        assetInIdVal,
+        assetOutIdVal,
         proofVal,
         nullifierVal,
         merkleRootVal,
-        assetOutIdVal,
-        exchangeRateVal,
-        rateDenominatorVal,
-        withdrawalAmountVal,
-        assetInIdVal
+        withdrawalAmountVal
       )
     )
     .setTimeout(300)

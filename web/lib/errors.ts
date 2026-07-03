@@ -382,7 +382,7 @@ export function handleError(error: unknown, context: string, showToast = true): 
         label: zendSwapError.actionLabel,
         onClick: zendSwapError.actionHandler || (() => {})
       } : undefined,
-      duration: zendSwapError.severity === 'error' || zendSwapError.severity === 'catastrophic' ? 0 : 5000,
+      duration: zendSwapError.severity === 'error' || zendSwapError.severity === 'catastrophic' ? 10000 : 5000,
     });
   }
 
