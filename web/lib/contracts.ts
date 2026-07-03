@@ -808,7 +808,7 @@ export async function submitVerifyWithdrawal(
     .setTimeout(300)
     .build();
 
-  return await executeTransaction(rpcServer, transaction, 100000000);
+  return await executeTransaction(rpcServer, transaction, 0);
 }
 
 export async function submitExecuteWithdrawal(
