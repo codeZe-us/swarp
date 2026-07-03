@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '@/hooks/useWallet';
 import { Button } from '@/components/ui/Button';
 import { submitVerifyKyc } from '@/lib/contracts';
@@ -12,6 +12,15 @@ export default function KycPage() {
   const [isProving, setIsProving] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [kycStatus, setKycStatus] = useState<'unverified' | 'verified'>('unverified');
+
+  useEffect(() => {
+    const savedStatus = localStorage.getItem(`kyc_status_${walletAddress}`);
+    if (savedStatus === 'verified') {
+      setKycStatus('verified');
+    } else {
+      setKycStatus('unverified');
+    }
+  }, [walletAddress]);
 
   const handleVerifyKyc = async () => {
     if (!walletAddress) {
@@ -56,6 +65,9 @@ export default function KycPage() {
       }
       
       setKycStatus('verified');
+      if (walletAddress) {
+        localStorage.setItem(`kyc_status_${walletAddress}`, 'verified');
+      }
       addToast({ severity: 'success', message: 'KYC successfully verified on-chain!' });
     } catch (error: any) {
       console.error(error);

@@ -33,6 +33,8 @@ export default function SwapPage() {
   
   const isConnected = status === 'connected';
 
+  const [kycVerified, setKycVerified] = useState(false);
+
   const [assetInCode, setAssetInCode] = useState<string>('USDC');
   const [assetOutCode, setAssetOutCode] = useState<string>('EURC');
   const [amountIn, setAmountIn] = useState<string>('');
@@ -75,6 +77,15 @@ export default function SwapPage() {
   useEffect(() => {
     fetchPoolState();
   }, [fetchPoolState]);
+
+  useEffect(() => {
+    if (address) {
+      const savedStatus = localStorage.getItem(`kyc_status_${address}`);
+      setKycVerified(savedStatus === 'verified');
+    } else {
+      setKycVerified(false);
+    }
+  }, [address]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -849,11 +860,11 @@ export default function SwapPage() {
             <div className="mt-5">
               <button
                 onClick={handleDeposit}
-                disabled={depositTxStatus === 'loading' || (isConnected && !depositValidation.isValid)}
+                disabled={depositTxStatus === 'loading' || (isConnected && (!depositValidation.isValid || !kycVerified))}
                 className={`w-full py-3.5 rounded-[12px] font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 font-display ${
                   depositTxStatus === 'loading'
                     ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-wait shadow-none'
-                    : isConnected && !depositValidation.isValid
+                    : isConnected && (!depositValidation.isValid || !kycVerified)
                     ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-not-allowed shadow-none'
                     : 'bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white active:scale-[0.99] shadow-[0_0_28px_rgba(123,55,168,0.3)] border-none'
                 }`}
@@ -868,6 +879,8 @@ export default function SwapPage() {
                   </>
                 ) : !isConnected ? (
                   'Connect wallet to deposit'
+                ) : !kycVerified ? (
+                  'KYC Required to Deposit'
                 ) : (
                   depositValidation.message === 'Deposit' && amountIn
                     ? `Deposit ${amountIn} ${assetInCode}`
@@ -1087,14 +1100,14 @@ export default function SwapPage() {
                 <div className="mt-2 font-display flex gap-2">
                   <button
                     onClick={() => { setCanResumeNoteId(null); handleWithdraw(); }}
-                    disabled={!selectedNoteId || !recipientAddress || withdrawStatus === 'loading'}
+                    disabled={!selectedNoteId || !recipientAddress || withdrawStatus === 'loading' || !kycVerified}
                     className={`w-full py-3.5 rounded-[12px] font-bold text-sm tracking-wide uppercase transition duration-200 flex items-center justify-center gap-2 ${
-                      !selectedNoteId || !recipientAddress
+                      !selectedNoteId || !recipientAddress || !kycVerified
                         ? 'bg-[#1D1D1F] text-mutedText border border-[#333336] cursor-not-allowed shadow-none'
                         : 'bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white active:scale-[0.99] shadow-[0_0_28px_rgba(123,55,168,0.3)] border-none'
                     }`}
                   >
-                    Withdraw
+                    {!kycVerified ? 'KYC Required to Withdraw' : 'Withdraw'}
                   </button>
                   {canResumeNoteId === selectedNoteId && (
                     <button

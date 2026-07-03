@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import Link from 'next/link';
 import { useStore } from '../../store/useStore';
 import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 import { Badge } from '../../components/ui/Badge';
@@ -34,6 +35,7 @@ export default function PayrollPage() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionProgress, setExecutionProgress] = useState(0);
   const [editingRecipient, setEditingRecipient] = useState<Recipient | null>(null);
+  const [kycVerified, setKycVerified] = useState(false);
 
   const [isFetchingData, setIsFetchingData] = useState(true);
 
@@ -42,6 +44,15 @@ export default function PayrollPage() {
     const timer = setTimeout(() => setIsFetchingData(false), 800);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (address) {
+      const savedStatus = localStorage.getItem(`kyc_status_${address}`);
+      setKycVerified(savedStatus === 'verified');
+    } else {
+      setKycVerified(false);
+    }
+  }, [address]);
 
   
   const [formName, setFormName] = useState('');
@@ -238,9 +249,9 @@ export default function PayrollPage() {
         <div>
           <button
             onClick={handleOpenAdd}
-            disabled={!isConnected}
+            disabled={!isConnected || !kycVerified}
             className={`px-4 py-2 border rounded-[9px] text-xs font-bold uppercase tracking-wider transition duration-150 font-display flex items-center gap-1.5 ${
-              isConnected
+              isConnected && kycVerified
                 ? 'border-[rgba(94,42,140,0.4)] text-white hover:bg-brandPurple/10 bg-transparent'
                 : 'border-borderSubtle text-mutedText/50 cursor-not-allowed bg-[#000000]'
             }`}
@@ -328,6 +339,24 @@ export default function PayrollPage() {
           >
             Connect Wallet
           </button>
+        </div>
+      ) : !kycVerified ? (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-500">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white font-display">KYC Verification Required</h3>
+            <p className="text-xs text-mutedText mt-1 max-w-sm">You must complete ZK-KYC verification before you can process private payrolls.</p>
+          </div>
+          <Link
+            href="/kyc"
+            className="px-5 py-2 bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 font-display border-none"
+          >
+            Verify Identity
+          </Link>
         </div>
       ) : (
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col gap-6">
