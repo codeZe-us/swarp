@@ -1,9 +1,3 @@
-/**
- * web/lib/prover.ts
- *
- * Main-thread orchestrator for ZK proof generation.
- * Loads the Web Worker from the public/ directory to bypass Next.js Webpack.
- */
 import { SwapProverInput } from '../workers/prover.worker';
 
 export type SwapProofInput = SwapProverInput;
@@ -25,15 +19,13 @@ export async function generateSwapProof(
   let timeoutId: any = null;
 
   try {
-    const response = await fetch('/circuits/circuit.json');
+    const response = await fetch('/swap.json');
     if (!response.ok) {
       throw new Error(`Failed to load circuit artifact: ${response.status} ${response.statusText}`);
     }
     const circuit = await response.json();
 
     return await new Promise<{ proof: Uint8Array; publicInputs: string[] }>((resolve, reject) => {
-      // Load the pre-bundled worker from the public/ directory.
-      // This bypasses Next.js Webpack entirely!
       worker = new Worker('/prover.worker.js', { type: 'module' });
 
       timeoutId = setTimeout(() => {

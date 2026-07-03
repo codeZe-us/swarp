@@ -22,7 +22,7 @@ export function getConfig() {
 }
 import { signTransaction as walletSignTransaction } from './stellar';
 
-// Custom error classes for clear categorization
+
 export class SorobanNetworkError extends Error {
   constructor(message: string, public cause?: any) {
     super(message);
@@ -44,7 +44,7 @@ export class SorobanTransactionError extends Error {
   }
 }
 
-// Retry logic: 1 retry after 2 seconds delay
+
 export async function withRetry<T>(
   fn: () => Promise<T>,
   retries = 1,
@@ -62,7 +62,7 @@ export async function withRetry<T>(
   }
 }
 
-// Parse contract & token error logs/codes to user-friendly messages
+
 export function parseSorobanError(error: any): string {
   if (!error) return 'Unknown error occurred.';
 
@@ -70,10 +70,10 @@ export function parseSorobanError(error: any): string {
     ? error
     : error?.message || error?.error || JSON.stringify(error);
 
-  // ZendSwap specific ContractError mapping (defined in contracts/zendswap-pool/src/lib.rs)
-  // if (errorStr.includes('Contract, #1') || errorStr.includes('Error(Contract, #1)')) {
-  //   return 'The ZendSwap pool is not initialized.';
-  // }
+  
+  
+  
+  
   if (errorStr.includes('Contract, #2') || errorStr.includes('Error(Contract, #2)')) {
     return 'The ZendSwap pool is already initialized.';
   }
@@ -102,7 +102,7 @@ export function parseSorobanError(error: any): string {
     return 'Invalid rate (numerator/denominator must be positive and denominator exactly 10,000,000).';
   }
 
-  // Parse common token SAC errors
+  
   if (
     errorStr.toLowerCase().includes('insufficient balance') ||
     errorStr.includes('Error(Token, #1)') ||
@@ -125,14 +125,12 @@ export function parseSorobanError(error: any): string {
 import { Keypair } from '@stellar/stellar-sdk';
 
 function getDummyAccount(): Account {
-  // Use a randomly generated valid public key for simulation to satisfy strict checksum validation
+  
   const dummyPublicKey = Keypair.random().publicKey();
   return new Account(dummyPublicKey, '0');
 }
 
-/**
- * Read-only getters
- */
+
 
 export async function getPoolInfo(poolContractIdOverride?: string): Promise<{
   usdcReserve: bigint;
@@ -351,9 +349,7 @@ export async function getReserves(poolContractIdOverride?: string): Promise<bigi
   return reservesVal.map((r: any) => typeof r === 'bigint' ? r : BigInt(r ?? 0));
 }
 
-/**
- * Write transaction submission functions
- */
+
 
 export async function submitDeposit(
   depositor: string,
@@ -363,7 +359,7 @@ export async function submitDeposit(
 ): Promise<{ txHash: string; leafIndex: number }> {
   const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
-  // 1. Inputs validation
+  
   if (!depositor || !StrKey.isValidEd25519PublicKey(depositor)) {
     throw new Error('Invalid depositor address.');
   }
@@ -380,7 +376,7 @@ export async function submitDeposit(
 
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
 
-  // 2. Fetch active source account context (including sequence number)
+  
   let account;
   try {
     account = await withRetry(() => rpcServer.getAccount(depositor));
@@ -388,7 +384,7 @@ export async function submitDeposit(
     throw new SorobanNetworkError('Failed to fetch depositor account details from RPC.', error);
   }
 
-  // 3. Build base transaction
+  
   const contract = new Contract(POOL_CONTRACT_ID);
   const depositorVal = new Address(depositor).toScVal();
   const assetIdVal = nativeToScVal(assetId, { type: 'u64' });
@@ -401,10 +397,10 @@ export async function submitDeposit(
     networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
   })
     .addOperation(contract.call('deposit', depositorVal, assetIdVal, amountVal, commitmentVal))
-    .setTimeout(30) // timeout: 30 seconds
+    .setTimeout(30) 
     .build();
 
-  // 4. Simulate Transaction
+  
   let simulation;
   try {
     simulation = await withRetry(() => rpcServer.simulateTransaction(transaction));
@@ -417,14 +413,14 @@ export async function submitDeposit(
     throw new SorobanSimulationError(errorMsg, simulation.error);
   }
 
-  // 5. Assemble transaction details using simulated footprint and fee settings
+  
   try {
     transaction = rpc.assembleTransaction(transaction, simulation).build();
   } catch (error) {
     throw new SorobanSimulationError('Failed to assemble transaction resources from simulation.', error);
   }
 
-  // 6. Sign transaction via the Freighter/kit extension
+  
   const xdrString = transaction.toXDR();
   let signedXdr;
   try {
@@ -433,8 +429,8 @@ export async function submitDeposit(
     throw new Error(`Transaction signature rejected: ${error.message || error}`);
   }
 
-  // 7. Submit transaction
-  // 7. Submit transaction
+  
+  
   const signedTx = TransactionBuilder.fromXDR(signedXdr, STELLAR_NETWORK_PASSPHRASE) as Transaction;
   let response;
   try {
@@ -447,7 +443,7 @@ export async function submitDeposit(
     throw new SorobanTransactionError('Transaction submission failed.', response.hash, response);
   }
 
-  // Poll for transaction confirmation
+  
   let txStatus;
   let attempts = 0;
   while (attempts < 20) {
@@ -492,14 +488,14 @@ export async function submitDeposit(
     throw new SorobanTransactionError(`Transaction failed with status: ${txStatus?.status}`, response.hash, txStatus);
   }
 
-  // Extract leafIndex from deposit event emitted by the contract
+  
   let leafIndex = 0;
   try {
-    // txStatus.resultMetaXdr contains the transaction result metadata including contract events
+    
     const resultMeta = txStatus?.resultMetaXdr;
     if (resultMeta) {
-      // The deposit event contains { commitment, leaf_index, token }
-      // Parse events from transaction meta to get the leaf_index
+      
+      
       const rawEvents = (txStatus as any)?.events;
       const events = Array.isArray(rawEvents) ? rawEvents : (rawEvents ? [rawEvents] : []);
       for (const evt of events) {
@@ -512,11 +508,11 @@ export async function submitDeposit(
             break;
           }
         } catch (_) {
-          // skip unparseable events
+          
         }
       }
     }
-    // If not found in events, try to get the leaf count from chain minus 1
+    
     if (leafIndex === 0) {
       try {
         leafIndex = await getLeafCount() - 1;
@@ -538,7 +534,7 @@ export async function submitPayment(
   tokenContractId: string,
   amount: bigint | string | number
 ): Promise<{ txHash: string }> {
-  // 1. Inputs validation
+  
   if (!sender || !StrKey.isValidEd25519PublicKey(sender)) {
     throw new Error('Invalid sender address.');
   }
@@ -553,7 +549,7 @@ export async function submitPayment(
   const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
 
-  // 2. Fetch active source account context (including sequence number)
+  
   let account;
   try {
     account = await withRetry(() => rpcServer.getAccount(sender));
@@ -561,7 +557,7 @@ export async function submitPayment(
     throw new SorobanNetworkError('Failed to fetch sender account details from RPC.', error);
   }
 
-  // 3. Build base transaction
+  
   const contract = new Contract(tokenContractId);
   const senderVal = new Address(sender).toScVal();
   const recipientVal = new Address(recipient).toScVal();
@@ -572,10 +568,10 @@ export async function submitPayment(
     networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
   })
     .addOperation(contract.call('transfer', senderVal, recipientVal, amountVal))
-    .setTimeout(30) // timeout: 30 seconds
+    .setTimeout(30) 
     .build();
 
-  // 4. Simulate Transaction
+  
   let simulation;
   try {
     simulation = await withRetry(() => rpcServer.simulateTransaction(transaction));
@@ -588,14 +584,14 @@ export async function submitPayment(
     throw new SorobanSimulationError(errorMsg, simulation.error);
   }
 
-  // 5. Assemble transaction details using simulated footprint and fee settings
+  
   try {
     transaction = rpc.assembleTransaction(transaction, simulation).build();
   } catch (error) {
     throw new SorobanSimulationError('Failed to assemble transaction resources from simulation.', error);
   }
 
-  // 6. Sign transaction via the Freighter/kit extension
+  
   const xdrString = transaction.toXDR();
   let signedXdr;
   try {
@@ -604,7 +600,7 @@ export async function submitPayment(
     throw new Error(`Transaction signature rejected: ${error.message || error}`);
   }
 
-  // 7. Submit transaction
+  
   const signedTx = TransactionBuilder.fromXDR(signedXdr, STELLAR_NETWORK_PASSPHRASE) as Transaction;
   let response;
   try {
@@ -618,10 +614,10 @@ export async function submitPayment(
     throw new SorobanTransactionError(errorMsg, response.hash, response.errorResult);
   }
 
-  // 8. Poll for confirmation status
+  
   let getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
   let attempts = 0;
-  const maxAttempts = 30; // 30 seconds polling timeout
+  const maxAttempts = 30; 
   while (getResponse.status === 'NOT_FOUND' && attempts < maxAttempts) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
@@ -644,88 +640,16 @@ export async function submitPayment(
   throw new SorobanTransactionError(`Transaction status: ${getResponse.status}`, response.hash);
 }
 
-export async function submitWithdraw(
-  recipient: string,
-  assetInId: number,
-  assetOutId: number,
-  proof: string,
-  nullifier: string,
-  merkleRoot: string,
-  withdrawalAmount: bigint | string | number,
-  poolContractIdOverride?: string
+
+async function executeTransaction(
+  rpcServer: any,
+  transaction: any,
+  bumpFee: number = 0
 ): Promise<{ txHash: string }> {
-  const config = getConfig();
-  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
-  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
-
-  // 1. Inputs validation
-  if (!recipient || !StrKey.isValidEd25519PublicKey(recipient)) {
-    throw new Error('Invalid recipient address.');
-  }
-  if (assetInId < 0 || assetInId > 4) {
-    throw new Error('Invalid asset in ID.');
-  }
-  if (assetOutId < 0 || assetOutId > 4) {
-    throw new Error('Invalid asset out ID.');
-  }
-  if (!proof || proof.length === 0) {
-    throw new Error('Proof cannot be empty.');
-  }
-  if (!nullifier || !/^[0-9a-fA-F]{64}$/.test(nullifier)) {
-    throw new Error('Nullifier must be a valid 32-byte (64 character) hex string.');
-  }
-  if (!merkleRoot || !/^[0-9a-fA-F]{64}$/.test(merkleRoot)) {
-    throw new Error('Merkle root must be a valid 32-byte (64 character) hex string.');
-  }
-  const amountBig = BigInt(withdrawalAmount);
-  if (amountBig <= BigInt(0)) {
-    throw new Error('Withdrawal amount must be positive.');
-  }
-
-  const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
-
-  // 2. Fetch recipient account details
-  let account;
+  
+  let simulation: any;
   try {
-    account = await withRetry(() => rpcServer.getAccount(recipient));
-  } catch (error) {
-    throw new SorobanNetworkError('Failed to fetch recipient account details from RPC.', error);
-  }
-
-  // 3. Build Transaction
-  const contract = new Contract(POOL_CONTRACT_ID);
-  const recipientVal = new Address(recipient).toScVal();
-  const assetInIdVal = nativeToScVal(assetInId, { type: 'u64' });
-  const assetOutIdVal = nativeToScVal(assetOutId, { type: 'u64' });
-  const proofBytes = Buffer.from(proof, 'hex');
-  const proofVal = nativeToScVal(proofBytes);
-  const nullifierVal = xdr.ScVal.scvBytes(Buffer.from(nullifier, 'hex'));
-  const merkleRootVal = xdr.ScVal.scvBytes(Buffer.from(merkleRoot, 'hex'));
-  const withdrawalAmountVal = nativeToScVal(amountBig, { type: 'i128' });
-
-  let transaction = new TransactionBuilder(account, {
-    fee: BASE_FEE,
-    networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
-  })
-    .addOperation(
-      contract.call(
-        'withdraw',
-        recipientVal,
-        assetInIdVal,
-        assetOutIdVal,
-        proofVal,
-        nullifierVal,
-        merkleRootVal,
-        withdrawalAmountVal
-      )
-    )
-    .setTimeout(60) // timeout: 60 seconds
-    .build();
-
-  // 4. Simulate Transaction
-  let simulation;
-  try {
-    simulation = await withRetry(() => rpcServer.simulateTransaction(transaction));
+    simulation = await withRetry(() => rpcServer.simulateTransaction(transaction, { cpuInstructions: 200_000_000 }));
   } catch (error) {
     throw new SorobanNetworkError('Network error during transaction simulation.', error);
   }
@@ -735,14 +659,18 @@ export async function submitWithdraw(
     throw new SorobanSimulationError(errorMsg, simulation.error);
   }
 
-  // 5. Assemble transaction footprint details
+  
   try {
     transaction = rpc.assembleTransaction(transaction, simulation).build();
+    if (bumpFee > 0) {
+      const bumpedFee = (Number(transaction.fee) + bumpFee).toString();
+      transaction = TransactionBuilder.cloneFrom(transaction, { fee: bumpedFee }).build() as Transaction;
+    }
   } catch (error) {
     throw new SorobanSimulationError('Failed to assemble transaction resources from simulation.', error);
   }
 
-  // 6. Sign transaction XDR via the Freighter/kit extension
+  
   const xdrString = transaction.toXDR();
   let signedXdr;
   try {
@@ -751,9 +679,10 @@ export async function submitWithdraw(
     throw new Error(`Transaction signature rejected: ${error.message || error}`);
   }
 
-  // 7. Submit transaction
+  
+  const { STELLAR_NETWORK_PASSPHRASE } = getConfig();
   const signedTx = TransactionBuilder.fromXDR(signedXdr, STELLAR_NETWORK_PASSPHRASE) as Transaction;
-  let response;
+  let response: any;
   try {
     response = await withRetry(() => rpcServer.sendTransaction(signedTx));
   } catch (error) {
@@ -765,41 +694,28 @@ export async function submitWithdraw(
     throw new SorobanTransactionError(errorMsg, response.hash, response.errorResult);
   }
 
-  // 8. Poll for transaction completion
+  
   let getResponse: any;
   let attempts = 0;
-  const maxAttempts = 60; // 60 seconds polling timeout
-  while (attempts < maxAttempts) {
+  while (attempts < 60) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     try {
       getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
-      if (getResponse.status !== 'NOT_FOUND') {
-        break;
-      }
+      if (getResponse.status !== 'NOT_FOUND') break;
     } catch (e: any) {
       if (e.message && e.message.includes('Bad union switch: 4')) {
-        console.warn('stellar-sdk failed to parse getTransaction result in withdraw. Fetching raw RPC...');
-        try {
-          const rawResponse = await fetch(SOROBAN_RPC_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: 1,
-              method: 'getTransaction',
-              params: { hash: response.hash }
-            })
-          });
-          const rawData = await rawResponse.json();
-          if (rawData.result && rawData.result.status === 'SUCCESS') {
-            getResponse = rawData.result;
-            break;
-          } else {
-            console.error('Raw RPC getTransaction failed result:', JSON.stringify(rawData, null, 2));
-            throw new Error('Withdraw transaction execution failed on the network. See console for details.');
-          }
-        } catch (rawErr) {
-          throw e;
+        const { SOROBAN_RPC_URL } = getConfig();
+        const rawResponse = await fetch(SOROBAN_RPC_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTransaction', params: { hash: response.hash } })
+        });
+        const rawData = await rawResponse.json();
+        if (rawData.result && rawData.result.status === 'SUCCESS') {
+          getResponse = rawData.result;
+          break;
+        } else {
+          throw new Error('Withdraw transaction execution failed on the network. See console for details.');
         }
       }
       throw e;
@@ -808,17 +724,113 @@ export async function submitWithdraw(
   }
 
   if (getResponse.status === 'SUCCESS') {
-    return {
-      txHash: response.hash,
-    };
+    return { txHash: response.hash };
   }
-
   if (getResponse.status === 'FAILED') {
     const errorMsg = parseSorobanError(getResponse.resultXdr);
     throw new SorobanTransactionError(errorMsg, response.hash, getResponse.resultXdr);
   }
-
   throw new SorobanTransactionError(`Transaction status: ${getResponse.status}`, response.hash);
+}
+
+export async function submitVerifyWithdrawal(
+  caller: string,
+  proof: string,
+  nullifier: string,
+  merkleRoot: string,
+  assetOutId: number,
+  exchangeRate: bigint | string | number,
+  rateDenominator: bigint | string | number,
+  withdrawalAmount: bigint | string | number,
+  assetInId: number,
+  poolContractIdOverride?: string
+): Promise<{ txHash: string }> {
+  const config = getConfig();
+  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
+
+  const amountBig = BigInt(withdrawalAmount);
+  if (amountBig <= BigInt(0)) throw new Error('Withdrawal amount must be positive.');
+
+  const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
+  let account;
+  try {
+    account = await withRetry(() => rpcServer.getAccount(caller));
+  } catch (error) {
+    throw new SorobanNetworkError('Failed to fetch caller account details from RPC.', error);
+  }
+
+  const contract = new Contract(POOL_CONTRACT_ID);
+  
+  
+  
+  
+  const callerVal = new Address(caller).toScVal();
+  const assetInIdVal = nativeToScVal(BigInt(assetInId), { type: 'u64' });
+  const assetOutIdVal = nativeToScVal(BigInt(assetOutId), { type: 'u64' });
+  const proofVal = nativeToScVal(Buffer.from(proof, 'hex'));
+  const nullifierVal = xdr.ScVal.scvBytes(Buffer.from(nullifier, 'hex'));
+  const merkleRootVal = xdr.ScVal.scvBytes(Buffer.from(merkleRoot, 'hex'));
+  const withdrawalAmountVal = nativeToScVal(amountBig, { type: 'i128' });
+
+  const transaction = new TransactionBuilder(account, {
+    fee: '100000000',
+    networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+  })
+    .addOperation(
+      contract.call(
+        'verify_withdrawal',
+        callerVal,
+        assetInIdVal,
+        assetOutIdVal,
+        proofVal,
+        nullifierVal,
+        merkleRootVal,
+        withdrawalAmountVal
+      )
+    )
+    .setTimeout(300)
+    .build();
+
+  return await executeTransaction(rpcServer, transaction, 100000000);
+}
+
+export async function submitExecuteWithdrawal(
+  recipient: string,
+  nullifier: string,
+  poolContractIdOverride?: string
+): Promise<{ txHash: string }> {
+  const config = getConfig();
+  const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
+  const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = config;
+
+  const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
+  let account;
+  try {
+    account = await withRetry(() => rpcServer.getAccount(recipient));
+  } catch (error) {
+    throw new SorobanNetworkError('Failed to fetch recipient account details from RPC.', error);
+  }
+
+  const contract = new Contract(POOL_CONTRACT_ID);
+  const recipientVal = new Address(recipient).toScVal();
+  const nullifierVal = xdr.ScVal.scvBytes(Buffer.from(nullifier, 'hex'));
+
+  const transaction = new TransactionBuilder(account, {
+    fee: '1000000',
+    networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
+  })
+    .addOperation(
+      contract.call(
+        'execute_withdrawal',
+        recipientVal,
+        nullifierVal
+      )
+    )
+    .setTimeout(300)
+    .build();
+
+  return await executeTransaction(rpcServer, transaction, 0);
 }
 
 export async function getTokenBalance(
@@ -867,13 +879,11 @@ export async function getTokenBalance(
   }
 }
 
-/**
- * Hackathon Faucet / Fund logic
- */
+
 export async function fundTestnetAsset(recipientAddress: string, assetCode: string, amount: string = '200') {
   const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE, STELLAR_HORIZON_URL } = getConfig();
   
-  // Resolve issuer secret and address dynamically based on assetCode
+  
   const envSecretKey = `NEXT_PUBLIC_${assetCode.toUpperCase()}_ISSUER_SECRET`;
   const envAddressKey = `NEXT_PUBLIC_${assetCode.toUpperCase()}_ISSUER_ADDRESS`;
   

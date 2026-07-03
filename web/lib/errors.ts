@@ -37,7 +37,6 @@ export class ZendSwapError extends Error {
   }
 }
 
-// Registry to map raw errors to user-friendly ZendSwapErrors
 export function mapError(error: unknown, context: string): ZendSwapError {
   let errStr = '';
   if (error instanceof Error) {
@@ -50,7 +49,6 @@ export function mapError(error: unknown, context: string): ZendSwapError {
 
   const errObj = error as any;
 
-  // --- E2: Wallet Connection Errors ---
   if (
     context === 'wallet_connect' &&
     (errStr.includes('extension not installed') || errStr.includes('Freighter is not installed'))
@@ -67,8 +65,8 @@ export function mapError(error: unknown, context: string): ZendSwapError {
       rawError: error,
     });
   }
-  
-  if (context === 'wallet_connect' && (errStr.includes('cancelled') || errStr.includes('rejected') || errStr.includes('closed the modal'))) {
+
+    if (context === 'wallet_connect' && (errStr.includes('cancelled') || errStr.includes('rejected') || errStr.includes('closed the modal'))) {
     return new ZendSwapError({
       code: 'WALLET_CONNECTION_CANCELLED',
       title: 'Connection cancelled',
@@ -79,7 +77,6 @@ export function mapError(error: unknown, context: string): ZendSwapError {
     });
   }
 
-  // Transaction Signature Rejected
   if (errStr.includes('User declined') || errStr.includes('cancelled') || errStr.includes('rejected')) {
     return new ZendSwapError({
       code: 'TX_SIGNATURE_REJECTED',
@@ -92,7 +89,6 @@ export function mapError(error: unknown, context: string): ZendSwapError {
     });
   }
 
-  // --- E3: Transaction and Blockchain Errors ---
   if (errStr.includes('tx_bad_auth')) {
     return new ZendSwapError({
       code: 'TX_BAD_AUTH',
@@ -188,7 +184,6 @@ export function mapError(error: unknown, context: string): ZendSwapError {
     });
   }
 
-  // --- E4: Smart Contract Errors ---
   if (errStr.includes('already spent') || errStr.includes('nullifier')) {
     return new ZendSwapError({
       code: 'CONTRACT_NULLIFIER_SPENT',
@@ -238,7 +233,6 @@ export function mapError(error: unknown, context: string): ZendSwapError {
     });
   }
 
-  // KYC and Deny list errors
   if (errStr.includes('KYC proof required')) {
     return new ZendSwapError({
       code: 'CONTRACT_KYC_REQUIRED',
@@ -299,7 +293,6 @@ export function mapError(error: unknown, context: string): ZendSwapError {
     });
   }
 
-  // --- E5: Proof Generation Errors ---
   if (errStr.includes('WebAssembly') || errStr.includes('WASM')) {
     return new ZendSwapError({
       code: 'PROOF_WASM_FAILED',
@@ -349,7 +342,6 @@ export function mapError(error: unknown, context: string): ZendSwapError {
     });
   }
 
-  // --- E7: Browser Environment Errors ---
   if (errStr.includes('localStorage') || errStr.includes('QuotaExceededError')) {
     return new ZendSwapError({
       code: 'BROWSER_STORAGE_FULL',
@@ -361,7 +353,6 @@ export function mapError(error: unknown, context: string): ZendSwapError {
     });
   }
 
-  // Fallback
   return new ZendSwapError({
     code: 'UNKNOWN_ERROR',
     title: 'An unexpected error occurred',
@@ -372,11 +363,9 @@ export function mapError(error: unknown, context: string): ZendSwapError {
   });
 }
 
-// Main handler
 export function handleError(error: unknown, context: string, showToast = true): ZendSwapError {
   const zendSwapError = error instanceof ZendSwapError ? error : mapError(error, context);
 
-  // Always log for debugging
   console.error(`[ZendSwapError - ${context}]`, {
     code: zendSwapError.code,
     title: zendSwapError.title,
@@ -393,7 +382,7 @@ export function handleError(error: unknown, context: string, showToast = true): 
         label: zendSwapError.actionLabel,
         onClick: zendSwapError.actionHandler || (() => {})
       } : undefined,
-      duration: zendSwapError.severity === 'error' || zendSwapError.severity === 'catastrophic' ? 0 : 5000,
+      duration: zendSwapError.severity === 'error' || zendSwapError.severity === 'catastrophic' ? 10000 : 5000,
     });
   }
 

@@ -24,8 +24,8 @@ update_env() {
 }
 
 echo "=== Building Contracts ==="
-# (cd contracts && cargo build --target wasm32v1-none --release -p ultrahonk-verifier)
-# (cd contracts && cargo build --target wasm32v1-none --release -p zendswap-pool)
+(cd contracts && cargo build --target wasm32v1-none --release -p ultrahonk-verifier)
+(cd contracts && cargo build --target wasm32v1-none --release -p zendswap-pool-multi)
 
 echo "=== Deploying ultrahonk-verifier ==="
 echo "Deploying ultrahonk-verifier contract to testnet..."

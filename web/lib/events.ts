@@ -8,10 +8,6 @@ export interface DepositEventData {
   token: string;
 }
 
-/**
- * Fetches deposit events emitted by the ZendSwap pool contract from Stellar RPC.
- * Automatically handles historical query limits (pruning to 7-day windows in RPC nodes).
- */
 export async function fetchDepositEvents(fromLedger?: number, poolContractIdOverride?: string): Promise<DepositEventData[]> {
   const config = getConfig();
   const POOL_CONTRACT_ID = poolContractIdOverride || config.POOL_CONTRACT_ID;
@@ -29,7 +25,6 @@ export async function fetchDepositEvents(fromLedger?: number, poolContractIdOver
   } else {
     try {
       const latest = await withRetry(() => rpcServer.getLatestLedger());
-      // Query approximately the last 7 days of events (120,000 ledgers)
       startLedger = Math.max(1, latest.sequence - 120000);
     } catch (e) {
       console.warn('Failed to fetch latest ledger sequence. Falling back to sequence 1.', e);
@@ -56,7 +51,6 @@ export async function fetchDepositEvents(fromLedger?: number, poolContractIdOver
 
   for (const item of response.events) {
     try {
-      // Decode event value: DepositEvent { commitment: BytesN<32>, leaf_index: u32, token: Address }
       const nativeVal = scValToNative(item.value);
 
       const commitment = Buffer.from(nativeVal.commitment).toString('hex');
@@ -73,16 +67,11 @@ export async function fetchDepositEvents(fromLedger?: number, poolContractIdOver
     }
   }
 
-  // Sort events by leafIndex to guarantee leaf sequence order
   events.sort((a, b) => a.leafIndex - b.leafIndex);
 
   return events;
 }
 
-/**
- * Reconstructs the full leaf array by reading directly from on-chain contract storage.
- * More reliable than events since it reads from persistent storage, not ephemeral event logs.
- */
 export async function reconstructCommitmentsFromChain(poolContractIdOverride?: string): Promise<bigint[]> {
   const count = await getLeafCount(poolContractIdOverride);
   if (count === 0) return [];
@@ -94,7 +83,6 @@ export async function reconstructCommitmentsFromChain(poolContractIdOverride?: s
       leaves.push(BigInt('0x' + hexLeaf));
     } catch (e) {
       console.warn(`Failed to fetch leaf ${i} from chain:`, e);
-      // Fill with zero leaf on error
       const zeros = getZeroValues();
       leaves.push(zeros[0]);
     }
@@ -102,13 +90,7 @@ export async function reconstructCommitmentsFromChain(poolContractIdOverride?: s
   return leaves;
 }
 
-/**
- * Reconstructs the full, ordered array of commitments as BigInts.
- * Primary: reads from on-chain contract storage (getLeaf).
- * Fallback: reconstructs from deposit events.
- */
 export async function reconstructCommitments(poolContractIdOverride?: string): Promise<bigint[]> {
-  // Try reading directly from the contract first (most reliable)
   try {
     const chainLeaves = await reconstructCommitmentsFromChain(poolContractIdOverride);
     if (chainLeaves.length > 0) {

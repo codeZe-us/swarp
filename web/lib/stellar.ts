@@ -29,8 +29,6 @@ export async function connectWallet(): Promise<{ address: string; walletId: stri
     throw new Error('Wallet connection is only supported in the browser.');
   }
 
-  // Ensure Freighter is installed if they specifically need it,
-  // or handle general kit modal connection
   initKit();
 
   try {
@@ -41,19 +39,16 @@ export async function connectWallet(): Promise<{ address: string; walletId: stri
       throw new Error('Invalid Stellar public key returned by the connected wallet.');
     }
 
-    // Get the selected wallet ID (productId)
     const walletId = StellarWalletsKit.selectedModule?.productId || 'freighter';
-    
-    localStorage.setItem('walletId', walletId);
+
+        localStorage.setItem('walletId', walletId);
 
     return { address, walletId };
   } catch (error: any) {
-    // If the modal was closed, pass through the clean message
     if (error?.message === 'The user closed the modal.') {
       throw error;
     }
-    
-    // Explicitly check if Freighter is installed if connection fails
+
     const { isConnected: freighterConnected } = await isConnected();
     if (!freighterConnected) {
       throw new Error('Freighter wallet is not installed. Please install Freighter to proceed.');
@@ -113,8 +108,8 @@ export async function signTransaction(xdr: string, accountToSign?: string): Prom
   if (accountToSign) {
     options.accountToSign = accountToSign;
   }
-  
-  const result = await StellarWalletsKit.signTransaction(xdr, options);
+
+    const result = await StellarWalletsKit.signTransaction(xdr, options);
 
   if (!result.signedTxXdr) {
     throw new Error('Transaction signing failed: returned XDR is empty.');
@@ -143,7 +138,6 @@ export async function addTrustline(assetCode: string, issuerAddress: string): Pr
   const xdr = tx.toXDR();
   const signedXdr = await signTransaction(xdr);
 
-  // Submit the signed transaction back to Horizon
   const txToSubmit = TransactionBuilder.fromXDR(signedXdr, config.STELLAR_NETWORK_PASSPHRASE) as any;
   const txRecord = await horizon.submitTransaction(txToSubmit);
 

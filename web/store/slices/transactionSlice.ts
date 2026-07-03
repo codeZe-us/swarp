@@ -41,7 +41,6 @@ export const createTransactionSlice: StateCreator<
         set({ transactions: JSON.parse(saved) as Transaction[] });
         return;
       } catch (e) {
-        // Ignore
       }
     }
     set({ transactions: [] });

@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Don't bundle Noir/BB.js on the server — they're browser-only WASM packages.
   serverExternalPackages: [
     "@noir-lang/noir_js",
     "@noir-lang/acvm_js",
@@ -11,20 +10,17 @@ const nextConfig: NextConfig = {
   ],
 
   webpack: (config, { webpack, isServer }) => {
-    // Enable async WASM loading
     config.experiments = {
       ...config.experiments,
       asyncWebAssembly: true,
     };
 
-    // Emit WASM files as static assets instead of trying to inline them
     config.module.rules.push({
       test: /\.wasm$/,
       type: "asset/resource",
     });
 
     if (isServer) {
-      // Server: mark Noir/BB.js as external so they're never bundled server-side
       const externals = Array.isArray(config.externals) ? config.externals : [];
       config.externals = [
         ...externals,
@@ -33,7 +29,6 @@ const nextConfig: NextConfig = {
         "@aztec/bb.js",
       ];
     } else {
-      // Browser: stub out Node-only modules so the browser bundle doesn't crash
       config.resolve = {
         ...config.resolve,
         fallback: {

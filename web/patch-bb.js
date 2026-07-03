@@ -5,8 +5,8 @@ function patchFile(filePath) {
   if (!fs.existsSync(filePath)) return;
   let content = fs.readFileSync(filePath, 'utf8');
   if (!content.includes('Object.defineProperty(exports,')) return;
-  
-  content = content.replace(
+
+    content = content.replace(
     /Object\.defineProperty\(exports,/g,
     'if(typeof exports!=="undefined")Object.defineProperty(exports,'
   );
@@ -27,7 +27,6 @@ function patchDirectory(dirPath) {
   }
 }
 
-// Patch all files in these directories recursively
 patchDirectory(path.join('node_modules', '@aztec', 'bb.js', 'dest'));
 patchDirectory(path.join('node_modules', '@noir-lang', 'noir_js', 'lib'));
 patchDirectory(path.join('node_modules', '@noir-lang', 'acvm_js', 'nodejs'));

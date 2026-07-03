@@ -9,12 +9,12 @@ import { TeamMember } from '../../store/types';
 import { useToastStore } from '../../store/useToast';
 
 export default function TeamPage() {
-  // Zustand Store variables
+  
   const address = useStore((state) => state.address);
   const status = useStore((state) => state.status);
   const connect = useStore((state) => state.connect);
   
-  // Team slice
+  
   const teamMembers = useStore((state) => state.teamMembers);
   const signersRequired = useStore((state) => state.signersRequired);
   const inviteMember = useStore((state) => state.inviteMember);
@@ -24,7 +24,7 @@ export default function TeamPage() {
 
   const isConnected = status === 'connected';
 
-  // Modal states
+  
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteName, setInviteName] = useState('');
   const [inviteAddress, setInviteAddress] = useState('');
@@ -32,23 +32,23 @@ export default function TeamPage() {
 
   const [isFetchingData, setIsFetchingData] = useState(true);
 
-  // Simulate data fetch
+  
   useEffect(() => {
     const timer = setTimeout(() => setIsFetchingData(false), 800);
     return () => clearTimeout(timer);
   }, []);
 
-  // Compute active signers (status === Active)
+  
   const activeMembersCount = useMemo(() => {
     return teamMembers.filter((m) => m.status === 'Active').length;
   }, [teamMembers]);
 
-  // Compute pending invites count
+  
   const pendingInvitesCount = useMemo(() => {
     return teamMembers.filter((m) => m.status === 'Pending').length;
   }, [teamMembers]);
 
-  // Invite form submit handler
+  
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -62,7 +62,7 @@ export default function TeamPage() {
       return;
     }
 
-    // Check if address is already in team list
+    
     const isDuplicate = teamMembers.some(
       (m) => m.address.toLowerCase() === inviteAddress.trim().toLowerCase()
     );
@@ -87,13 +87,13 @@ export default function TeamPage() {
     }
   };
 
-  // Change signers required threshold
+  
   const handleSignersThresholdChange = async (count: number) => {
     await updateSignersRequired(count);
     useToastStore.getState().addToast({ title: 'Success', message: 'Multisig threshold updated.', severity: 'success' });
   };
 
-  // Generate Initials Avatar
+  
   const getInitials = (member: TeamMember) => {
     if (member.role === 'Owner') return 'Y';
     const parts = member.name.trim().split(' ');
@@ -106,7 +106,7 @@ export default function TeamPage() {
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto font-sans">
       
-      {/* Page Header */}
+      {}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-bold text-brandLightPurple tracking-wider uppercase font-display">Governance</span>
@@ -127,7 +127,7 @@ export default function TeamPage() {
         </div>
       </div>
 
-      {/* Stats Cards Section */}
+      {}
       {isFetchingData ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
@@ -137,7 +137,7 @@ export default function TeamPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* Card 1: Members */}
+        {}
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between min-h-[148px]">
           <div>
             <span className="text-[10px] font-bold text-mutedText uppercase tracking-wider font-display">Members</span>
@@ -148,7 +148,7 @@ export default function TeamPage() {
           <p className="text-[10px] text-mutedText mt-2">Total registered workspace users.</p>
         </div>
 
-        {/* Card 2: Signers required */}
+        {}
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between min-h-[148px]">
           <div>
             <span className="text-[10px] font-bold text-mutedText uppercase tracking-wider font-display">Signers required</span>
@@ -159,7 +159,7 @@ export default function TeamPage() {
           <p className="text-[10px] text-mutedText mt-2">Required signature approvals for run.</p>
         </div>
 
-        {/* Card 3: Pending invites */}
+        {}
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between min-h-[148px]">
           <div>
             <span className="text-[10px] font-bold text-mutedText uppercase tracking-wider font-display">Pending invites</span>
@@ -173,7 +173,7 @@ export default function TeamPage() {
       </div>
       )}
 
-      {/* Connection Warning Banner */}
+      {}
       {isFetchingData ? (
         <div className="w-full bg-[#0B0B0C] border border-borderSubtle rounded-[13px] overflow-hidden min-h-[300px]">
           <ShimmerLoader className="w-full h-full min-h-[300px]" borderRadius={13} />
@@ -214,7 +214,7 @@ export default function TeamPage() {
                 {teamMembers.map((member) => (
                   <tr key={member.id} className="hover:bg-[#1D1D1F]/20 group transition duration-150">
                     
-                    {/* Avatar Initials + Name */}
+                    {}
                     <td className="py-4 pr-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-brandPurple/20 border border-brandPurple/30 flex items-center justify-center text-white text-xs font-bold font-display select-none">
@@ -228,12 +228,12 @@ export default function TeamPage() {
                       </div>
                     </td>
 
-                    {/* Wallet Address */}
+                    {}
                     <td className="py-4 pr-4 font-mono text-mutedText font-medium text-xs">
                       {member.address.slice(0, 8)}...{member.address.slice(-8)}
                     </td>
 
-                    {/* Role Badge */}
+                    {}
                     <td className="py-4 pr-4">
                       {member.role === 'Owner' && (
                         <div className="inline-block bg-brandPurple/10 border border-brandPurple/20 px-2.5 py-0.5 rounded text-[10px] font-bold text-brandLightPurple font-display select-none">
@@ -252,7 +252,7 @@ export default function TeamPage() {
                       )}
                     </td>
 
-                    {/* Status Badge */}
+                    {}
                     <td className="py-4 pr-4">
                       {member.status === 'Active' ? (
                         <div className="inline-flex items-center gap-1.5 bg-[#5E2A8C]/10 border border-[#5E2A8C]/20 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-brandLightPurple font-display select-none">
@@ -267,7 +267,7 @@ export default function TeamPage() {
                       )}
                     </td>
 
-                    {/* Actions */}
+                    {}
                     <td className="py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {member.status === 'Pending' && (
@@ -300,11 +300,11 @@ export default function TeamPage() {
         </div>
       )}
 
-      {/* Configuration Section & Settings (Owner Editable) */}
+      {}
       {isConnected && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* Multi-sig Configuration Panel */}
+          {}
           <div className="md:col-span-2 bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between">
             <div className="flex flex-col gap-1.5">
               <span className="text-[10px] font-bold text-mutedText uppercase tracking-wider font-display">Multi-sig configuration</span>
@@ -314,7 +314,7 @@ export default function TeamPage() {
               </p>
             </div>
 
-            {/* Threshold drop down selector */}
+            {}
             <div className="flex items-center gap-4 mt-6">
               <div className="flex items-center gap-2">
                 <select
@@ -339,7 +339,7 @@ export default function TeamPage() {
             </div>
           </div>
 
-          {/* Explanation panel */}
+          {}
           <div className="md:col-span-1 bg-[#1D1D1F]/20 border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between">
             <span className="text-[10px] font-bold text-brandLightPurple uppercase tracking-wider font-display">Security notice</span>
             <p className="text-xs text-mutedText leading-relaxed mt-2.5">
@@ -355,17 +355,17 @@ export default function TeamPage() {
         </div>
       )}
 
-      {/* Invited notice info */}
+      {}
       <p className="text-[10px] text-mutedText/60 text-center leading-relaxed font-semibold max-w-lg mx-auto">
         Invited members receive a one-time link. They connect a Stellar wallet to accept, then appear here, no email account or password required.
       </p>
 
-      {/* Invite Member Form Modal */}
+      {}
       {isInviteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 transition-opacity duration-300">
           <div className="w-full max-w-md bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] shadow-2xl relative flex flex-col font-sans overflow-hidden">
             
-            {/* Header row */}
+            {}
             <div className="p-6 pb-4 border-b border-[#1D1D1F]">
               <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Treasury console</span>
               <h2 className="text-xl font-extrabold text-white mt-1 font-display">Invite Member</h2>
@@ -379,10 +379,10 @@ export default function TeamPage() {
               </button>
             </div>
 
-            {/* Modal Body / Form */}
+            {}
             <form onSubmit={handleInviteSubmit} className="p-6 flex flex-col gap-4 font-display text-xs">
               
-              {/* Name */}
+              {}
               <div className="flex flex-col gap-1.5">
                 <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Name (Optional)</label>
                 <input
@@ -394,7 +394,7 @@ export default function TeamPage() {
                 />
               </div>
 
-              {/* Wallet Address */}
+              {}
               <div className="flex flex-col gap-1.5">
                 <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Stellar Wallet Address</label>
                 <input
@@ -406,7 +406,7 @@ export default function TeamPage() {
                 />
               </div>
 
-              {/* Role Selector */}
+              {}
               <div className="flex flex-col gap-1.5">
                 <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Role</label>
                 <select
@@ -419,7 +419,7 @@ export default function TeamPage() {
                 </select>
               </div>
 
-              {/* Footer controls */}
+              {}
               <div className="flex gap-3 mt-4">
                 <button
                   type="submit"
@@ -436,7 +436,7 @@ export default function TeamPage() {
                 </button>
               </div>
 
-              {/* Footer text specific to modal */}
+              {}
               <p className="text-[10px] text-mutedText/60 text-center leading-relaxed font-semibold mt-2">
                 Invited members receive a one-time link. They connect a Stellar wallet to accept, then appear here, no email account or password required.
               </p>

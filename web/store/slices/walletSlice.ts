@@ -34,8 +34,8 @@ export const createWalletSlice: StateCreator<
     set({ status: 'connecting', error: null });
     try {
       const { address, walletId } = await connectWallet();
-      
-      if (typeof window !== 'undefined' && walletId === 'freighter') {
+
+            if (typeof window !== 'undefined' && walletId === 'freighter') {
         try {
           const networkDetails = await getNetworkDetails();
           if (networkDetails.network === 'PUBLIC' || networkDetails.network.toLowerCase().includes('mainnet')) {
@@ -59,8 +59,8 @@ export const createWalletSlice: StateCreator<
       }
 
       set({ address, status: 'connected', error: null, kit: StellarWalletsKit });
-      
-      await get().loadNotes(address);
+
+            await get().loadNotes(address);
       get().loadTransactions(address);
       await get().loadPayroll(address);
       await get().loadTeam(address);
@@ -97,7 +97,6 @@ export const createWalletSlice: StateCreator<
     if (!lastWalletId) return;
 
     try {
-      // If Freighter was connected, check if it's still present/unlocked
       if (lastWalletId === 'freighter') {
         const { isConnected: freighterConnected } = await isConnected();
         if (!freighterConnected) {

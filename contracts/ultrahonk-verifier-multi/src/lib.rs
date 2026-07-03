@@ -7,13 +7,13 @@ extern crate std;
 use soroban_sdk::{contract, contractimpl, Bytes, BytesN, Env, Vec, U256};
 use ultrahonk_soroban_verifier::{UltraHonkVerifier, PROOF_BYTES};
 
-// ── Verification Key ─────────────────────────────────────────────────────────
-// The Verification Key (VK) is embedded at compile time and is immutable.
-// VK is 1764 bytes (with a 4-byte recursive flag at the end). The verifier
-// library strictly expects 1760 bytes, so it is sliced accordingly at load.
+
+
+
+
 const VK_BYTES: &[u8] = include_bytes!("../vk");
 
-// ── Point Validation Helpers ──────────────────────────────────────────────────
+
 
 fn combine_limbs(lo: &[u8; 32], hi: &[u8; 32]) -> [u8; 32] {
     let mut out = [0u8; 32];
@@ -67,7 +67,7 @@ fn is_on_curve(env: &Env, x_bytes: &[u8; 32], y_bytes: &[u8; 32]) -> bool {
         return false;
     }
 
-    // G1 curve equation: y^2 = x^3 + 3 (mod p)
+    
     let y_sq = mul_mod(env, &y, &y, &p);
 
     let x_sq = mul_mod(env, &x, &x, &p);
@@ -126,21 +126,21 @@ fn validate_proof_g1_points(env: &Env, proof: &Bytes) -> bool {
         valid
     };
 
-    // Validate the 8 head G1 points starting at 512
+    
     for i in 0..8 {
         if !validate_at_offset(512 + i * 128) {
             return false;
         }
     }
 
-    // Validate the 27 Gemini G1 points starting at 9984
+    
     for i in 0..27 {
         if !validate_at_offset(9984 + i * 128) {
             return false;
         }
     }
 
-    // Validate the 2 tail G1 points starting at 14336
+    
     for i in 0..2 {
         if !validate_at_offset(14336 + i * 128) {
             return false;
@@ -150,25 +150,25 @@ fn validate_proof_g1_points(env: &Env, proof: &Bytes) -> bool {
     true
 }
 
-// ── Contract ─────────────────────────────────────────────────────────────────
 
-/// On-chain UltraHonk proof verifier for the ZendSwap swap circuit.
+
+
 #[contract]
 pub struct UltraHonkVerifierContract;
 
 #[contractimpl]
 impl UltraHonkVerifierContract {
-    /// Verify an UltraHonk proof for the ZendSwap swap circuit.
-    ///
-    /// # Arguments
-    ///
-    /// * `proof`         – raw proof bytes (must be exactly PROOF_BYTES = 14592 bytes)
-    /// * `public_inputs` – 6 public inputs, in the order:
-    ///                     [merkle_root, nullifier_hash, exchange_rate,
-    ///                      rate_denominator, asset_out_public, asset_in]
-    ///
-    /// # Returns
-    /// `true` on valid proof, `false` on any failure or invalid inputs.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub fn verify(env: Env, proof: Bytes, public_inputs: Vec<BytesN<32>>) -> bool {
         if proof.len() as usize != PROOF_BYTES {
             return false;
@@ -182,17 +182,17 @@ impl UltraHonkVerifierContract {
             return false;
         }
 
-        // 4. Reorder public inputs to match the Noir circuit declaration order:
-        // Input `public_inputs` has order:
-        //   [0] merkle_root
-        //   [1] nullifier_hash
-        //   [2] exchange_rate
-        //   [3] rate_denominator
-        //   [4] asset_out_public
-        //   [5] asset_in
-        //
-        // Noir circuit expects declaration order in main.nr:
-        //   asset_in, exchange_rate, rate_denominator, nullifier_hash, asset_out_public, merkle_root
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         let merkle_root = public_inputs.get(0).unwrap();
         let nullifier_hash = public_inputs.get(1).unwrap();
         let exchange_rate = public_inputs.get(2).unwrap();
@@ -239,7 +239,7 @@ impl UltraHonkVerifierContract {
         }
     }
 
-    /// Returns the embedded VK as raw bytes (sliced to 1760 bytes).
+    
     pub fn vk_bytes(env: Env) -> Bytes {
         if VK_BYTES.len() < 1760 {
             Bytes::new(&env)
@@ -248,7 +248,7 @@ impl UltraHonkVerifierContract {
         }
     }
 
-    /// Returns the expected proof length in bytes.
+    
     pub fn proof_bytes_len(_env: Env) -> u32 {
         PROOF_BYTES as u32
     }
@@ -273,45 +273,53 @@ mod test {
 
         let mut public_inputs = Vec::new(&env);
 
-        // 1. merkle_root: 0x13d5a5935821225211517d91c3b202470ed10537de8b8d7aa765c0f163ab8288
-        let merkle_root_bytes: [u8; 32] = [
-            0x13, 0xd5, 0xa5, 0x93, 0x58, 0x21, 0x22, 0x52, 0x11, 0x51, 0x7d, 0x91, 0xc3, 0xb2,
-            0x02, 0x47, 0x0e, 0xd1, 0x05, 0x37, 0xde, 0x8b, 0x8d, 0x7a, 0xa7, 0x65, 0xc0, 0xf1,
-            0x63, 0xab, 0x82, 0x88,
+        let pi_0: [u8; 32] = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
-        public_inputs.push_back(BytesN::from_array(&env, &merkle_root_bytes));
+        public_inputs.push_back(BytesN::from_array(&env, &pi_0));
 
-        // 2. nullifier_hash: 0x045e9cf13d3ab92cc27bc4ce8111d4c3278ce84764812648e69113b43507daf8
-        let nullifier_hash_bytes: [u8; 32] = [
-            0x04, 0x5e, 0x9c, 0xf1, 0x3d, 0x3a, 0xb9, 0x2c, 0xc2, 0x7b, 0xc4, 0xce, 0x81, 0x11,
-            0xd4, 0xc3, 0x27, 0x8c, 0xe8, 0x47, 0x64, 0x81, 0x26, 0x48, 0xe6, 0x91, 0x13, 0xb4,
-            0x35, 0x07, 0xda, 0xf8,
+        let pi_1: [u8; 32] = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xe8,
         ];
-        public_inputs.push_back(BytesN::from_array(&env, &nullifier_hash_bytes));
+        public_inputs.push_back(BytesN::from_array(&env, &pi_1));
 
-        // 3. exchange_rate: 9200000 (0x8c6180)
-        let mut exchange_rate_bytes = [0u8; 32];
-        exchange_rate_bytes[29] = 0x8c;
-        exchange_rate_bytes[30] = 0x61;
-        exchange_rate_bytes[31] = 0x80;
-        public_inputs.push_back(BytesN::from_array(&env, &exchange_rate_bytes));
+        let pi_2: [u8; 32] = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xe8,
+        ];
+        public_inputs.push_back(BytesN::from_array(&env, &pi_2));
 
-        // 4. rate_denominator: 10000000 (0x989680)
-        let mut rate_denominator_bytes = [0u8; 32];
-        rate_denominator_bytes[29] = 0x98;
-        rate_denominator_bytes[30] = 0x96;
-        rate_denominator_bytes[31] = 0x80;
-        public_inputs.push_back(BytesN::from_array(&env, &rate_denominator_bytes));
+        let pi_3: [u8; 32] = [
+            0x1f, 0x19, 0xa2, 0xb2, 0x9c, 0x09, 0x3f, 0xfe,
+            0x45, 0x96, 0xda, 0x1b, 0xe4, 0x0a, 0x0d, 0x82,
+            0x6b, 0x5d, 0x1a, 0x8b, 0xaf, 0xa7, 0x16, 0xb0,
+            0x14, 0xb0, 0xf2, 0x52, 0x80, 0xfe, 0x48, 0x9f,
+        ];
+        public_inputs.push_back(BytesN::from_array(&env, &pi_3));
 
-        // 5. asset_out_public: 1
-        let mut asset_out_public_bytes = [0u8; 32];
-        asset_out_public_bytes[31] = 1;
-        public_inputs.push_back(BytesN::from_array(&env, &asset_out_public_bytes));
+        let pi_4: [u8; 32] = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+        ];
+        public_inputs.push_back(BytesN::from_array(&env, &pi_4));
 
-        // 6. asset_in: 0
-        let asset_in_bytes = [0u8; 32];
-        // asset_in is 0 in Prover.toml, so it's all zeros
-        public_inputs.push_back(BytesN::from_array(&env, &asset_in_bytes));
+        let pi_5: [u8; 32] = [
+            0x2d, 0x56, 0x53, 0x8f, 0xa9, 0x66, 0xfd, 0xfc,
+            0xe9, 0xee, 0x6d, 0x48, 0x0e, 0x45, 0x85, 0xfd,
+            0x6f, 0xbd, 0xe5, 0x85, 0x52, 0xf6, 0xa9, 0x52,
+            0xaa, 0x0f, 0xfb, 0xe5, 0x2d, 0x11, 0x0f, 0xb0,
+        ];
+        public_inputs.push_back(BytesN::from_array(&env, &pi_5));
 
         let verified = client.verify(&proof_bytes, &public_inputs);
         assert!(verified, "Valid proof failed verification!");
@@ -329,39 +337,53 @@ mod test {
 
         let mut public_inputs = Vec::new(&env);
 
-        let merkle_root_bytes: [u8; 32] = [
-            0x13, 0xd5, 0xa5, 0x93, 0x58, 0x21, 0x22, 0x52, 0x11, 0x51, 0x7d, 0x91, 0xc3, 0xb2,
-            0x02, 0x47, 0x0e, 0xd1, 0x05, 0x37, 0xde, 0x8b, 0x8d, 0x7a, 0xa7, 0x65, 0xc0, 0xf1,
-            0x63, 0xab, 0x82, 0x88,
+        let pi_0: [u8; 32] = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
-        public_inputs.push_back(BytesN::from_array(&env, &merkle_root_bytes));
+        public_inputs.push_back(BytesN::from_array(&env, &pi_0));
 
-        let nullifier_hash_bytes: [u8; 32] = [
-            0x04, 0x5e, 0x9c, 0xf1, 0x3d, 0x3a, 0xb9, 0x2c, 0xc2, 0x7b, 0xc4, 0xce, 0x81, 0x11,
-            0xd4, 0xc3, 0x27, 0x8c, 0xe8, 0x47, 0x64, 0x81, 0x26, 0x48, 0xe6, 0x91, 0x13, 0xb4,
-            0x35, 0x07, 0xda, 0xf8,
+        let pi_1: [u8; 32] = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xe8,
         ];
-        public_inputs.push_back(BytesN::from_array(&env, &nullifier_hash_bytes));
+        public_inputs.push_back(BytesN::from_array(&env, &pi_1));
 
-        // Modified exchange_rate: 9200001 (0x8c6181)
-        let mut exchange_rate_bytes = [0u8; 32];
-        exchange_rate_bytes[29] = 0x8c;
-        exchange_rate_bytes[30] = 0x61;
-        exchange_rate_bytes[31] = 0x81;
-        public_inputs.push_back(BytesN::from_array(&env, &exchange_rate_bytes));
+        let pi_2: [u8; 32] = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xe9, // Modified byte to ensure failure
+        ];
+        public_inputs.push_back(BytesN::from_array(&env, &pi_2));
 
-        let mut rate_denominator_bytes = [0u8; 32];
-        rate_denominator_bytes[29] = 0x98;
-        rate_denominator_bytes[30] = 0x96;
-        rate_denominator_bytes[31] = 0x80;
-        public_inputs.push_back(BytesN::from_array(&env, &rate_denominator_bytes));
+        let pi_3: [u8; 32] = [
+            0x1f, 0x19, 0xa2, 0xb2, 0x9c, 0x09, 0x3f, 0xfe,
+            0x45, 0x96, 0xda, 0x1b, 0xe4, 0x0a, 0x0d, 0x82,
+            0x6b, 0x5d, 0x1a, 0x8b, 0xaf, 0xa7, 0x16, 0xb0,
+            0x14, 0xb0, 0xf2, 0x52, 0x80, 0xfe, 0x48, 0x9f,
+        ];
+        public_inputs.push_back(BytesN::from_array(&env, &pi_3));
 
-        let mut asset_out_public_bytes = [0u8; 32];
-        asset_out_public_bytes[31] = 1;
-        public_inputs.push_back(BytesN::from_array(&env, &asset_out_public_bytes));
+        let pi_4: [u8; 32] = [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+        ];
+        public_inputs.push_back(BytesN::from_array(&env, &pi_4));
 
-        let asset_in_bytes = [0u8; 32];
-        public_inputs.push_back(BytesN::from_array(&env, &asset_in_bytes));
+        let pi_5: [u8; 32] = [
+            0x2d, 0x56, 0x53, 0x8f, 0xa9, 0x66, 0xfd, 0xfc,
+            0xe9, 0xee, 0x6d, 0x48, 0x0e, 0x45, 0x85, 0xfd,
+            0x6f, 0xbd, 0xe5, 0x85, 0x52, 0xf6, 0xa9, 0x52,
+            0xaa, 0x0f, 0xfb, 0xe5, 0x2d, 0x11, 0x0f, 0xb0,
+        ];
+        public_inputs.push_back(BytesN::from_array(&env, &pi_5));
 
         let verified = client.verify(&proof_bytes, &public_inputs);
         assert!(!verified, "Modified public input should fail verification!");
@@ -385,5 +407,61 @@ mod test {
 
         let verified = client.verify(&garbage_proof, &public_inputs);
         assert!(!verified, "Garbage proof should return false, not panic!");
+    }
+
+    #[test]
+    fn test_verification_fresh_proof() {
+        let env = Env::default();
+        env.cost_estimate().budget().reset_unlimited();
+
+        let contract_id = env.register(UltraHonkVerifierContract, ());
+        let client = UltraHonkVerifierContractClient::new(&env, &contract_id);
+
+        let proof_hex_str = include_str!("../fresh_proof.hex");
+        let pi_hex_str = include_str!("../fresh_pi.hex");
+
+        let mut proof_bytes = alloc::vec::Vec::new();
+        for i in (0..proof_hex_str.len()).step_by(2) {
+            proof_bytes.push(u8::from_str_radix(&proof_hex_str[i..i+2], 16).unwrap());
+        }
+        let proof = Bytes::from_slice(&env, &proof_bytes);
+
+        let mut pi_bytes = alloc::vec::Vec::new();
+        for i in (0..pi_hex_str.len()).step_by(2) {
+            pi_bytes.push(u8::from_str_radix(&pi_hex_str[i..i+2], 16).unwrap());
+        }
+
+        let mut public_inputs = Vec::new(&env);
+        
+        
+        
+        
+        
+        
+        
+        
+        let get_chunk = |idx: usize| {
+            let mut chunk = [0u8; 32];
+            chunk.copy_from_slice(&pi_bytes[idx*32..(idx+1)*32]);
+            BytesN::from_array(&env, &chunk)
+        };
+
+        
+        let asset_in = get_chunk(0);
+        let exchange_rate = get_chunk(1);
+        let rate_denominator = get_chunk(2);
+        let nullifier_hash = get_chunk(3);
+        let asset_out_public = get_chunk(4);
+        let merkle_root = get_chunk(5);
+
+        public_inputs.push_back(merkle_root);
+        public_inputs.push_back(nullifier_hash);
+        public_inputs.push_back(exchange_rate);
+        public_inputs.push_back(rate_denominator);
+        public_inputs.push_back(asset_out_public);
+        public_inputs.push_back(asset_in);
+
+        let verified = client.verify(&proof, &public_inputs);
+        assert!(verified, "Fresh proof should verify!");
     }
 }

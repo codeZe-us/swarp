@@ -217,10 +217,10 @@ mint_if_needed() {
 }
 
 echo "=== Minting Assets ==="
-mint_if_needed "$POOL_OPERATOR_ADDRESS" "USDC" "$USDC_ISSUER_ADDRESS" "usdc-issuer" "100000"
-mint_if_needed "$POOL_OPERATOR_ADDRESS" "EURC" "$EURC_ISSUER_ADDRESS" "eurc-issuer" "100000"
-mint_if_needed "$POOL_OPERATOR_ADDRESS" "MGUSD" "$MGUSD_ISSUER_ADDRESS" "mgusd-issuer" "100000"
-mint_if_needed "$POOL_OPERATOR_ADDRESS" "YLDS" "$YLDS_ISSUER_ADDRESS" "ylds-issuer" "100000"
+mint_if_needed "$POOL_OPERATOR_ADDRESS" "USDC" "$USDC_ISSUER_ADDRESS" "usdc-issuer" "500000000000"
+mint_if_needed "$POOL_OPERATOR_ADDRESS" "EURC" "$EURC_ISSUER_ADDRESS" "eurc-issuer" "500000000000"
+mint_if_needed "$POOL_OPERATOR_ADDRESS" "MGUSD" "$MGUSD_ISSUER_ADDRESS" "mgusd-issuer" "500000000000"
+mint_if_needed "$POOL_OPERATOR_ADDRESS" "YLDS" "$YLDS_ISSUER_ADDRESS" "ylds-issuer" "500000000000"
 
 mint_if_needed "$TEST_USER_ADDRESS" "USDC" "$USDC_ISSUER_ADDRESS" "usdc-issuer" "10000"
 mint_if_needed "$TEST_USER_ADDRESS" "EURC" "$EURC_ISSUER_ADDRESS" "eurc-issuer" "1000"

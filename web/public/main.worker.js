@@ -1,4 +1,4 @@
-/*! For license information please see main.worker.js.LICENSE.txt */
+
 var __webpack_modules__ = {
     0: module => {
         var s = 1e3;

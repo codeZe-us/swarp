@@ -29,14 +29,11 @@ export const createTeamSlice: StateCreator<
       return;
     }
 
-    // Load signers required threshold
     const savedSigners = localStorage.getItem(`swarp_team_signers_required_${address}`);
     const signersCount = savedSigners ? parseInt(savedSigners, 10) : 2;
 
-    // Load team members list
     const savedTeam = localStorage.getItem(`swarp_team_${address}`);
     if (!savedTeam) {
-      // Initialize with demo data
       const defaultMembers: TeamMember[] = [
         {
           id: 'owner-id',
@@ -84,7 +81,6 @@ export const createTeamSlice: StateCreator<
     try {
       let parsed = JSON.parse(savedTeam) as TeamMember[];
 
-      // Dynamic owner mapping: Ensure the row with role 'Owner' always matches the currently connected address
       let hasOwner = false;
       parsed = parsed.map((m) => {
         if (m.role === 'Owner') {
@@ -95,7 +91,6 @@ export const createTeamSlice: StateCreator<
       });
 
       if (!hasOwner) {
-        // If somehow no owner row exists, prepend it
         parsed.unshift({
           id: 'owner-id',
           name: 'You',
@@ -105,7 +100,6 @@ export const createTeamSlice: StateCreator<
         });
       }
 
-      // Ensure GCR6MLL2HF5RV5NKJSNEMV7MQDKONZ27RYHHMULKF34ICW2QA6QL6FLL is present
       const hasGCR6 = parsed.some((m) => m.address === 'GCR6MLL2HF5RV5NKJSNEMV7MQDKONZ27RYHHMULKF34ICW2QA6QL6FLL');
       if (!hasGCR6) {
         parsed.push({
@@ -117,7 +111,6 @@ export const createTeamSlice: StateCreator<
         });
       }
 
-      // Ensure GC2S532SGRZ7HVDYMXCULDHLXZL3UQIE4CBKNC2JBAJV7HMTC5CUHNLG is present
       const hasGC2S = parsed.some((m) => m.address === 'GC2S532SGRZ7HVDYMXCULDHLXZL3UQIE4CBKNC2JBAJV7HMTC5CUHNLG');
       if (!hasGC2S) {
         parsed.push({
@@ -172,7 +165,6 @@ export const createTeamSlice: StateCreator<
     const address = get().address;
     if (!address) return;
 
-    // Filter out the deleted member, but never let them delete the owner row
     const updated = get().teamMembers.filter((m) => m.id !== id || m.role === 'Owner');
     set({ teamMembers: updated });
 

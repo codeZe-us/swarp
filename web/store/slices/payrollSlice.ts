@@ -31,11 +31,9 @@ export const createPayrollSlice: StateCreator<
       return;
     }
 
-    // Load last run date
     const savedLastRun = localStorage.getItem(`swarp_payroll_last_run_${address}`);
     set({ lastRunDate: savedLastRun || null });
 
-    // Load encrypted recipients
     const savedRecipients = localStorage.getItem(`swarp_payroll_recipients_${address}`);
     if (!savedRecipients) {
       set({ recipients: [] });
@@ -117,7 +115,6 @@ export const createPayrollSlice: StateCreator<
     const address = get().address;
     if (!address) return;
 
-    // Get current date formatted like "May 31"
     const now = new Date();
     const formattedDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
