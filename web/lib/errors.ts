@@ -38,6 +38,10 @@ export class ZendSwapError extends Error {
 }
 
 export function mapError(error: unknown, context: string): ZendSwapError {
+  if (error instanceof ZendSwapError) {
+    return error;
+  }
+
   let errStr = '';
   if (error instanceof Error) {
     errStr = error.message;

@@ -29,3 +29,10 @@ html, body {
 ::-webkit-scrollbar-thumb:hover {
   background: #7C3AED;
 }
+
+/* Fix for Stellar Wallets Kit broken images in Next.js */
+.swk-modal-container img, 
+.stellar-wallets-kit img,
+[class*="swk"] img {
+  display: none !important;
+}

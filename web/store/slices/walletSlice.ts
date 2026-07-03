@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
 import { StellarWalletsKit } from '@creit.tech/stellar-wallets-kit/sdk';
 import { Networks } from '@creit.tech/stellar-wallets-kit';
-import { isConnected } from '@stellar/freighter-api';
+import { isConnected, getNetworkDetails } from '@stellar/freighter-api';
 import { StoreState } from '../useStore';
 import { connectWallet, disconnectWallet, initKit, isValidPublicKey } from '../../lib/stellar';
 import { ZendSwapError, handleError } from '../../lib/errors';
@@ -37,8 +37,19 @@ export const createWalletSlice: StateCreator<
 
         if (typeof window !== 'undefined') {
         try {
-          const networkDetails = await StellarWalletsKit.getNetwork();
-          const netName = (networkDetails?.network || '').toLowerCase();
+          let netName = '';
+          if (walletId === 'freighter') {
+            const fNetwork = await getNetworkDetails();
+            netName = (fNetwork?.network || '').toLowerCase();
+          } else {
+            try {
+              const networkDetails = await StellarWalletsKit.getNetwork();
+              netName = (networkDetails?.network || '').toLowerCase();
+            } catch (err) {
+              console.warn('StellarWalletsKit getNetwork failed, bypassing check for this wallet', err);
+            }
+          }
+          
           if (netName === 'public' || netName.includes('mainnet')) {
             await disconnectWallet();
             throw new ZendSwapError({
@@ -71,7 +82,6 @@ export const createWalletSlice: StateCreator<
     } catch (err: unknown) {
       const zError = handleError(err, 'wallet_connect');
       set({ status: 'error', error: zError });
-      throw zError;
     }
   },
   disconnect: async () => {
