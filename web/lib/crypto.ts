@@ -1,9 +1,5 @@
 import { Note, Recipient } from '../store/types';
 
-/**
- * Generates a cryptographically random 252-bit BigInt using window.crypto.getRandomValues.
- * A 252-bit value fits safely inside the BN254 scalar field modulus without overflow.
- */
 export function generateSecret(): bigint {
   if (typeof window === 'undefined') {
     throw new Error('generateSecret requires browser context (window.crypto).');
@@ -15,17 +11,10 @@ export function generateSecret(): bigint {
     val = (val << BigInt(8)) | BigInt(byte);
   }
 
-  // Mask to 252 bits: (BigInt(1) << BigInt(252)) - BigInt(1)
   const mask = (BigInt(1) << BigInt(252)) - BigInt(1);
   return val & mask;
 }
 
-/**
- * Derives a 256-bit AES-GCM key from the wallet public key using PBKDF2.
- * Hackathon Compromise Notice: In production, notes should be encrypted with a key derived
- * from wallet signing (e.g. signMessage) rather than the public key itself (since the public
- * key is publicly known).
- */
 async function deriveKey(walletPublicKey: string): Promise<CryptoKey> {
   const encoder = new TextEncoder();
   const passwordBytes = encoder.encode(walletPublicKey);
@@ -54,9 +43,6 @@ async function deriveKey(walletPublicKey: string): Promise<CryptoKey> {
   );
 }
 
-/**
- * Encrypts a list of Notes using PBKDF2 key derivation and AES-256-GCM.
- */
 export async function encryptNotes(notes: Note[], walletPublicKey: string): Promise<string> {
   try {
     const plaintext = JSON.stringify(notes);
@@ -71,7 +57,6 @@ export async function encryptNotes(notes: Note[], walletPublicKey: string): Prom
       encodedPlaintext
     );
 
-    // Combine IV and Ciphertext: [12-bytes IV][ciphertext...]
     const combined = new Uint8Array(iv.length + ciphertext.byteLength);
     combined.set(iv, 0);
     combined.set(new Uint8Array(ciphertext), iv.length);
@@ -88,9 +73,6 @@ export async function encryptNotes(notes: Note[], walletPublicKey: string): Prom
   }
 }
 
-/**
- * Decrypts a list of Notes using PBKDF2 key derivation and AES-256-GCM.
- */
 export async function decryptNotes(encrypted: string, walletPublicKey: string): Promise<Note[]> {
   try {
     const key = await deriveKey(walletPublicKey);
@@ -118,9 +100,6 @@ export async function decryptNotes(encrypted: string, walletPublicKey: string): 
   }
 }
 
-/**
- * Encrypts a list of Recipients using PBKDF2 key derivation and AES-256-GCM.
- */
 export async function encryptRecipients(recipients: Recipient[], walletPublicKey: string): Promise<string> {
   try {
     const plaintext = JSON.stringify(recipients);
@@ -135,7 +114,6 @@ export async function encryptRecipients(recipients: Recipient[], walletPublicKey
       encodedPlaintext
     );
 
-    // Combine IV and Ciphertext: [12-bytes IV][ciphertext...]
     const combined = new Uint8Array(iv.length + ciphertext.byteLength);
     combined.set(iv, 0);
     combined.set(new Uint8Array(ciphertext), iv.length);
@@ -152,9 +130,6 @@ export async function encryptRecipients(recipients: Recipient[], walletPublicKey
   }
 }
 
-/**
- * Decrypts a list of Recipients using PBKDF2 key derivation and AES-256-GCM.
- */
 export async function decryptRecipients(encrypted: string, walletPublicKey: string): Promise<Recipient[]> {
   try {
     const key = await deriveKey(walletPublicKey);

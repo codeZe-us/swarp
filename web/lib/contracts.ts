@@ -22,7 +22,7 @@ export function getConfig() {
 }
 import { signTransaction as walletSignTransaction } from './stellar';
 
-// Custom error classes for clear categorization
+
 export class SorobanNetworkError extends Error {
   constructor(message: string, public cause?: any) {
     super(message);
@@ -44,7 +44,7 @@ export class SorobanTransactionError extends Error {
   }
 }
 
-// Retry logic: 1 retry after 2 seconds delay
+
 export async function withRetry<T>(
   fn: () => Promise<T>,
   retries = 1,
@@ -62,7 +62,7 @@ export async function withRetry<T>(
   }
 }
 
-// Parse contract & token error logs/codes to user-friendly messages
+
 export function parseSorobanError(error: any): string {
   if (!error) return 'Unknown error occurred.';
 
@@ -70,10 +70,10 @@ export function parseSorobanError(error: any): string {
     ? error
     : error?.message || error?.error || JSON.stringify(error);
 
-  // ZendSwap specific ContractError mapping (defined in contracts/zendswap-pool/src/lib.rs)
-  // if (errorStr.includes('Contract, #1') || errorStr.includes('Error(Contract, #1)')) {
-  //   return 'The ZendSwap pool is not initialized.';
-  // }
+  
+  
+  
+  
   if (errorStr.includes('Contract, #2') || errorStr.includes('Error(Contract, #2)')) {
     return 'The ZendSwap pool is already initialized.';
   }
@@ -102,7 +102,7 @@ export function parseSorobanError(error: any): string {
     return 'Invalid rate (numerator/denominator must be positive and denominator exactly 10,000,000).';
   }
 
-  // Parse common token SAC errors
+  
   if (
     errorStr.toLowerCase().includes('insufficient balance') ||
     errorStr.includes('Error(Token, #1)') ||
@@ -125,14 +125,12 @@ export function parseSorobanError(error: any): string {
 import { Keypair } from '@stellar/stellar-sdk';
 
 function getDummyAccount(): Account {
-  // Use a randomly generated valid public key for simulation to satisfy strict checksum validation
+  
   const dummyPublicKey = Keypair.random().publicKey();
   return new Account(dummyPublicKey, '0');
 }
 
-/**
- * Read-only getters
- */
+
 
 export async function getPoolInfo(poolContractIdOverride?: string): Promise<{
   usdcReserve: bigint;
@@ -351,9 +349,7 @@ export async function getReserves(poolContractIdOverride?: string): Promise<bigi
   return reservesVal.map((r: any) => typeof r === 'bigint' ? r : BigInt(r ?? 0));
 }
 
-/**
- * Write transaction submission functions
- */
+
 
 export async function submitDeposit(
   depositor: string,
@@ -363,7 +359,7 @@ export async function submitDeposit(
 ): Promise<{ txHash: string; leafIndex: number }> {
   const { POOL_CONTRACT_ID, SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
 
-  // 1. Inputs validation
+  
   if (!depositor || !StrKey.isValidEd25519PublicKey(depositor)) {
     throw new Error('Invalid depositor address.');
   }
@@ -380,7 +376,7 @@ export async function submitDeposit(
 
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
 
-  // 2. Fetch active source account context (including sequence number)
+  
   let account;
   try {
     account = await withRetry(() => rpcServer.getAccount(depositor));
@@ -388,7 +384,7 @@ export async function submitDeposit(
     throw new SorobanNetworkError('Failed to fetch depositor account details from RPC.', error);
   }
 
-  // 3. Build base transaction
+  
   const contract = new Contract(POOL_CONTRACT_ID);
   const depositorVal = new Address(depositor).toScVal();
   const assetIdVal = nativeToScVal(assetId, { type: 'u64' });
@@ -401,10 +397,10 @@ export async function submitDeposit(
     networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
   })
     .addOperation(contract.call('deposit', depositorVal, assetIdVal, amountVal, commitmentVal))
-    .setTimeout(30) // timeout: 30 seconds
+    .setTimeout(30) 
     .build();
 
-  // 4. Simulate Transaction
+  
   let simulation;
   try {
     simulation = await withRetry(() => rpcServer.simulateTransaction(transaction));
@@ -417,14 +413,14 @@ export async function submitDeposit(
     throw new SorobanSimulationError(errorMsg, simulation.error);
   }
 
-  // 5. Assemble transaction details using simulated footprint and fee settings
+  
   try {
     transaction = rpc.assembleTransaction(transaction, simulation).build();
   } catch (error) {
     throw new SorobanSimulationError('Failed to assemble transaction resources from simulation.', error);
   }
 
-  // 6. Sign transaction via the Freighter/kit extension
+  
   const xdrString = transaction.toXDR();
   let signedXdr;
   try {
@@ -433,8 +429,8 @@ export async function submitDeposit(
     throw new Error(`Transaction signature rejected: ${error.message || error}`);
   }
 
-  // 7. Submit transaction
-  // 7. Submit transaction
+  
+  
   const signedTx = TransactionBuilder.fromXDR(signedXdr, STELLAR_NETWORK_PASSPHRASE) as Transaction;
   let response;
   try {
@@ -447,7 +443,7 @@ export async function submitDeposit(
     throw new SorobanTransactionError('Transaction submission failed.', response.hash, response);
   }
 
-  // Poll for transaction confirmation
+  
   let txStatus;
   let attempts = 0;
   while (attempts < 20) {
@@ -492,14 +488,14 @@ export async function submitDeposit(
     throw new SorobanTransactionError(`Transaction failed with status: ${txStatus?.status}`, response.hash, txStatus);
   }
 
-  // Extract leafIndex from deposit event emitted by the contract
+  
   let leafIndex = 0;
   try {
-    // txStatus.resultMetaXdr contains the transaction result metadata including contract events
+    
     const resultMeta = txStatus?.resultMetaXdr;
     if (resultMeta) {
-      // The deposit event contains { commitment, leaf_index, token }
-      // Parse events from transaction meta to get the leaf_index
+      
+      
       const rawEvents = (txStatus as any)?.events;
       const events = Array.isArray(rawEvents) ? rawEvents : (rawEvents ? [rawEvents] : []);
       for (const evt of events) {
@@ -512,11 +508,11 @@ export async function submitDeposit(
             break;
           }
         } catch (_) {
-          // skip unparseable events
+          
         }
       }
     }
-    // If not found in events, try to get the leaf count from chain minus 1
+    
     if (leafIndex === 0) {
       try {
         leafIndex = await getLeafCount() - 1;
@@ -538,7 +534,7 @@ export async function submitPayment(
   tokenContractId: string,
   amount: bigint | string | number
 ): Promise<{ txHash: string }> {
-  // 1. Inputs validation
+  
   if (!sender || !StrKey.isValidEd25519PublicKey(sender)) {
     throw new Error('Invalid sender address.');
   }
@@ -553,7 +549,7 @@ export async function submitPayment(
   const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE } = getConfig();
   const rpcServer = new rpc.Server(SOROBAN_RPC_URL);
 
-  // 2. Fetch active source account context (including sequence number)
+  
   let account;
   try {
     account = await withRetry(() => rpcServer.getAccount(sender));
@@ -561,7 +557,7 @@ export async function submitPayment(
     throw new SorobanNetworkError('Failed to fetch sender account details from RPC.', error);
   }
 
-  // 3. Build base transaction
+  
   const contract = new Contract(tokenContractId);
   const senderVal = new Address(sender).toScVal();
   const recipientVal = new Address(recipient).toScVal();
@@ -572,10 +568,10 @@ export async function submitPayment(
     networkPassphrase: STELLAR_NETWORK_PASSPHRASE,
   })
     .addOperation(contract.call('transfer', senderVal, recipientVal, amountVal))
-    .setTimeout(30) // timeout: 30 seconds
+    .setTimeout(30) 
     .build();
 
-  // 4. Simulate Transaction
+  
   let simulation;
   try {
     simulation = await withRetry(() => rpcServer.simulateTransaction(transaction));
@@ -588,14 +584,14 @@ export async function submitPayment(
     throw new SorobanSimulationError(errorMsg, simulation.error);
   }
 
-  // 5. Assemble transaction details using simulated footprint and fee settings
+  
   try {
     transaction = rpc.assembleTransaction(transaction, simulation).build();
   } catch (error) {
     throw new SorobanSimulationError('Failed to assemble transaction resources from simulation.', error);
   }
 
-  // 6. Sign transaction via the Freighter/kit extension
+  
   const xdrString = transaction.toXDR();
   let signedXdr;
   try {
@@ -604,7 +600,7 @@ export async function submitPayment(
     throw new Error(`Transaction signature rejected: ${error.message || error}`);
   }
 
-  // 7. Submit transaction
+  
   const signedTx = TransactionBuilder.fromXDR(signedXdr, STELLAR_NETWORK_PASSPHRASE) as Transaction;
   let response;
   try {
@@ -618,10 +614,10 @@ export async function submitPayment(
     throw new SorobanTransactionError(errorMsg, response.hash, response.errorResult);
   }
 
-  // 8. Poll for confirmation status
+  
   let getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
   let attempts = 0;
-  const maxAttempts = 30; // 30 seconds polling timeout
+  const maxAttempts = 30; 
   while (getResponse.status === 'NOT_FOUND' && attempts < maxAttempts) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     getResponse = await withRetry(() => rpcServer.getTransaction(response.hash));
@@ -644,14 +640,14 @@ export async function submitPayment(
   throw new SorobanTransactionError(`Transaction status: ${getResponse.status}`, response.hash);
 }
 
-// --- Helper to execute a transaction lifecycle ---
+
 async function executeTransaction(
   rpcServer: any,
   transaction: any,
   bumpFee: number = 0
 ): Promise<{ txHash: string }> {
-  // 1. Simulate
-  let simulation;
+  
+  let simulation: any;
   try {
     simulation = await withRetry(() => rpcServer.simulateTransaction(transaction, { cpuInstructions: 200_000_000 }));
   } catch (error) {
@@ -663,7 +659,7 @@ async function executeTransaction(
     throw new SorobanSimulationError(errorMsg, simulation.error);
   }
 
-  // 2. Assemble
+  
   try {
     transaction = rpc.assembleTransaction(transaction, simulation).build();
     if (bumpFee > 0) {
@@ -674,7 +670,7 @@ async function executeTransaction(
     throw new SorobanSimulationError('Failed to assemble transaction resources from simulation.', error);
   }
 
-  // 3. Sign
+  
   const xdrString = transaction.toXDR();
   let signedXdr;
   try {
@@ -683,10 +679,10 @@ async function executeTransaction(
     throw new Error(`Transaction signature rejected: ${error.message || error}`);
   }
 
-  // 4. Submit
+  
   const { STELLAR_NETWORK_PASSPHRASE } = getConfig();
   const signedTx = TransactionBuilder.fromXDR(signedXdr, STELLAR_NETWORK_PASSPHRASE) as Transaction;
-  let response;
+  let response: any;
   try {
     response = await withRetry(() => rpcServer.sendTransaction(signedTx));
   } catch (error) {
@@ -698,7 +694,7 @@ async function executeTransaction(
     throw new SorobanTransactionError(errorMsg, response.hash, response.errorResult);
   }
 
-  // 5. Wait
+  
   let getResponse: any;
   let attempts = 0;
   while (attempts < 60) {
@@ -766,9 +762,9 @@ export async function submitVerifyWithdrawal(
 
   const contract = new Contract(POOL_CONTRACT_ID);
   
-  // Create ScVals according to contract signature:
-  // caller: Address, proof: Bytes, nullifier_hash: BytesN<32>, merkle_root: BytesN<32>, 
-  // asset_out: u32, exchange_rate: u64, rate_denominator: u64, withdrawal_amount: i128, asset_in: u32
+  
+  
+  
   const callerVal = new Address(caller).toScVal();
   const proofVal = nativeToScVal(Buffer.from(proof, 'hex'));
   const nullifierVal = xdr.ScVal.scvBytes(Buffer.from(nullifier, 'hex'));
@@ -887,13 +883,11 @@ export async function getTokenBalance(
   }
 }
 
-/**
- * Hackathon Faucet / Fund logic
- */
+
 export async function fundTestnetAsset(recipientAddress: string, assetCode: string, amount: string = '200') {
   const { SOROBAN_RPC_URL, STELLAR_NETWORK_PASSPHRASE, STELLAR_HORIZON_URL } = getConfig();
   
-  // Resolve issuer secret and address dynamically based on assetCode
+  
   const envSecretKey = `NEXT_PUBLIC_${assetCode.toUpperCase()}_ISSUER_SECRET`;
   const envAddressKey = `NEXT_PUBLIC_${assetCode.toUpperCase()}_ISSUER_ADDRESS`;
   

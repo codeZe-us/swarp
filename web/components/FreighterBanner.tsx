@@ -7,7 +7,7 @@ export function FreighterBanner() {
   const [isFreighterMissing, setIsFreighterMissing] = useState(false);
 
   useEffect(() => {
-    // Small delay to allow extension injection
+    
     const timer = setTimeout(async () => {
       try {
         const result = await isConnected();

@@ -2,7 +2,7 @@
 use soroban_poseidon::poseidon_hash;
 use soroban_sdk::{crypto::bn254::Bn254Fr, vec, Bytes, Env, U256};
 
-// Helper function to create U256 from a 32-byte array representing big-endian bytes
+
 fn u256_from_bytes(env: &Env, bytes_arr: [u8; 32]) -> U256 {
     let bytes = Bytes::from_array(env, &bytes_arr);
     U256::from_be_bytes(env, &bytes)
@@ -13,10 +13,10 @@ fn test_poseidon_parity() {
     let env = Env::default();
 
     let in_1 = vec![&env, U256::from_u32(&env, 1)];
-    // T = 2, representing (rate = 1, capacity = 1)
+    
     let res_1 = poseidon_hash::<2, Bn254Fr>(&env, &in_1);
 
-    // Expected output from JS: 0x29176100eaa962bdc1fe6c654d6a3c130e96a4d1168b33848b897dc502820133
+    
     let expected_1 = u256_from_bytes(
         &env,
         [
@@ -28,10 +28,10 @@ fn test_poseidon_parity() {
     assert_eq!(res_1, expected_1, "Single input hash mismatch");
 
     let in_2 = vec![&env, U256::from_u32(&env, 1), U256::from_u32(&env, 2)];
-    // T = 3, representing (rate = 2, capacity = 1)
+    
     let res_2 = poseidon_hash::<3, Bn254Fr>(&env, &in_2);
 
-    // Expected output from JS: 0x115cc0f5e7d690413df64c6b9662e9cf2a3617f2743245519e19607a4417189a
+    
     let expected_2 = u256_from_bytes(
         &env,
         [
@@ -48,10 +48,10 @@ fn test_poseidon_parity() {
         U256::from_u32(&env, 2),
         U256::from_u32(&env, 3),
     ];
-    // T = 4, representing (rate = 3, capacity = 1)
+    
     let res_3 = poseidon_hash::<4, Bn254Fr>(&env, &in_3);
 
-    // Expected output from JS: 0x0e7732d89e6939c0ff03d5e58dab6302f3230e269dc5b968f725df34ab36d732
+    
     let expected_3 = u256_from_bytes(
         &env,
         [
@@ -69,10 +69,10 @@ fn test_poseidon_parity() {
         U256::from_u32(&env, 3),
         U256::from_u32(&env, 4),
     ];
-    // T = 5, representing (rate = 4, capacity = 1)
+    
     let res_4 = poseidon_hash::<5, Bn254Fr>(&env, &in_4);
 
-    // Expected output from JS: 0x299c867db6c1fdd79dcefa40e4510b9837e60ebb1ce0663dbaa525df65250465
+    
     let expected_4 = u256_from_bytes(
         &env,
         [
@@ -92,7 +92,7 @@ fn test_poseidon_parity() {
         ],
     );
 
-    // MGUSD commitment [500, 2, secret]
+    
     let in_mgusd = vec![
         &env,
         U256::from_u32(&env, 500),
@@ -110,7 +110,7 @@ fn test_poseidon_parity() {
     );
     assert_eq!(res_mgusd, expected_mgusd, "MGUSD commitment mismatch");
 
-    // YLDS commitment [500, 3, secret]
+    
     let in_ylds = vec![
         &env,
         U256::from_u32(&env, 500),
@@ -128,7 +128,7 @@ fn test_poseidon_parity() {
     );
     assert_eq!(res_ylds, expected_ylds, "YLDS commitment mismatch");
 
-    // XLM commitment [500, 4, secret]
+    
     let in_xlm = vec![
         &env,
         U256::from_u32(&env, 500),
@@ -146,7 +146,7 @@ fn test_poseidon_parity() {
     );
     assert_eq!(res_xlm, expected_xlm, "XLM commitment mismatch");
 
-    // MGUSD nullifier [c2, secret]
+    
     let in_n2 = vec![&env, expected_mgusd.clone(), secret.clone()];
     let res_n2 = poseidon_hash::<3, Bn254Fr>(&env, &in_n2);
     let expected_n2 = u256_from_bytes(
@@ -159,7 +159,7 @@ fn test_poseidon_parity() {
     );
     assert_eq!(res_n2, expected_n2, "MGUSD nullifier mismatch");
 
-    // XLM nullifier [c4, secret]
+    
     let in_n4 = vec![&env, expected_xlm.clone(), secret.clone()];
     let res_n4 = poseidon_hash::<3, Bn254Fr>(&env, &in_n4);
     let expected_n4 = u256_from_bytes(
@@ -175,7 +175,7 @@ fn test_poseidon_parity() {
     let in_zero = vec![&env, U256::from_u32(&env, 0)];
     let res_zero = poseidon_hash::<2, Bn254Fr>(&env, &in_zero);
 
-    // Expected output from JS: 0x2a09a9fd93c590c26b91effbb2499f07e8f7aa12e2b4940a3aed2411cb65e11c
+    
     let expected_zero = u256_from_bytes(
         &env,
         [
@@ -193,7 +193,7 @@ fn test_poseidon_parity() {
     let in_max_64 = vec![&env, U256::from_u128(&env, 18446744073709551615)];
     let res_max_64 = poseidon_hash::<2, Bn254Fr>(&env, &in_max_64);
 
-    // Expected output from JS: 0x2693f54c370d174aae1942f40015c61862f0ed7022bcb6dd59ccc70d631f9055
+    
     let expected_max_64 = u256_from_bytes(
         &env,
         [

@@ -1,13 +1,3 @@
-/**
- * web/workers/prover.worker.ts
- *
- * Browser Web Worker: ZendSwap UltraHonk prover.
- *
- * ALL Noir/BB.js imports are DYNAMIC (inside onmessage) — NOT static imports
- * at the top. Static imports get bundled by Webpack which corrupts the CJS
- * module environment. Dynamic imports run at runtime inside the worker scope,
- * bypassing Webpack's module wrapping entirely.
- */
 
 export interface SwapProverInput {
   deposit_amount:    string;
@@ -46,11 +36,6 @@ self.onmessage = async (event: MessageEvent<ProverWorkerMessage>) => {
   console.log('Worker received inputs:', JSON.stringify(input, null, 2));
 
   try {
-    // ----------------------------------------------------------------
-    // DYNAMIC IMPORTS — must stay inside onmessage, not at module top!
-    // Static imports are bundled by Webpack which breaks CJS init.
-    // Dynamic imports run at runtime in the worker scope, bypassing it.
-    // ----------------------------------------------------------------
     (self as any).postMessage({ type: 'loading' } as ProverWorkerMessage);
 
     const [{ Noir }, { UltraHonkBackend }] = await Promise.all([

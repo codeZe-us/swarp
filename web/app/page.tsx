@@ -18,7 +18,7 @@ export default function Home() {
   const [selectedTxHash, setSelectedTxHash] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  // Zustand Store variables
+  
   const address = useStore((state) => state.address);
   const status = useStore((state) => state.status);
   const connect = useStore((state) => state.connect);
@@ -30,11 +30,11 @@ export default function Home() {
 
   const isConnected = status === 'connected';
 
-  // Balances state
+  
   const [balances, setBalances] = useState({ USDC: 0, EURC: 0, MGUSD: 0, YLDS: 0, XLM: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch balances and pool state on connection
+  
   useEffect(() => {
     if (isConnected && address) {
       setIsLoading(true);
@@ -84,13 +84,13 @@ export default function Home() {
 
   const activeNotes = useMemo(() => notes.filter((n) => n.status === 'deposited'), [notes]);
   
-  // Calculate shielded pool totals
+  
   const shieldedPoolValue = useMemo(() => {
     return activeNotes.reduce((sum, note) => {
       const val = Number(note.amount) / 10_000_000;
       if (note.asset === 'EURC') return sum + val / decimalRate;
       if (note.asset === 'XLM') return sum + val * 0.08;
-      return sum + val; // treating MGUSD, USDC, YLDS as 1:1 for display pool value
+      return sum + val; 
     }, 0);
   }, [activeNotes, decimalRate]);
 
@@ -122,7 +122,7 @@ export default function Home() {
     });
   }, [sortedTransactions, filter]);
 
-  // Chart Points
+  
   const chartPoints = useMemo(() => {
     if (!isConnected || sortedTransactions.length === 0) {
       return totalValue > 0 ? `M 0,100 C 200,90 400,60 600,40` : 'M 0,100 L 600,100';
@@ -174,7 +174,7 @@ export default function Home() {
 
       <div className="flex flex-col gap-6">
         
-        {/* Row 1: Portfolio Value & Balances */}
+        {}
           <div className="bg-[#141419] border border-white/5 rounded-xl flex flex-col md:flex-row overflow-hidden">
             <div className="p-6 md:p-8 flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">PORTFOLIO VALUE</span>
@@ -264,7 +264,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Row 2: Shielded Pool */}
+        {}
         <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
           <div className="flex items-start justify-between mb-8">
             <div>
@@ -326,7 +326,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Row 3: Portfolio Chart */}
+        {}
         <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-[15px] font-bold text-white">Portfolio</h3>
@@ -353,7 +353,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Row 4: Transactions */}
+        {}
         <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-[15px] font-bold text-white">Transactions</h3>

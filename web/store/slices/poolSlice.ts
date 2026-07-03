@@ -44,9 +44,9 @@ export const createPoolSlice: StateCreator<
         } catch (e) {
           console.warn('Failed to fetch get_reserves()', e);
         }
-        
-        const poolState = {
-          merkleRoot: poolInfo.currentRoot, // plain 64-char hex, no 0x prefix
+
+                const poolState = {
+          merkleRoot: poolInfo.currentRoot, 
           exchangeRate: { 
             numerator: poolInfo.currentRate, 
             denominator: poolInfo.rateDenominator 
@@ -63,8 +63,6 @@ export const createPoolSlice: StateCreator<
       }
     },
     fetchCommitments: async () => {
-      // In a real implementation this would query the contract or an indexer for the commitments
-      // For now, we just clear it out since there are no actual deposits yet
       set({ commitments: [] });
     },
   };

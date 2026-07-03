@@ -20,18 +20,18 @@ export async function encryptNotes(address: string, notes: Note[]): Promise<stri
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const encoder = new TextEncoder();
     const encodedPlaintext = encoder.encode(plaintext);
-    
-    const ciphertext = await crypto.subtle.encrypt(
+
+        const ciphertext = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv },
       key,
       encodedPlaintext
     );
-    
-    const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+
+        const combined = new Uint8Array(iv.length + ciphertext.byteLength);
     combined.set(iv, 0);
     combined.set(new Uint8Array(ciphertext), iv.length);
-    
-    let binary = '';
+
+        let binary = '';
     const len = combined.byteLength;
     for (let i = 0; i < len; i++) {
       binary += String.fromCharCode(combined[i]);
@@ -51,17 +51,17 @@ export async function decryptNotes(address: string, base64Ciphertext: string): P
     for (let i = 0; i < binary.length; i++) {
       combined[i] = binary.charCodeAt(i);
     }
-    
-    const iv = combined.slice(0, 12);
+
+        const iv = combined.slice(0, 12);
     const ciphertext = combined.slice(12);
-    
-    const decrypted = await crypto.subtle.decrypt(
+
+        const decrypted = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },
       key,
       ciphertext
     );
-    
-    const decoder = new TextDecoder();
+
+        const decoder = new TextDecoder();
     const plaintext = decoder.decode(decrypted);
     return JSON.parse(plaintext) as Note[];
   } catch (err) {

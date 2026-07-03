@@ -28,7 +28,7 @@ pub enum Error {
     InvalidRate = 10,
 }
 
-// 2^63 - 1: upper bound matching the circuit's 64-bit range proof.
+
 const MAX_DEPOSIT_AMOUNT: i128 = i64::MAX as i128;
 
 const TREE_DEPTH: u32 = 20;
@@ -48,9 +48,9 @@ pub enum DataKey {
     RecentRoots,
     CurrentRoot,
     FilledSubtrees,
-    TokenRegistry(u64),    // asset_id -> Address
-    RateTable(u64, u64),   // (asset_in_id, asset_out_id) -> (u64, u64)
-    RecentRates(u64, u64), // (asset_in_id, asset_out_id) -> Vec<u64>
+    TokenRegistry(u64),    
+    RateTable(u64, u64),   
+    RecentRates(u64, u64), 
     PendingWithdrawal(BytesN<32>),
 }
 
@@ -63,8 +63,8 @@ pub struct PendingWithdrawalRecord {
     pub timestamp: u64,
 }
 
-// Amount is excluded from the event intentionally: the token transfer is already
-// on-chain, but omitting it here avoids making correlation across event feeds easier.
+
+
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct DepositEvent {
@@ -116,7 +116,7 @@ fn bytes_to_u256(env: &Env, b: &BytesN<32>) -> U256 {
     U256::from_be_bytes(env, &bytes)
 }
 
-// zeros[0] = Poseidon2([0]), zeros[i] = Poseidon2([zeros[i-1], zeros[i-1]])
+
 fn get_zeros_bytes(env: &Env) -> Vec<BytesN<32>> {
     let mut zeros: Vec<BytesN<32>> = Vec::new(env);
     let mut inputs = Vec::new(env);
@@ -185,7 +185,7 @@ impl ZendSwapPool {
                 .set(&DataKey::TokenRegistry(i as u64), &asset);
         }
 
-        // Initialize pairs with default rates (for testing/simplicity)
+        
         for i in 0..assets.len() {
             for j in 0..assets.len() {
                 if i != j {
@@ -236,7 +236,7 @@ impl ZendSwapPool {
         do_insert_leaf(&env, commitment)
     }
 
-    #[allow(deprecated)] // events().publish() deprecated; emit() not yet in soroban-sdk v26.
+    #[allow(deprecated)] 
     pub fn deposit(
         env: Env,
         depositor: Address,
@@ -400,7 +400,7 @@ impl ZendSwapPool {
             &recent_rates,
         );
 
-        // Optional: you could update RateUpdateEvent to include asset IDs, but we'll leave it as is for simplicity if the frontend relies on the old structure.
+        
 
         Ok(())
     }
@@ -445,7 +445,7 @@ impl ZendSwapPool {
         let usdc_reserve = reserves.get(0).unwrap_or(0);
         let eurc_reserve = reserves.get(1).unwrap_or(0);
 
-        let current_rate = 0; // Deprecated in PoolInfo but kept for struct compatibility, or maybe just read 0-1 pair.
+        let current_rate = 0; 
         let rate_denominator = 10000000;
         let total_deposits = Self::get_leaf_count(env.clone());
         let current_root = Self::get_root(env.clone());
@@ -461,7 +461,7 @@ impl ZendSwapPool {
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[allow(deprecated)] // events().publish() deprecated; emit() not yet in soroban-sdk v26.
+    #[allow(deprecated)] 
     pub fn withdraw(
         env: Env,
         recipient: Address,
@@ -532,13 +532,13 @@ impl ZendSwapPool {
         let verifier: Address = env.storage().instance().get(&DataKey::Verifier).unwrap();
 
         for rate in unique_rates.iter() {
-            // New Noir Public Inputs order:
-            // 1. asset_in
-            // 2. exchange_rate
-            // 3. rate_denominator
-            // 4. nullifier_hash
-            // 5. asset_out_public
-            // 6. merkle_root
+            
+            
+            
+            
+            
+            
+            
             let mut public_inputs = Vec::new(&env);
             public_inputs.push_back(u64_to_bytes32(&env, asset_in_id));
             public_inputs.push_back(u64_to_bytes32(&env, rate));
@@ -565,7 +565,7 @@ impl ZendSwapPool {
             return Err(Error::VerificationFailed);
         }
 
-        // spent set update (effects first to prevent reentrancy)
+        
         env.storage().persistent().set(&nullifier_key, &true);
         env.storage()
             .persistent()
@@ -706,7 +706,7 @@ impl ZendSwapPool {
         let pending_key = DataKey::PendingWithdrawal(nullifier_hash.clone());
         let record: PendingWithdrawalRecord = match env.storage().temporary().get(&pending_key) {
             Some(r) => r,
-            None => return Err(Error::VerificationFailed), // Or a specific error
+            None => return Err(Error::VerificationFailed), 
         };
 
         if record.recipient != recipient {
@@ -731,6 +731,7 @@ impl ZendSwapPool {
 
         env.storage().temporary().remove(&pending_key);
 
+        #[allow(deprecated)]
         env.events()
             .publish((Symbol::new(&env, "withdraw"),), nullifier_hash);
 
@@ -738,8 +739,8 @@ impl ZendSwapPool {
     }
 }
 
-// Frontier algorithm: update exactly TREE_DEPTH nodes along the insertion path.
-// filled[i] holds the last completed left-sibling at level i.
+
+
 fn do_insert_leaf(env: &Env, commitment: BytesN<32>) -> (u32, BytesN<32>) {
     let leaf_index: u32 = env
         .storage()
@@ -808,8 +809,8 @@ fn do_insert_leaf(env: &Env, commitment: BytesN<32>) -> (u32, BytesN<32>) {
     (leaf_index, new_root)
 }
 
-// Not a contract entry-point: full tree iteration exceeds Soroban's instruction budget.
-// Test-only native call.
+
+
 #[cfg(test)]
 #[allow(clippy::ptr_arg)]
 fn compute_root_from_leaves(env: &Env, leaves: &alloc::vec::Vec<BytesN<32>>) -> BytesN<32> {
@@ -906,7 +907,7 @@ mod tests {
         (client, usdc_addr, eurc_addr, depositor, contract_id)
     }
 
-    // Small BN254-safe commitment value (fits within field modulus).
+    
     fn commitment(env: &Env, val: u32) -> BytesN<32> {
         let mut bytes = [0u8; 32];
         bytes[28..32].copy_from_slice(&val.to_be_bytes());
@@ -1010,7 +1011,7 @@ mod tests {
         env.budget().reset_unlimited();
         let (client, _, _, _) = setup_pool(&env);
 
-        // Values must be < BN254 field modulus.
+        
         let commitment_a = BytesN::from_array(
             &env,
             &[
@@ -1101,7 +1102,7 @@ mod tests {
         let commitment = BytesN::from_array(&env, &leaf_bytes);
         let (_, new_root) = client.insert_leaf(&commitment);
 
-        // leaf_index=0 → all levels are left-child, so we hash with the zero subtree on the right.
+        
         let zeros = get_zeros_bytes(&env);
         let mut current = commitment;
         for level in 0..TREE_DEPTH {
@@ -1191,7 +1192,7 @@ mod tests {
         env.mock_all_auths();
         let (client, _usdc_addr, _, depositor, _) = setup_pool_with_sac(&env);
         client.deposit(&depositor, &0u64, &100, &commitment(&env, 99));
-        // Verify depositor.require_auth() was invoked.
+        
         assert!(env.auths().iter().any(|(addr, _)| addr == &depositor));
     }
 

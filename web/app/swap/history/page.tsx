@@ -10,7 +10,7 @@ import { generateDisclosure } from '../../../lib/disclosure';
 import { ASSETS, getAssetByCode } from '../../../lib/assets';
 
 export default function SwapHistoryPage() {
-  // Zustand Store variables
+  
   const address = useStore((state) => state.address);
   const status = useStore((state) => state.status);
   const notes = useStore((state) => state.notes);
@@ -19,29 +19,29 @@ export default function SwapHistoryPage() {
 
   const isConnected = status === 'connected';
 
-  // Filters State
+  
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
   const [directionFilter, setDirectionFilter] = useState<'all' | 'usdc_eurc' | 'eurc_usdc'>('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-  // Disclosure State
+  
   const [disclosingSwapId, setDisclosingSwapId] = useState<string | null>(null);
   const [disclosureTargetKey, setDisclosureTargetKey] = useState('');
   const [disclosurePayloadStr, setDisclosurePayloadStr] = useState<string | null>(null);
 
-  // Pagination State
+  
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  // File upload input reference
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Rate information
+  
   const rateNum = exchangeRate?.numerator || 9200000;
   const rateDen = exchangeRate?.denominator || 10000000;
   const decimalRate = rateNum / rateDen;
 
-  // 1. Export Notes Handler (saves JSON backup client-side)
+  
   const handleExportNotes = () => {
     if (!address) return;
     const encryptedBlob = localStorage.getItem(`swarp_notes_${address}`);
@@ -66,7 +66,7 @@ export default function SwapHistoryPage() {
     downloadAnchor.remove();
   };
 
-  // 2. Import Notes Handler (validates, decrypts, and merges notes)
+  
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -78,7 +78,7 @@ export default function SwapHistoryPage() {
         const content = event.target?.result as string;
         const data = JSON.parse(content);
 
-        // Validate structure
+        
         if (!data || typeof data.ciphertext !== 'string' || typeof data.address !== 'string') {
           alert('Import Failed: Malformed file structure. The uploaded backup is not a valid ZendSwap notes backup.');
           return;
@@ -90,23 +90,23 @@ export default function SwapHistoryPage() {
           return;
         }
 
-        // Validate wallet matches
+        
         if (data.address !== currentAddress) {
           alert(`Import Failed: This backup file belongs to wallet (${data.address.slice(0, 8)}...). Please connect the correct wallet first.`);
           return;
         }
 
-        // Decrypt notes using PBKDF2/AES-GCM key derived from address
+        
         const decryptedNotes = await decryptNotes(data.ciphertext, currentAddress);
         if (!Array.isArray(decryptedNotes)) {
           throw new Error('Invalid notes structure.');
         }
 
-        // Merge notes (deduplicating by commitment hash)
+        
         await mergeNotes(decryptedNotes);
         alert(`Successfully imported and merged ${decryptedNotes.length} notes!`);
         
-        // Reset file input
+        
         if (fileInputRef.current) fileInputRef.current.value = '';
       } catch (err) {
         console.error('Import notes failed:', err);
@@ -116,14 +116,14 @@ export default function SwapHistoryPage() {
     reader.readAsText(file);
   };
 
-  // Warning calculations: find unwithdrawn notes older than 7 days
+  
   const warningNotes = useMemo(() => {
     if (!isConnected) return [];
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     return notes.filter((n) => n.status === 'deposited' && n.createdAt < sevenDaysAgo);
   }, [notes, isConnected]);
 
-  // List of all notes parsed into a "Swap Pair" list for history display
+  
   const swapHistoryList = useMemo(() => {
     if (!isConnected) return [];
 
@@ -150,33 +150,33 @@ export default function SwapHistoryPage() {
     });
   }, [notes, isConnected, decimalRate]);
 
-  // Filter history
+  
   const filteredHistory = useMemo(() => {
     return swapHistoryList
       .filter((swap) => {
-        // Status filter
+        
         if (statusFilter !== 'all' && swap.status !== statusFilter) return false;
 
-        // Direction filter
+        
         if (directionFilter !== 'all' && swap.direction !== directionFilter) return false;
 
-        // Date range filter
+        
         if (dateRange.start) {
           const startTime = new Date(dateRange.start).getTime();
           if (swap.date < startTime) return false;
         }
         if (dateRange.end) {
-          // Add 23h59m to include whole day
+          
           const endTime = new Date(dateRange.end).getTime() + 24 * 60 * 60 * 1000;
           if (swap.date > endTime) return false;
         }
 
         return true;
       })
-      .sort((a, b) => b.date - a.date); // Sort by date, newest first
+      .sort((a, b) => b.date - a.date); 
   }, [swapHistoryList, statusFilter, directionFilter, dateRange]);
 
-  // Paginated subset
+  
   const paginatedHistory = useMemo(() => {
     const startIdx = (currentPage - 1) * itemsPerPage;
     return filteredHistory.slice(startIdx, startIdx + itemsPerPage);
@@ -208,7 +208,7 @@ export default function SwapHistoryPage() {
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto font-sans">
       
-      {/* Header Row */}
+      {}
       <div className="flex items-center justify-between">
         <div>
           <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">History</span>
@@ -223,14 +223,14 @@ export default function SwapHistoryPage() {
         </Link>
       </div>
 
-      {/* Connection warning banner */}
+      {}
       {!isConnected && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-[12px] p-6 text-center text-xs text-mutedText font-semibold flex flex-col items-center justify-center gap-2">
           <span>Connect your wallet to load swap history logs and note backup features.</span>
         </div>
       )}
 
-      {/* Safety warning banner for old pending notes */}
+      {}
       {isConnected && warningNotes.length > 0 && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-[12px] p-4 flex items-start gap-3">
           <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -250,7 +250,7 @@ export default function SwapHistoryPage() {
       {isConnected && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
-          {/* Note Management Summary Card */}
+          {}
           <div className="md:col-span-1 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-5 flex flex-col justify-between min-h-[160px]">
             <div>
               <span className="text-[10px] text-mutedText uppercase font-bold tracking-wider font-display">
@@ -268,7 +268,7 @@ export default function SwapHistoryPage() {
             </p>
           </div>
 
-          {/* Note Export/Import Backup Card */}
+          {}
           <div className="md:col-span-2 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-5 flex flex-col justify-between min-h-[160px]">
             <div>
               <span className="text-[10px] text-mutedText uppercase font-bold tracking-wider font-display">
@@ -310,17 +310,17 @@ export default function SwapHistoryPage() {
         </div>
       )}
 
-      {/* History table and filters */}
+      {}
       {isConnected && (
         <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6 flex flex-col gap-6">
           
-          {/* Filters Bar */}
+          {}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#1D1D1F] pb-5">
             <h2 className="text-md font-bold text-white font-display">Swaps Log</h2>
             
             <div className="flex flex-wrap items-center gap-4 text-xs font-semibold">
               
-              {/* Status filter */}
+              {}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] text-mutedText font-display uppercase font-bold">Status</span>
                 <select
@@ -337,7 +337,7 @@ export default function SwapHistoryPage() {
                 </select>
               </div>
 
-              {/* Direction filter */}
+              {}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] text-mutedText font-display uppercase font-bold">Direction</span>
                 <select
@@ -354,7 +354,7 @@ export default function SwapHistoryPage() {
                 </select>
               </div>
 
-              {/* Date inputs */}
+              {}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] text-mutedText font-display uppercase font-bold">Start Date</span>
                 <input
@@ -384,7 +384,7 @@ export default function SwapHistoryPage() {
             </div>
           </div>
 
-          {/* Table Container */}
+          {}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -399,7 +399,7 @@ export default function SwapHistoryPage() {
               <tbody className="divide-y divide-[#1D1D1F] font-mono">
                 {paginatedHistory.map((swap) => (
                   <tr key={swap.id} className="hover:bg-[#1D1D1F]/20 transition duration-150">
-                    {/* Assets Swap Pair */}
+                    {}
                     <td className="py-4 pr-4">
                       <div className="flex items-center gap-1.5 font-bold text-white">
                         <span>
@@ -413,17 +413,17 @@ export default function SwapHistoryPage() {
                         </span>
                       </div>
                     </td>
-                    {/* Deposit Date */}
+                    {}
                     <td className="py-4 pr-4 text-mutedText font-semibold">
                       {new Date(swap.date).toLocaleDateString()}
                     </td>
-                    {/* Status badge */}
+                    {}
                     <td className="py-4 pr-4">
                       <Badge variant={swap.status === 'completed' ? 'active' : 'pending'}>
                         {swap.status}
                       </Badge>
                     </td>
-                    {/* Deposit TX Link */}
+                    {}
                     <td className="py-4 pr-4">
                       {swap.depositTxHash ? (
                         <a
@@ -438,7 +438,7 @@ export default function SwapHistoryPage() {
                         <span className="text-mutedText/40 italic">N/A</span>
                       )}
                     </td>
-                    {/* Withdrawal TX Link */}
+                    {}
                     <td className="py-4 pr-4">
                       {swap.status === 'completed' && swap.withdrawTxHash ? (
                         <div className="flex items-center gap-4">
@@ -480,7 +480,7 @@ export default function SwapHistoryPage() {
             </table>
           </div>
 
-          {/* Pagination Controls */}
+          {}
           {filteredHistory.length > itemsPerPage && (
             <div className="flex items-center justify-between border-t border-[#1D1D1F] pt-4 font-display">
               <span className="text-xs text-mutedText font-semibold">
@@ -511,7 +511,7 @@ export default function SwapHistoryPage() {
         </div>
       )}
 
-      {/* Selective Disclosure Modal */}
+      {}
       {disclosingSwapId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-display">
           <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] w-full max-w-md flex flex-col shadow-2xl overflow-hidden">

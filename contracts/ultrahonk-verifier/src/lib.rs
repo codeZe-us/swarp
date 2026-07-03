@@ -4,36 +4,36 @@ extern crate alloc;
 #[cfg(test)]
 extern crate std;
 
-use soroban_sdk::{contract, contractimpl, Bytes, BytesN, Env, Vec, U256};
+use soroban_sdk::{contract, contractimpl, Bytes, BytesN, Env, Vec};
 use ultrahonk_soroban_verifier::{UltraHonkVerifier, PROOF_BYTES};
 
-// ── Verification Key ─────────────────────────────────────────────────────────
-// The Verification Key (VK) is embedded at compile time and is immutable.
-// VK is 1764 bytes (with a 4-byte recursive flag at the end). The verifier
-// library strictly expects 1760 bytes, so it is sliced accordingly at load.
+
+
+
+
 const VK_BYTES: &[u8] = include_bytes!("../vk");
 
 
 
-// ── Contract ─────────────────────────────────────────────────────────────────
 
-/// On-chain UltraHonk proof verifier for the ZendSwap swap circuit.
+
+
 #[contract]
 pub struct UltraHonkVerifierContract;
 
 #[contractimpl]
 impl UltraHonkVerifierContract {
-    /// Verify an UltraHonk proof for the ZendSwap swap circuit.
-    ///
-    /// # Arguments
-    /// 
-    /// * `proof`         – raw proof bytes (must be exactly PROOF_BYTES = 14592 bytes)
-    /// * `public_inputs` – 6 public inputs, in the Noir declaration order:
-    ///                     [asset_in, exchange_rate, rate_denominator,
-    ///                      nullifier_hash, asset_out_public, merkle_root]
-    ///
-    /// # Returns
-    /// `true` on valid proof, `false` on any failure or invalid inputs.
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     pub fn verify(
         env: Env,
         proof: Bytes,
@@ -49,8 +49,8 @@ impl UltraHonkVerifierContract {
 
 
 
-        // The public inputs are passed in Noir declaration order:
-        //   asset_in, exchange_rate, rate_denominator, nullifier_hash, asset_out_public, merkle_root
+        
+        
         let asset_in = public_inputs.get(0).unwrap();
         let exchange_rate = public_inputs.get(1).unwrap();
         let rate_denominator = public_inputs.get(2).unwrap();
@@ -97,7 +97,7 @@ impl UltraHonkVerifierContract {
         }
     }
 
-    /// Returns the embedded VK as raw bytes (sliced to 1760 bytes).
+    
     pub fn vk_bytes(env: Env) -> Bytes {
         if VK_BYTES.len() < 1760 {
             Bytes::new(&env)
@@ -106,7 +106,7 @@ impl UltraHonkVerifierContract {
         }
     }
 
-    /// Returns the expected proof length in bytes.
+    
     pub fn proof_bytes_len(_env: Env) -> u32 {
         PROOF_BYTES as u32
     }
@@ -131,7 +131,7 @@ mod test {
 
         let mut public_inputs = Vec::new(&env);
 
-        // 1. merkle_root: 0x13d5a5935821225211517d91c3b202470ed10537de8b8d7aa765c0f163ab8288
+        
         let merkle_root_bytes: [u8; 32] = [
             0x13, 0xd5, 0xa5, 0x93, 0x58, 0x21, 0x22, 0x52,
             0x11, 0x51, 0x7d, 0x91, 0xc3, 0xb2, 0x02, 0x47,
@@ -140,7 +140,7 @@ mod test {
         ];
         public_inputs.push_back(BytesN::from_array(&env, &merkle_root_bytes));
 
-        // 2. nullifier_hash: 0x045e9cf13d3ab92cc27bc4ce8111d4c3278ce84764812648e69113b43507daf8
+        
         let nullifier_hash_bytes: [u8; 32] = [
             0x04, 0x5e, 0x9c, 0xf1, 0x3d, 0x3a, 0xb9, 0x2c,
             0xc2, 0x7b, 0xc4, 0xce, 0x81, 0x11, 0xd4, 0xc3,
@@ -149,28 +149,28 @@ mod test {
         ];
         public_inputs.push_back(BytesN::from_array(&env, &nullifier_hash_bytes));
 
-        // 3. exchange_rate: 9200000 (0x8c6180)
+        
         let mut exchange_rate_bytes = [0u8; 32];
         exchange_rate_bytes[29] = 0x8c;
         exchange_rate_bytes[30] = 0x61;
         exchange_rate_bytes[31] = 0x80;
         public_inputs.push_back(BytesN::from_array(&env, &exchange_rate_bytes));
 
-        // 4. rate_denominator: 10000000 (0x989680)
+        
         let mut rate_denominator_bytes = [0u8; 32];
         rate_denominator_bytes[29] = 0x98;
         rate_denominator_bytes[30] = 0x96;
         rate_denominator_bytes[31] = 0x80;
         public_inputs.push_back(BytesN::from_array(&env, &rate_denominator_bytes));
 
-        // 5. asset_out_public: 1
+        
         let mut asset_out_public_bytes = [0u8; 32];
         asset_out_public_bytes[31] = 1;
         public_inputs.push_back(BytesN::from_array(&env, &asset_out_public_bytes));
 
-        // 6. asset_in: 0
-        let mut asset_in_bytes = [0u8; 32];
-        // asset_in is 0 in Prover.toml, so it's all zeros
+        
+        let asset_in_bytes = [0u8; 32];
+        
         public_inputs.push_back(BytesN::from_array(&env, &asset_in_bytes));
 
         let verified = client.verify(&proof_bytes, &public_inputs);
@@ -205,7 +205,7 @@ mod test {
         ];
         public_inputs.push_back(BytesN::from_array(&env, &nullifier_hash_bytes));
 
-        // Modified exchange_rate: 9200001 (0x8c6181)
+        
         let mut exchange_rate_bytes = [0u8; 32];
         exchange_rate_bytes[29] = 0x8c;
         exchange_rate_bytes[30] = 0x61;
@@ -222,7 +222,7 @@ mod test {
         asset_out_public_bytes[31] = 1;
         public_inputs.push_back(BytesN::from_array(&env, &asset_out_public_bytes));
 
-        let mut asset_in_bytes = [0u8; 32];
+        let asset_in_bytes = [0u8; 32];
         public_inputs.push_back(BytesN::from_array(&env, &asset_in_bytes));
 
         let verified = client.verify(&proof_bytes, &public_inputs);

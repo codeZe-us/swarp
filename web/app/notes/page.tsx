@@ -10,13 +10,13 @@ import Link from 'next/link';
 export default function NotesPage() {
   const notes = useStore((state) => state.notes);
   
-  // Filter active vs spent
+  
   const availableNotes = useMemo(() => notes.filter(n => n.status === 'deposited'), [notes]);
   const usedNotes = useMemo(() => notes.filter(n => n.status === 'withdrawn'), [notes]);
 
   const [isFetchingData, setIsFetchingData] = useState(true);
 
-  // Simulate data fetch
+  
   useEffect(() => {
     const timer = setTimeout(() => setIsFetchingData(false), 800);
     return () => clearTimeout(timer);
@@ -24,7 +24,7 @@ export default function NotesPage() {
 
   return (
     <div className="max-w-[860px] mx-auto pt-8 pb-12 animate-fade-in px-4">
-      {/* Header */}
+      {}
       <div className="flex items-start justify-between mb-10">
         <div>
           <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Shielded</span>
@@ -38,7 +38,7 @@ export default function NotesPage() {
         </div>
       </div>
 
-      {/* Stats Row */}
+      {}
       {isFetchingData ? (
         <div className="bg-[#141419] border border-white/5 rounded-xl flex overflow-hidden mb-6 min-h-[120px]">
           <ShimmerLoader className="w-full h-full min-h-[120px]" borderRadius={12} />
@@ -60,7 +60,7 @@ export default function NotesPage() {
       </div>
       )}
 
-      {/* Notes List */}
+      {}
       <div className="space-y-4">
         {isFetchingData ? (
           <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] overflow-hidden min-h-[180px]">

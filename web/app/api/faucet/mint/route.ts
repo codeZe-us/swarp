@@ -15,7 +15,7 @@ const NETWORK_PASSPHRASE = (
 const HORIZON_URL =
   process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL || 'https://horizon-testnet.stellar.org';
 
-// Map of assetCode -> { secret, issuerAddress }
+
 const ASSET_ISSUERS: Record<string, { secret: string; issuerAddress: string } | undefined> = {
   USDC: {
     secret: process.env.NEXT_PUBLIC_USDC_ISSUER_SECRET || '',

@@ -10,9 +10,9 @@ async function main() {
   const account = await rpcServer.getAccount(adminKp.publicKey());
 
   const contract = new Contract(eurcId);
-  const amountVal = nativeToScVal(BigInt("100000000000"), { type: 'i128' }); // 10,000 EURC
-  
-  const tx = new TransactionBuilder(account, {
+  const amountVal = nativeToScVal(BigInt("100000000000"), { type: 'i128' }); 
+
+    const tx = new TransactionBuilder(account, {
     fee: BASE_FEE,
     networkPassphrase: "Test SDF Network ; September 2015"
   })
@@ -32,8 +32,7 @@ async function main() {
     assembled.sign(adminKp);
     const result = await rpcServer.sendTransaction(assembled);
     console.log("Tx sent:", result.hash);
-    
-    // poll
+
     for(let i=0; i<10; i++) {
         await new Promise(r => setTimeout(r, 2000));
         const st = await rpcServer.getTransaction(result.hash);

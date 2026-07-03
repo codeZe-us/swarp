@@ -13,7 +13,7 @@ export interface Toast {
   message: string;
   severity: ToastSeverity;
   action?: ToastAction;
-  duration?: number; // 0 means persistent
+  duration?: number; 
 }
 
 interface ToastState {

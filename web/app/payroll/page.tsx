@@ -10,7 +10,7 @@ import { Recipient } from '../../store/types';
 import { useToastStore } from '../../store/useToast';
 
 export default function PayrollPage() {
-  // Zustand Store variables
+  
   const address = useStore((state) => state.address);
   const status = useStore((state) => state.status);
   const connect = useStore((state) => state.connect);
@@ -18,7 +18,7 @@ export default function PayrollPage() {
   const teamMembers = useStore((state) => state.teamMembers);
   const config = useStore((state) => state.config);
   
-  // Payroll slice
+  
   const recipients = useStore((state) => state.recipients);
   const lastRunDate = useStore((state) => state.lastRunDate);
   const addRecipient = useStore((state) => state.addRecipient);
@@ -29,7 +29,7 @@ export default function PayrollPage() {
 
   const isConnected = status === 'connected';
 
-  // Modal states
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionProgress, setExecutionProgress] = useState(0);
@@ -37,31 +37,31 @@ export default function PayrollPage() {
 
   const [isFetchingData, setIsFetchingData] = useState(true);
 
-  // Simulate data fetch
+  
   useEffect(() => {
     const timer = setTimeout(() => setIsFetchingData(false), 800);
     return () => clearTimeout(timer);
   }, []);
 
-  // Form states
+  
   const [formName, setFormName] = useState('');
   const [formDept, setFormDept] = useState('');
   const [formAddress, setFormAddress] = useState('');
   const [formAmount, setFormAmount] = useState('');
   const [formAsset, setFormAsset] = useState<string>('USDC');
 
-  // Exchange rate helpers
+  
   const rateNum = exchangeRate?.numerator || 9200000;
   const rateDen = exchangeRate?.denominator || 10000000;
   const decimalRate = rateNum / rateDen;
 
-  // Compute current month dynamically (e.g. "June pay run")
+  
   const payRunTitle = useMemo(() => {
     const month = new Date().toLocaleString('en-US', { month: 'long' });
     return `${month} pay run`;
   }, []);
 
-  // Compute totals
+  
   const totals = useMemo(() => {
     let usdcSum = 0;
     let eurcSum = 0;
@@ -74,7 +74,7 @@ export default function PayrollPage() {
         usdTotal += amt;
       } else {
         eurcSum += amt;
-        // EURC converted to USD = EURC / decimalRate
+        
         usdTotal += amt / decimalRate;
       }
     });
@@ -86,7 +86,7 @@ export default function PayrollPage() {
     };
   }, [recipients, decimalRate]);
 
-  // Open form modal for adding
+  
   const handleOpenAdd = () => {
     setEditingRecipient(null);
     setFormName('');
@@ -97,7 +97,7 @@ export default function PayrollPage() {
     setIsFormOpen(true);
   };
 
-  // Open form modal for editing
+  
   const handleOpenEdit = (recipient: Recipient) => {
     setEditingRecipient(recipient);
     setFormName(recipient.name);
@@ -108,11 +108,11 @@ export default function PayrollPage() {
     setIsFormOpen(true);
   };
 
-  // Form submit handler
+  
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validations
+    
     if (!formName.trim()) {
       useToastStore.getState().addToast({ title: 'Error', message: 'Please enter a recipient name.', severity: 'error' });
       return;
@@ -135,7 +135,7 @@ export default function PayrollPage() {
       return;
     }
 
-    // Amount precision check (max 7 decimals for Stellar)
+    
     const decimalsPart = formAmount.split('.')[1];
     if (decimalsPart && decimalsPart.length > 7) {
       useToastStore.getState().addToast({ title: 'Error', message: 'Amount precision cannot exceed 7 decimal places.', severity: 'error' });
@@ -164,7 +164,7 @@ export default function PayrollPage() {
     }
   };
 
-  // Trigger payroll execution modal
+  
   const handleRunPayroll = async () => {
     if (!isConnected || !address) {
       connect();
@@ -178,32 +178,32 @@ export default function PayrollPage() {
     setIsExecuting(true);
     setExecutionProgress(0);
     
-    // Execute actual transfers loop
+    
     for (let i = 0; i < recipients.length; i++) {
       const recipient = recipients[i];
       const tokenContractId = recipient.asset === 'USDC' ? config?.USDC_SAC_ID || '' : config?.EURC_SAC_ID || '';
       
       try {
         const amt = parseFloat(recipient.amount);
-        const sendAmt = BigInt(Math.floor(amt * 10000000)); // 7 decimals
+        const sendAmt = BigInt(Math.floor(amt * 10000000)); 
         
-        // Call actual smart contract transfer via SDK
+        
         const { txHash } = await submitPayment(address, recipient.address, tokenContractId, sendAmt);
         
-        // Log transaction history
+        
         addTransaction({
           type: 'withdrawal',
           amount: recipient.amount,
           asset: recipient.asset,
           txHash: txHash,
           timestamp: Date.now(),
-          privacy: 'private' // Although this is a direct transfer, marking it as private in the history for UX as requested
+          privacy: 'private' 
         });
         
       } catch (error: any) {
         console.error(`Failed to process payment for ${recipient.name}:`, error);
         alert(`Payment failed for ${recipient.name}: ${error.message}`);
-        // Optionally halt execution or continue
+        
         setIsExecuting(false);
         return;
       }
@@ -216,7 +216,7 @@ export default function PayrollPage() {
     useToastStore.getState().addToast({ title: 'Success', message: `Private Payroll Successful! Executed ${recipients.length} transfers. Total: $${totals.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, severity: 'success' });
   };
 
-  // Generate Initials Avatar
+  
   const getInitials = (name: string) => {
     const parts = name.trim().split(' ');
     if (parts.length >= 2) {
@@ -228,7 +228,7 @@ export default function PayrollPage() {
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto font-sans">
       
-      {/* Page Header */}
+      {}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-bold text-brandLightPurple tracking-wider uppercase font-display">Employer console</span>
@@ -253,7 +253,7 @@ export default function PayrollPage() {
         </div>
       </div>
 
-      {/* Stats Cards Section */}
+      {}
       {isFetchingData ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
@@ -263,7 +263,7 @@ export default function PayrollPage() {
       ) : (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* Card 1: This run total (Gradient highlighted) */}
+        {}
         <div className="bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] rounded-[13px] p-6 flex flex-col justify-between min-h-[148px] shadow-[0_0_28px_rgba(123,55,168,0.25)] border-none">
           <div>
             <span className="text-[10px] font-bold text-white/80 uppercase tracking-wider font-display">This run total</span>
@@ -281,7 +281,7 @@ export default function PayrollPage() {
           )}
         </div>
 
-        {/* Card 2: Recipients */}
+        {}
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between min-h-[148px]">
           <div>
             <span className="text-[10px] font-bold text-mutedText uppercase tracking-wider font-display">Recipients</span>
@@ -292,7 +292,7 @@ export default function PayrollPage() {
           <p className="text-[10px] text-mutedText mt-2">Active salary payouts defined in memory.</p>
         </div>
 
-        {/* Card 3: Last run */}
+        {}
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between min-h-[148px]">
           <div>
             <span className="text-[10px] font-bold text-mutedText uppercase tracking-wider font-display">Last run</span>
@@ -306,7 +306,7 @@ export default function PayrollPage() {
       </div>
       )}
 
-      {/* Connection Warning Banner */}
+      {}
       {isFetchingData ? (
         <div className="w-full bg-[#0B0B0C] border border-borderSubtle rounded-[13px] overflow-hidden min-h-[300px]">
           <ShimmerLoader className="w-full h-full min-h-[300px]" borderRadius={13} />
@@ -332,7 +332,7 @@ export default function PayrollPage() {
       ) : (
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col gap-6">
           
-          {/* Header of Table */}
+          {}
           <div className="flex items-center justify-between">
             <h3 className="text-md font-bold text-white font-display">{payRunTitle}</h3>
             <span className="text-[9px] font-bold text-mutedText/70 tracking-widest uppercase font-mono">
@@ -340,7 +340,7 @@ export default function PayrollPage() {
             </span>
           </div>
 
-          {/* Table Element */}
+          {}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -355,7 +355,7 @@ export default function PayrollPage() {
                 {recipients.map((r) => (
                   <tr key={r.id} className="hover:bg-[#1D1D1F]/20 group transition duration-150">
                     
-                    {/* Recipient Avatar + Name */}
+                    {}
                     <td className="py-4 pr-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-brandPurple/20 border border-brandPurple/30 flex items-center justify-center text-white text-xs font-bold font-display select-none">
@@ -372,12 +372,12 @@ export default function PayrollPage() {
                       </div>
                     </td>
 
-                    {/* Destination Stellar Address */}
+                    {}
                     <td className="py-4 pr-4 font-mono text-mutedText font-medium text-xs">
                       {r.address.slice(0, 8)}...{r.address.slice(-8)}
                     </td>
 
-                    {/* Salary amount */}
+                    {}
                     <td className="py-4 pr-4">
                       <div className="flex items-center gap-2">
                         {r.asset === 'USDC' ? (
@@ -395,7 +395,7 @@ export default function PayrollPage() {
                       </div>
                     </td>
 
-                    {/* Edit/Remove actions */}
+                    {}
                     <td className="py-4 text-right">
                       <div className="flex items-center justify-end gap-2.5">
                         <button
@@ -438,7 +438,7 @@ export default function PayrollPage() {
             </table>
           </div>
 
-          {/* Bottom Table Summary & Execute button */}
+          {}
           <div className="border-t border-[#1D1D1F] pt-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <span className="text-xs text-mutedText block font-display font-semibold">Total payout</span>
@@ -464,17 +464,17 @@ export default function PayrollPage() {
         </div>
       )}
 
-      {/* Footer Text */}
+      {}
       <p className="text-[10px] text-mutedText/60 text-center leading-relaxed font-semibold max-w-lg mx-auto">
         Each payout is a separate shielded withdrawal. On-chain, recipients and amounts can&apos;t be linked to your company or to each other.
       </p>
 
-      {/* Add / Edit Form Modal */}
+      {}
       {isFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 transition-opacity duration-300">
           <div className="w-full max-w-md bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] shadow-2xl relative flex flex-col font-sans overflow-hidden">
             
-            {/* Header row */}
+            {}
             <div className="p-6 pb-4 border-b border-[#1D1D1F]">
               <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Manage payroll</span>
               <h2 className="text-xl font-extrabold text-white mt-1 font-display">
@@ -490,10 +490,10 @@ export default function PayrollPage() {
               </button>
             </div>
 
-            {/* Modal Body / Form */}
+            {}
             <form onSubmit={handleFormSubmit} className="p-6 flex flex-col gap-4 font-display text-xs">
               
-              {/* Name / Team Member */}
+              {}
               <div className="flex flex-col gap-1.5">
                 <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Recipient (Team Member)</label>
                 <select
@@ -518,7 +518,7 @@ export default function PayrollPage() {
                 </select>
               </div>
 
-              {/* Department */}
+              {}
               <div className="flex flex-col gap-1.5">
                 <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Department</label>
                 <input
@@ -530,7 +530,7 @@ export default function PayrollPage() {
                 />
               </div>
 
-              {/* Stellar Address (Auto-filled) */}
+              {}
               <div className="flex flex-col gap-1.5 opacity-60">
                 <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Stellar Destination Address</label>
                 <input
@@ -543,7 +543,7 @@ export default function PayrollPage() {
                 />
               </div>
 
-              {/* Amount & Asset Grid */}
+              {}
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2 flex flex-col gap-1.5">
                   <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Amount</label>
@@ -569,7 +569,7 @@ export default function PayrollPage() {
                 </div>
               </div>
 
-              {/* Footer controls */}
+              {}
               <div className="flex gap-3 mt-4">
                 <button
                   type="submit"
@@ -592,12 +592,12 @@ export default function PayrollPage() {
         </div>
       )}
 
-      {/* Execution Progress Modal */}
+      {}
       {isExecuting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 transition-opacity duration-300">
           <div className="w-full max-w-md bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] shadow-2xl relative flex flex-col font-sans p-8 overflow-hidden items-center">
             
-            {/* Spinning Loader */}
+            {}
             <div className="w-16 h-16 border-4 border-[#1D1D1F] border-t-[#5E2A8C] rounded-full animate-spin mb-6"></div>
 
             <div className="text-center flex flex-col gap-2 w-full">
@@ -611,7 +611,7 @@ export default function PayrollPage() {
                 Shielding transfers for {recipients.length} recipients...
               </p>
               
-              {/* Progress Bar */}
+              {}
               <div className="w-full bg-[#1D1D1F] rounded-full h-2 mt-4 overflow-hidden">
                 <div 
                   className="bg-gradient-to-r from-[#5E2A8C] to-[#B488DC] h-2 rounded-full transition-all duration-500"

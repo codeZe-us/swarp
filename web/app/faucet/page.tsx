@@ -159,7 +159,7 @@ export default function FaucetPage() {
 
   return (
     <div className="max-w-[1000px] mx-auto pt-8 pb-12 animate-fade-in px-4">
-      {/* Header */}
+      {}
       <div className="mb-10">
         <h1 className="text-[32px] font-bold text-white mb-2">Faucet</h1>
         <p className="text-gray-400 text-sm">Mint mock testnet assets to your wallet.</p>
@@ -167,10 +167,10 @@ export default function FaucetPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         
-        {/* Main Column */}
+        {}
         <div className="space-y-6">
           
-          {/* XLM Section */}
+          {}
           <div className="bg-[#141419] border border-white/5 rounded-xl p-6 flex items-center justify-between">
             <div>
               <h2 className="text-white font-bold text-lg mb-1">XLM for fees</h2>
@@ -189,7 +189,7 @@ export default function FaucetPage() {
             </button>
           </div>
 
-          {/* Minting Form */}
+          {}
           <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SELECT TOKEN</span>
             
@@ -251,7 +251,7 @@ export default function FaucetPage() {
           </div>
         </div>
 
-        {/* Right Sidebar */}
+        {}
         <div className="space-y-6">
           
           <div className="bg-[#141419] border border-white/5 rounded-xl p-6">

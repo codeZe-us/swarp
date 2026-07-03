@@ -3,11 +3,6 @@ import { MERKLE_TREE_DEPTH } from './constants';
 
 export const TREE_DEPTH = MERKLE_TREE_DEPTH;
 
-/**
- * Pre-computes empty tree zero values at each level:
- * zeros[0] = Poseidon2([0n])
- * zeros[i] = Poseidon2([zeros[i-1], zeros[i-1]])
- */
 export function getZeroValues(): bigint[] {
   const zeros: bigint[] = new Array(TREE_DEPTH + 1);
   zeros[0] = poseidon2Hash([BigInt(0)]);
@@ -17,10 +12,6 @@ export function getZeroValues(): bigint[] {
   return zeros;
 }
 
-/**
- * Efficiently builds a depth-20 Merkle tree root from an array of leaves.
- * Complexity is O(N * log M) where N is number of leaves, avoiding allocating 2^20 nodes.
- */
 export function buildTree(leaves: bigint[]): bigint {
   const zeros = getZeroValues();
   if (leaves.length === 0) {
@@ -55,11 +46,6 @@ export function buildTree(leaves: bigint[]): bigint {
   return currentLayer[0];
 }
 
-/**
- * Generates elements and indices Merkle proof paths for a leaf index.
- * pathElements: sibling hashes at each level
- * pathIndices: 0 if left, 1 if right
- */
 export function getProof(
   leaves: bigint[],
   leafIndex: number
@@ -87,7 +73,6 @@ export function getProof(
     pathElements.push(sibling);
     pathIndices.push(isLeft ? 0 : 1);
 
-    // Compute next layer
     const nextLayer: bigint[] = [];
     for (let i = 0; i < currentLayer.length; i += 2) {
       const left = currentLayer[i];
@@ -108,9 +93,6 @@ export function getProof(
   return { pathElements, pathIndices };
 }
 
-/**
- * Verifies a Merkle proof locally.
- */
 export function computeRootFromPath(
   leaf: bigint,
   pathElements: bigint[],
@@ -135,9 +117,6 @@ export function computeRootFromPath(
   return current;
 }
 
-/**
- * Verifies a Merkle proof locally.
- */
 export function verifyProof(
   root: bigint,
   leaf: bigint,

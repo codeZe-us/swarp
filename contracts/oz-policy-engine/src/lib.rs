@@ -39,7 +39,7 @@ impl OzPolicyEngine {
         env.storage().persistent().remove(&DataKey::Allowed(account));
     }
 
-    /// OpenZeppelin Policy Trait Implementation
+    
     pub fn is_authorized(env: Env, account: Address, _token: Address) -> bool {
         env.storage().persistent().get(&DataKey::Allowed(account)).unwrap_or(false)
     }

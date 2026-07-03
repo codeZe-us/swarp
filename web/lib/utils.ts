@@ -1,9 +1,8 @@
 export function formatCurrency(amount: string | number, asset: string): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  
-  if (isNaN(num)) return amount.toString();
-  
-  // Format the number string without currency symbol first
+
+    if (isNaN(num)) return amount.toString();
+
   const formattedNum = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
