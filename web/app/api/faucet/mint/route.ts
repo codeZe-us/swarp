@@ -8,6 +8,9 @@ import {
   Horizon,
 } from '@stellar/stellar-sdk';
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
 const NETWORK_PASSPHRASE = (
   process.env.NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE || 'Test SDF Network ; September 2015'
 ).replace(/^["']|["']$/g, '');
@@ -88,10 +91,30 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ txHash: response.hash });
   } catch (err: any) {
-    const detail =
-      err?.response?.data?.extras?.result_codes ||
-      err?.message ||
-      'Unknown error';
-    return NextResponse.json({ error: `Faucet mint failed: ${JSON.stringify(detail)}` }, { status: 500 });
+    const detail = err?.response?.data?.extras?.result_codes || err?.message || 'Unknown error';
+    let errorMessage = 'Unknown error';
+    
+    try {
+      if (typeof detail === 'object' && detail !== null) {
+        const ops = detail.operations || [];
+        const tx = detail.transaction;
+        
+        if (ops.includes('op_no_destination')) {
+          errorMessage = 'The recipient account does not exist on the network. Please fund it with XLM first. (op_no_destination)';
+        } else if (ops.includes('op_no_trust')) {
+          errorMessage = 'The recipient account does not have a trustline for this asset. Please add a trustline in your wallet. (op_no_trust)';
+        } else if (tx === 'tx_bad_seq') {
+          errorMessage = 'Network sequence mismatch. Please try your request again. (tx_bad_seq)';
+        } else {
+          errorMessage = JSON.stringify(detail);
+        }
+      } else {
+        errorMessage = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      }
+    } catch (e) {
+      errorMessage = err?.message || 'Failed to stringify error';
+    }
+    
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

@@ -125,6 +125,13 @@ export default function FaucetPage() {
         } catch (trustErr: any) {
           useToastStore.getState().addToast({ title: 'Error', message: trustErr.message === 'The user closed the modal.' ? 'Trustline creation was rejected.' : `Failed to add trustline: ${trustErr.message}`, severity: 'error' });
         }
+      } else if (err.message?.includes('op_no_destination')) {
+        setMintStep('Account not found');
+        useToastStore.getState().addToast({ 
+          title: 'Account Not Funded', 
+          message: 'Your wallet account does not exist on testnet yet. Please click the "Fund XLM" button first to activate it!', 
+          severity: 'warning' 
+        });
       } else {
         useToastStore.getState().addToast({ title: 'Error', message: err.message || `Failed to mint ${activeAsset}`, severity: 'error' });
       }
