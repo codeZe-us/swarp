@@ -52,6 +52,12 @@ pub enum DataKey {
     RateTable(u64, u64),   
     RecentRates(u64, u64), 
     PendingWithdrawal(BytesN<32>),
+    KycEnabled,
+    KycVerifier,
+    RequiredCredentialType,
+    RequiredIssuer,
+    KycRoots,
+    KycVerified(Address),
 }
 
 #[contracttype]
@@ -247,6 +253,14 @@ impl ZendSwapPool {
         extend_ttl(&env);
 
         depositor.require_auth();
+
+        let kyc_enabled: bool = env.storage().instance().get(&DataKey::KycEnabled).unwrap_or(false);
+        if kyc_enabled {
+            let verified: bool = env.storage().temporary().get(&DataKey::KycVerified(depositor.clone())).unwrap_or(false);
+            if !verified {
+                panic!("KYC not verified");
+            }
+        }
 
         let token: Address = env
             .storage()

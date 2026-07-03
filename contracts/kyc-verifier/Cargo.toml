@@ -1,10 +1,10 @@
 [package]
-name = "ultrahonk-verifier-multi"
+name = "kyc-verifier"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["rlib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 soroban-sdk = { workspace = true, features = ["alloc"] }
