@@ -74,6 +74,7 @@ export default function SwapPage() {
   });
 
   const [currentRate, setCurrentRate] = useState<{ numerator: number; denominator: number }>({ numerator: 9200000, denominator: 10000000 });
+  const [withdrawCurrentRate, setWithdrawCurrentRate] = useState<{ numerator: number; denominator: number } | null>(null);
   const [isFetchingData, setIsFetchingData] = useState(true);
 
   
@@ -179,7 +180,29 @@ export default function SwapPage() {
       }
     };
     fetchPairRate();
-  }, [assetInCode, assetOutCode]);
+  }, [assetInCode, assetOutCode, config]);
+
+  useEffect(() => {
+    const fetchWithdrawRate = async () => {
+      if (!selectedNoteId || !withdrawAssetOutCode) {
+        setWithdrawCurrentRate(null);
+        return;
+      }
+      const note = notes.find(n => n.id === selectedNoteId);
+      if (!note) return;
+      const depositAsset = getAssetByCode(note.asset);
+      const withdrawAsset = getAssetByCode(withdrawAssetOutCode);
+      if (depositAsset && withdrawAsset && depositAsset.id !== withdrawAsset.id) {
+        try {
+          const rate = await getRate(depositAsset.id, withdrawAsset.id, note.poolContractId);
+          setWithdrawCurrentRate(rate);
+        } catch (e) {
+          console.warn('Failed to fetch withdraw rate', e);
+        }
+      }
+    };
+    fetchWithdrawRate();
+  }, [selectedNoteId, withdrawAssetOutCode, notes]);
 
 
   
@@ -974,7 +997,17 @@ export default function SwapPage() {
                           <button
                             key={note.id}
                             type="button"
-                            onClick={() => setSelectedNoteId(isSelected ? null : note.id)}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedNoteId(null);
+                              } else {
+                                setSelectedNoteId(note.id);
+                                if (note.asset === withdrawAssetOutCode || withdrawAssetOutCode === '') {
+                                  const newOut = note.asset === 'USDC' ? 'EURC' : 'USDC';
+                                  setWithdrawAssetOutCode(newOut);
+                                }
+                              }
+                            }}
                             className={`flex items-center justify-between p-4 rounded-[12px] border text-left transition duration-150 ${
                               isSelected
                                 ? 'bg-[#5E2A8C]/10 border-[#5E2A8C] text-white'
@@ -1025,6 +1058,7 @@ export default function SwapPage() {
                         <div className="absolute left-0 right-0 mt-2 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display max-h-48 overflow-y-auto">
                           {ASSETS.filter((asset) => {
                             const note = notes.find(n => n.id === selectedNoteId);
+                            if (note && asset.code === note.asset) return false;
                             const legacyPoolId = (config as any)?.LEGACY_POOL_CONTRACT_ID;
                             if (note && note.poolContractId === legacyPoolId) {
                               return asset.code === 'USDC' || asset.code === 'EURC';
@@ -1052,6 +1086,23 @@ export default function SwapPage() {
                         </div>
                       )}
                     </div>
+                    {withdrawCurrentRate && (() => {
+                      const note = notes.find(n => n.id === selectedNoteId);
+                      if (!note) return null;
+                      const depositAmountBig = Number(note.amount) / 10_000_000;
+                      const wRateDecimal = withdrawCurrentRate.numerator / withdrawCurrentRate.denominator;
+                      const outAmount = depositAmountBig * wRateDecimal;
+                      return (
+                        <div className="mt-2 text-xs text-mutedText flex items-center justify-between px-1">
+                          <span>
+                            You will receive: <strong className="text-white">{outAmount.toLocaleString('en-US', { maximumFractionDigits: 7 })} {withdrawAssetOutCode}</strong>
+                          </span>
+                          <span className="opacity-75">
+                            (Rate: 1 {note.asset} = {wRateDecimal.toFixed(4)} {withdrawAssetOutCode})
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 

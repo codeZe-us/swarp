@@ -37,7 +37,7 @@ export const createConfigSlice: StateCreator<
   configError: null,
   fetchConfig: async () => {
     try {
-      const response = await fetch('/api/pool/config');
+      const response = await fetch('/api/pool/config', { cache: 'no-store' });
       if (!response.ok) {
         throw new Error('Failed to fetch pool configuration');
       }
