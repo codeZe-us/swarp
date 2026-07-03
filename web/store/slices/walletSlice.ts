@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
 import { StellarWalletsKit } from '@creit.tech/stellar-wallets-kit/sdk';
 import { Networks } from '@creit.tech/stellar-wallets-kit';
-import { getNetworkDetails, isConnected } from '@stellar/freighter-api';
+import { isConnected } from '@stellar/freighter-api';
 import { StoreState } from '../useStore';
 import { connectWallet, disconnectWallet, initKit, isValidPublicKey } from '../../lib/stellar';
 import { ZendSwapError, handleError } from '../../lib/errors';
@@ -35,15 +35,18 @@ export const createWalletSlice: StateCreator<
     try {
       const { address, walletId } = await connectWallet();
 
-            if (typeof window !== 'undefined' && walletId === 'freighter') {
+        if (typeof window !== 'undefined') {
         try {
-          const networkDetails = await getNetworkDetails();
-          if (networkDetails.network === 'PUBLIC' || networkDetails.network.toLowerCase().includes('mainnet')) {
-            useToastStore.getState().addToast({
+          const networkDetails = await StellarWalletsKit.getNetwork();
+          const netName = (networkDetails?.network || '').toLowerCase();
+          if (netName === 'public' || netName.includes('mainnet')) {
+            await disconnectWallet();
+            throw new ZendSwapError({
+              code: 'WALLET_WRONG_NETWORK',
               title: 'Mainnet Detected',
               message: 'You are currently connected to the Stellar Mainnet. We are currently working with Testnet. Please switch your wallet network to Testnet.',
               severity: 'error',
-              duration: 10000,
+              source: 'wallet'
             });
           } else {
              useToastStore.getState().addToast({
@@ -54,6 +57,7 @@ export const createWalletSlice: StateCreator<
             });
           }
         } catch (e) {
+          if (e instanceof ZendSwapError) throw e;
           console.warn('Could not fetch network details', e);
         }
       }

@@ -126,6 +126,16 @@ export default function KycPage() {
           </Button>
         </div>
       </div>
+
+      <div className="bg-cardSurface/40 border border-borderSubtle rounded-2xl p-6 w-full text-left mt-2">
+        <h3 className="text-base font-bold text-white mb-3">How it works</h3>
+        <ol className="list-decimal list-inside space-y-2 text-sm text-mutedText font-medium">
+          <li><strong className="text-white">Local Proving:</strong> A Zero-Knowledge proof is generated directly in your browser.</li>
+          <li><strong className="text-white">Data Privacy:</strong> Your personal identity data never leaves your device.</li>
+          <li><strong className="text-white">On-Chain Verification:</strong> Only the cryptographic proof is submitted to Soroban.</li>
+          <li><strong className="text-white">Pool Access:</strong> Once verified, your wallet is cleared to interact with the private liquidity pool.</li>
+        </ol>
+      </div>
     </div>
   );
 }
