@@ -14,8 +14,8 @@ Swarp solves this by splitting the DeFi flow into two layers:
 
 - **Private Stablecoin Swaps:** Exchange assets natively on Stellar (supported: USDC, EURC, XLM, MGUSD, YLDS) without revealing trade amounts on the public ledger, utilizing UltraHonk zero-knowledge proofs.
 - **Private Payroll (Employer Console):** Pay your entire team in one run without salaries touching the public ledger. Each payout is a separate shielded transaction, preventing on-chain linking between your company's wallet and your employees' salaries.
-- **ZK-KYC Compliance:** Prove you hold a valid identity credential issued by a trusted entity without revealing your actual identity, using Merkle tree inclusion proofs.
-
+- **ZK-KYC Compliance & Access Control:** Private swaps and payroll distributions are strictly gated behind mandatory ZK-KYC verification. You must prove you hold a valid identity credential issued by a trusted entity (using Merkle tree inclusion proofs) before you can interact with the private liquidity pool.
+- **Strict Network Enforcement:** To prevent accidental loss of funds and ensure a safe testing environment, Swarp actively monitors wallet connections across all supported Stellar wallets (Freighter, xBull, Lobstr, etc.) and automatically blocks any attempts to connect using the Stellar Mainnet, forcing a Testnet-only environment.
 ## Architecture & How It Works
 
 Swarp leverages a novel architecture using Web Workers, Noir, and Soroban to ensure end-to-end privacy and decentralization. The architecture is split across three main domains:
