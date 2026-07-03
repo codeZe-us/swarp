@@ -1,5 +1,7 @@
 # Swarp: Private Stablecoin Exchange & Payroll on Stellar
 
+**Live Demo:** [https://swarp-web.vercel.app/](https://swarp-web.vercel.app/)
+
 **Swarp** is a privacy-preserving decentralized exchange (DEX) and employer console built on Stellar. It utilizes Zero-Knowledge Proofs (Noir & UltraHonk) to enable anonymous stablecoin swaps, ZK-KYC compliance, and private payroll distribution across multiple assets including **USDC, EURC, XLM, MGUSD, and YLDS**.
 
 ## Vision
