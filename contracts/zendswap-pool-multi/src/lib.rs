@@ -28,7 +28,6 @@ pub enum Error {
     InvalidRate = 10,
 }
 
-
 const MAX_DEPOSIT_AMOUNT: i128 = i64::MAX as i128;
 
 const TREE_DEPTH: u32 = 20;
@@ -52,6 +51,12 @@ pub enum DataKey {
     RateTable(u64, u64),   
     RecentRates(u64, u64), 
     PendingWithdrawal(BytesN<32>),
+    KycEnabled,
+    KycVerifier,
+    RequiredCredentialType,
+    RequiredIssuer,
+    KycRoots,
+    KycVerified(Address),
 }
 
 #[contracttype]
@@ -62,8 +67,6 @@ pub struct PendingWithdrawalRecord {
     pub recipient: Address,
     pub timestamp: u64,
 }
-
-
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
@@ -115,7 +118,6 @@ fn bytes_to_u256(env: &Env, b: &BytesN<32>) -> U256 {
     let bytes = Bytes::from_array(env, &arr);
     U256::from_be_bytes(env, &bytes)
 }
-
 
 fn get_zeros_bytes(env: &Env) -> Vec<BytesN<32>> {
     let mut zeros: Vec<BytesN<32>> = Vec::new(env);
@@ -185,7 +187,6 @@ impl ZendSwapPool {
                 .set(&DataKey::TokenRegistry(i as u64), &asset);
         }
 
-        
         for i in 0..assets.len() {
             for j in 0..assets.len() {
                 if i != j {
@@ -247,6 +248,14 @@ impl ZendSwapPool {
         extend_ttl(&env);
 
         depositor.require_auth();
+
+        let kyc_enabled: bool = env.storage().instance().get(&DataKey::KycEnabled).unwrap_or(false);
+        if kyc_enabled {
+            let verified: bool = env.storage().temporary().get(&DataKey::KycVerified(depositor.clone())).unwrap_or(false);
+            if !verified {
+                panic!("KYC not verified");
+            }
+        }
 
         let token: Address = env
             .storage()
@@ -400,8 +409,6 @@ impl ZendSwapPool {
             &recent_rates,
         );
 
-        
-
         Ok(())
     }
 
@@ -533,12 +540,6 @@ impl ZendSwapPool {
 
         for rate in unique_rates.iter() {
             
-            
-            
-            
-            
-            
-            
             let mut public_inputs = Vec::new(&env);
             public_inputs.push_back(u64_to_bytes32(&env, asset_in_id));
             public_inputs.push_back(u64_to_bytes32(&env, rate));
@@ -565,7 +566,6 @@ impl ZendSwapPool {
             return Err(Error::VerificationFailed);
         }
 
-        
         env.storage().persistent().set(&nullifier_key, &true);
         env.storage()
             .persistent()
@@ -674,7 +674,6 @@ impl ZendSwapPool {
             env.try_invoke_contract::<bool, Val>(&verifier, &Symbol::new(&env, "verify"), args);
 
         if let Ok(Ok(true)) = invoke_res {
-            // Success
         } else {
             return Err(Error::VerificationFailed);
         }
@@ -735,9 +734,87 @@ impl ZendSwapPool {
 
         Ok(())
     }
+    pub fn set_kyc_config(
+        env: Env,
+        admin: Address,
+        enabled: bool,
+        verifier: Address,
+        required_type: u64,
+        required_issuer: U256,
+    ) {
+        admin.require_auth();
+        if admin != env.storage().instance().get(&DataKey::Admin).unwrap() {
+            panic!("not admin");
+        }
+        env.storage().instance().set(&DataKey::KycEnabled, &enabled);
+        env.storage().instance().set(&DataKey::KycVerifier, &verifier);
+        env.storage().instance().set(&DataKey::RequiredCredentialType, &required_type);
+        env.storage().instance().set(&DataKey::RequiredIssuer, &required_issuer);
+    }
+
+    pub fn update_kyc_root(env: Env, admin: Address, new_root: BytesN<32>) {
+        admin.require_auth();
+        if admin != env.storage().instance().get(&DataKey::Admin).unwrap() {
+            panic!("not admin");
+        }
+        let mut recent_roots: Vec<BytesN<32>> = env
+            .storage()
+            .instance()
+            .get(&DataKey::KycRoots)
+            .unwrap_or_else(|| Vec::new(&env));
+        recent_roots.push_back(new_root);
+        if recent_roots.len() > MAX_RECENT_ROOTS {
+            recent_roots.pop_front();
+        }
+        env.storage().instance().set(&DataKey::KycRoots, &recent_roots);
+    }
+
+    pub fn verify_kyc(
+        env: Env,
+        caller: Address,
+        proof: Bytes,
+        public_inputs: Vec<BytesN<32>>,
+    ) -> bool {
+        caller.require_auth();
+        let kyc_enabled: bool = env.storage().instance().get(&DataKey::KycEnabled).unwrap_or(false);
+        if !kyc_enabled {
+            return true;
+        }
+
+        let root = public_inputs.get_unchecked(0);
+        let recent_roots: Vec<BytesN<32>> = env.storage().instance().get(&DataKey::KycRoots).unwrap_or_else(|| Vec::new(&env));
+        let mut valid_root = false;
+        for r in recent_roots.iter() {
+            if r == root {
+                valid_root = true;
+                break;
+            }
+        }
+        if !valid_root {
+            panic!("Invalid KYC root");
+        }
+        
+        let req_type: u64 = env.storage().instance().get(&DataKey::RequiredCredentialType).unwrap();
+        let p_type = bytes_to_u256(&env, &public_inputs.get_unchecked(2));
+        if p_type != U256::from_u32(&env, req_type as u32) {
+             panic!("Invalid required credential type");
+        }
+
+        let verifier: Address = env.storage().instance().get(&DataKey::KycVerifier).unwrap();
+        let mut invoke_args: Vec<Val> = Vec::new(&env);
+        invoke_args.push_back(proof.into_val(&env));
+        invoke_args.push_back(public_inputs.into_val(&env));
+
+        let verified: bool = env.invoke_contract(&verifier, &Symbol::new(&env, "verify"), invoke_args);
+        if !verified {
+            panic!("KYC proof failed");
+        }
+
+        env.storage().temporary().set(&DataKey::KycVerified(caller.clone()), &true);
+        env.storage().temporary().extend_ttl(&DataKey::KycVerified(caller), 100, 100);
+        true
+    }
 }
-
-
 
 fn do_insert_leaf(env: &Env, commitment: BytesN<32>) -> (u32, BytesN<32>) {
     let leaf_index: u32 = env
@@ -806,8 +883,6 @@ fn do_insert_leaf(env: &Env, commitment: BytesN<32>) -> (u32, BytesN<32>) {
 
     (leaf_index, new_root)
 }
-
-
 
 #[cfg(test)]
 #[allow(clippy::ptr_arg)]
@@ -905,7 +980,6 @@ mod tests {
         (client, usdc_addr, eurc_addr, depositor, contract_id)
     }
 
-    
     fn commitment(env: &Env, val: u32) -> BytesN<32> {
         let mut bytes = [0u8; 32];
         bytes[28..32].copy_from_slice(&val.to_be_bytes());
@@ -1007,7 +1081,6 @@ mod tests {
         env.cost_estimate().budget().reset_unlimited();
         let (client, _, _, _) = setup_pool(&env);
 
-        
         let commitment_a = BytesN::from_array(
             &env,
             &[
@@ -1092,7 +1165,6 @@ mod tests {
         let commitment = BytesN::from_array(&env, &leaf_bytes);
         let (_, new_root) = client.insert_leaf(&commitment);
 
-        
         let zeros = get_zeros_bytes(&env);
         let mut current = commitment;
         for level in 0..TREE_DEPTH {

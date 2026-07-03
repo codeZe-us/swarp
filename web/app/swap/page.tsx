@@ -19,7 +19,6 @@ import { useToastStore } from '../../store/useToast';
 export default function SwapPage() {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit');
   
-  
   const address = useStore((state) => state.address);
   const status = useStore((state) => state.status);
   const connect = useStore((state) => state.connect);
@@ -34,7 +33,6 @@ export default function SwapPage() {
   
   const isConnected = status === 'connected';
 
-  
   const [assetInCode, setAssetInCode] = useState<string>('USDC');
   const [assetOutCode, setAssetOutCode] = useState<string>('EURC');
   const [amountIn, setAmountIn] = useState<string>('');
@@ -47,15 +45,12 @@ export default function SwapPage() {
   const [isWithdrawDropdownOpen, setIsWithdrawDropdownOpen] = useState(false);
   const withdrawDropdownRef = useRef<HTMLDivElement>(null);
 
-  
   const [depositTxStatus, setDepositTxStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [depositTxHash, setDepositTxHash] = useState<string | null>(null);
   const [depositLeafIndex, setDepositLeafIndex] = useState<number | null>(null);
 
-  
   const [isFunding, setIsFunding] = useState(false);
 
-  
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [recipientAddress, setRecipientAddress] = useState<string>('');
   const [withdrawStep, setWithdrawStep] = useState<number>(0); 
@@ -77,12 +72,10 @@ export default function SwapPage() {
   const [withdrawCurrentRate, setWithdrawCurrentRate] = useState<{ numerator: number; denominator: number } | null>(null);
   const [isFetchingData, setIsFetchingData] = useState(true);
 
-  
   useEffect(() => {
     fetchPoolState();
   }, [fetchPoolState]);
 
-  
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -94,14 +87,12 @@ export default function SwapPage() {
     }
   }, []);
 
-  
   useEffect(() => {
     if (isConnected && address && !recipientAddress) {
       setRecipientAddress(address);
     }
   }, [isConnected, address, recipientAddress]);
 
-  
   useEffect(() => {
     if (isConnected && address) {
       const fetchRealBalances = async () => {
@@ -146,7 +137,6 @@ export default function SwapPage() {
     }
   }, [isConnected, address]);
 
-  
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownInRef.current && !dropdownInRef.current.contains(event.target as Node)) setIsDropdownInOpen(false);
@@ -155,16 +145,12 @@ export default function SwapPage() {
     };
     document.addEventListener('mousedown', handleClickOutside);
   
-
   return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  
   const withdrawableNotes = useMemo(() => {
     return notes.filter((n) => n.status === 'deposited');
   }, [notes]);
-
-  
 
   useEffect(() => {
     const fetchPairRate = async () => {
@@ -204,13 +190,10 @@ export default function SwapPage() {
     fetchWithdrawRate();
   }, [selectedNoteId, withdrawAssetOutCode, notes]);
 
-
-  
   const rateNum = currentRate.numerator;
   const rateDen = currentRate.denominator;
   const decimalRate = rateNum / rateDen;
 
-  
   const calculatedOut = useMemo(() => {
     if (!amountIn || isNaN(parseFloat(amountIn))) return '';
     const val = parseFloat(amountIn);
@@ -218,7 +201,6 @@ export default function SwapPage() {
     return Number(out.toFixed(7)).toString();
   }, [amountIn, decimalRate]);
 
-  
   const handleAmountChange = (val: string) => {
     if (val === '' || /^\d*\.?\d{0,7}$/.test(val)) {
       setAmountIn(val);
@@ -230,9 +212,6 @@ export default function SwapPage() {
     }
   };
 
-  
-
-  
   const handleFlipAssets = () => {
     setAssetInCode(assetOutCode);
     setAssetOutCode(assetInCode);
@@ -243,13 +222,11 @@ export default function SwapPage() {
     }
   };
 
-  
   const handleMaxClick = () => {
     const maxBalance = balances[assetInCode];
     setAmountIn(maxBalance.toString());
   };
 
-  
   const depositValidation = useMemo(() => {
     if (!amountIn) {
       return { isValid: false, message: 'Enter an amount' };
@@ -273,7 +250,6 @@ export default function SwapPage() {
     return { isValid: true, message: 'Deposit' };
   }, [amountIn, assetInCode, balances]);
 
-  
   const handleDeposit = async () => {
     if (!isConnected) {
       connect();
@@ -299,8 +275,6 @@ export default function SwapPage() {
       const poolContractId = (config as any)?.POOL_CONTRACT_ID;
       const note = createNote(amountBigInt, assetId, poolContractId);
 
-      
-      
       const commitmentHex = BigInt(note.commitment).toString(16).padStart(64, '0');
 
       const result = await submitDeposit(
@@ -340,7 +314,6 @@ export default function SwapPage() {
     }
   };
 
-  
   const formattedCalculatedOut = useMemo(() => {
     if (!calculatedOut) return '';
     const num = parseFloat(calculatedOut);
@@ -353,7 +326,6 @@ export default function SwapPage() {
     return num.toFixed(2);
   }, [calculatedOut]);
 
-  
   const workerProgressMessage = useMemo(() => {
     if (!workerStage) return '';
     switch (workerStage) {
@@ -368,7 +340,6 @@ export default function SwapPage() {
     }
   }, [workerStage, provingSeconds]);
 
-  
   useEffect(() => {
     let timer: any = null;
     if (withdrawStatus === 'loading' && withdrawStep === 3) {
@@ -383,7 +354,6 @@ export default function SwapPage() {
     };
   }, [withdrawStatus, withdrawStep]);
 
-  
   const handleWithdraw = async () => {
     setLiquidityError(null);
     if (!isConnected) {
@@ -398,16 +368,12 @@ export default function SwapPage() {
     setWithdrawTxHash(null);
     setWorkerStage(null);
 
-    
     let activeSecret: bigint | null = BigInt(note.secret);
 
     try {
       
-      
-      
       const depositAmountBig = BigInt(note.amount);
       const isUSDCIn = false; 
-      
       
       const depositAsset = getAssetByCode(note.asset);
       const withdrawAsset = getAssetByCode(withdrawAssetOutCode);
@@ -420,7 +386,6 @@ export default function SwapPage() {
       const withdrawRate = await getRate(depositAsset.id, withdrawAsset.id, note.poolContractId);
       const withdrawAmountBig = (depositAmountBig * BigInt(withdrawRate.numerator)) / BigInt(withdrawRate.denominator);
 
-      
       const poolReserves = await getReserves(note.poolContractId);
       const reserveAvailable = poolReserves.length > withdrawAsset.id ? poolReserves[withdrawAsset.id] : BigInt(0);
 
@@ -437,11 +402,7 @@ export default function SwapPage() {
         console.warn(`MOCK MODE: Token contract for output asset is not configured.`);
       }
 
-      
-      
-      
       setWithdrawStep(1);
-      
       
       const currentRoot = await getMerkleRoot(note.poolContractId);
       
@@ -449,16 +410,12 @@ export default function SwapPage() {
         throw new Error('Could not fetch active Merkle root from chain.');
       }
 
-      
-      
-      
       setWithdrawStep(2);
       
       const leaves = await reconstructCommitments(note.poolContractId);
       
       const commitmentBig = BigInt(note.commitment);
       const commitmentHex = note.commitment;
-      
       
       const events = await fetchDepositEvents(undefined, note.poolContractId);
       console.log('=== EVENT DEBUG ===');
@@ -470,10 +427,8 @@ export default function SwapPage() {
       }
       console.log('===================');
       
-      
       let leafIdx: number = leaves.findIndex((l) => l === commitmentBig);
       if (leafIdx === -1) {
-        
         
         if (note.leafIndex !== null && note.leafIndex !== undefined) {
           leafIdx = note.leafIndex;
@@ -494,20 +449,15 @@ export default function SwapPage() {
       let rootBigInt = buildTree(leaves);
       const { pathElements, pathIndices } = getProof(leaves, leafIdx);
 
-      
       if (!config?.POOL_CONTRACT_ID) {
          rootBigInt = computeRootFromPath(commitmentBig, pathElements, pathIndices);
       }
 
-      
       const isProofValid = verifyProof(rootBigInt, commitmentBig, pathElements, pathIndices);
       if (!isProofValid) {
         throw new Error('Local Merkle proof verification failed. Sibling tree elements did not hash to root.');
       }
 
-      
-      
-      
       setWithdrawStep(3);
       const nullifierBig = computeNullifier(commitmentBig, activeSecret);
 
@@ -528,7 +478,6 @@ export default function SwapPage() {
         merkle_root: toHex32(rootBigInt),
       };
 
-      
       let proofResult;
       if (!config?.POOL_CONTRACT_ID) {
         
@@ -544,16 +493,11 @@ export default function SwapPage() {
         });
       }
 
-      
-      
-      
       setWithdrawStep(4);
       setWorkerStage(null);
 
-      
       const { proofHex } = formatProofForContract(proofResult.proof, proofResult.publicInputs);
 
-      
       try {
         await submitVerifyWithdrawal(
           recipientAddress,
@@ -572,9 +516,6 @@ export default function SwapPage() {
         throw new Error("Proof verification failed: " + (err.message || err));
       }
 
-      
-      
-      
       setWithdrawStep(5);
       
       let result;
@@ -590,19 +531,13 @@ export default function SwapPage() {
         throw new Error("Execution failed. Verification completed, so you can resume withdrawal. " + (err.message || err));
       }
 
-      
-      
-      
       setWithdrawStep(6);
 
-      
       activeSecret = null;
 
-      
       await updateNote(note.id, { secret: '0' });
       await markWithdrawn(note.id, result.txHash);
 
-      
       addTransaction({
         type: 'withdrawal',
         amount: (Number(withdrawAmountBig) / 10_000_000).toString(),
@@ -643,10 +578,6 @@ export default function SwapPage() {
       if (!note) throw new Error('Note not found.');
       const depositAsset = getAssetByCode(note.asset);
       if (!depositAsset) throw new Error('Unknown asset.');
-      
-      
-      
-      
       
       if (!note.secret) {
         throw new Error('Secret not found in local memory. Please re-enter it to continue.');

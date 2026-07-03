@@ -5,7 +5,7 @@ members = [
     "zendswap-pool",
     "ultrahonk-verifier-multi",
     "zendswap-pool-multi",
-    "mock-verifier", "oz-policy-engine",
+    "mock-verifier", "oz-policy-engine", "kyc-verifier"
 ]
 
 [workspace.dependencies]

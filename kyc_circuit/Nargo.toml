@@ -1,0 +1,6 @@
+[package]
+name = "zendswap_kyc"
+type = "bin"
+authors = ["Swarp Team"]
+
+[dependencies]

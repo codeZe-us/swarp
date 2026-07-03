@@ -902,6 +902,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "kyc-verifier"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "ultrahonk_soroban_verifier 0.1.0 (git+https://github.com/NethermindEth/rs-soroban-ultrahonk?branch=main)",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
