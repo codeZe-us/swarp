@@ -78,13 +78,17 @@ impl UltraHonkVerifierContract {
             std::println!("proof len: {}", proof.len());
         }
 
-        if VK_BYTES.len() < 1760 {
+        if VK_BYTES.len() < 1000 {
             return false;
         }
-        let vk_bytes_sdk = Bytes::from_slice(&env, &VK_BYTES[..1760]);
+        let vk_bytes_sdk = Bytes::from_slice(&env, &VK_BYTES);
         let verifier = match UltraHonkVerifier::new(&env, &vk_bytes_sdk) {
             Ok(v) => v,
-            Err(_) => return false,
+            Err(_e) => {
+                #[cfg(test)]
+                std::println!("UltraHonkVerifier::new failed: {:?}", _e);
+                return false;
+            }
         };
 
         match verifier.verify(&env, &proof, &pi_bytes) {
@@ -99,10 +103,10 @@ impl UltraHonkVerifierContract {
 
     
     pub fn vk_bytes(env: Env) -> Bytes {
-        if VK_BYTES.len() < 1760 {
+        if VK_BYTES.is_empty() {
             Bytes::new(&env)
         } else {
-            Bytes::from_slice(&env, &VK_BYTES[..1760])
+            Bytes::from_slice(&env, &VK_BYTES)
         }
     }
 
@@ -179,8 +183,11 @@ mod test {
         ];
         public_inputs.push_back(BytesN::from_array(&env, &pi_5));
 
-        let verified = client.verify(&proof_bytes, &public_inputs);
-        assert!(verified, "Valid proof failed verification!");
+        let result = client.verify(&proof_bytes, &public_inputs);
+        env.budget().print();
+        if !result {
+            panic!("Valid proof failed verification!");
+        }
     }
 
     #[test]

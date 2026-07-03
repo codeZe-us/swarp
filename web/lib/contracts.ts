@@ -649,7 +649,7 @@ async function executeTransaction(
   
   let simulation: any;
   try {
-    simulation = await withRetry(() => rpcServer.simulateTransaction(transaction, { cpuInstructions: 200_000_000 }));
+    simulation = await withRetry(() => rpcServer.simulateTransaction(transaction, { resourceConfig: { instructionLeeway: 100000000 } }));
   } catch (error) {
     throw new SorobanNetworkError('Network error during transaction simulation.', error);
   }
@@ -771,7 +771,21 @@ export async function submitVerifyWithdrawal(
   const proofVal = nativeToScVal(Buffer.from(proof, 'hex'));
   const nullifierVal = xdr.ScVal.scvBytes(Buffer.from(nullifier, 'hex'));
   const merkleRootVal = xdr.ScVal.scvBytes(Buffer.from(merkleRoot, 'hex'));
+  const exchangeRateVal = nativeToScVal(BigInt(exchangeRate), { type: 'u64' });
+  const rateDenominatorVal = nativeToScVal(BigInt(rateDenominator), { type: 'u64' });
   const withdrawalAmountVal = nativeToScVal(amountBig, { type: 'i128' });
+
+  console.log('=== VERIFY_WITHDRAWAL DEBUG ===');
+  console.log('Pool contract:', POOL_CONTRACT_ID);
+  console.log('Verifier contract:', config.VERIFIER_CONTRACT_ID);
+  console.log('Proof byte length:', Buffer.from(proof, 'hex').length);
+  console.log('Public inputs count:', 6);
+  console.log('Asset in:', assetInId);
+  console.log('Asset out:', assetOutId);
+  console.log('Exchange rate:', exchangeRate);
+  console.log('Rate denominator:', rateDenominator);
+  console.log('Withdrawal amount:', withdrawalAmount);
+  console.log('================================');
 
   const transaction = new TransactionBuilder(account, {
     fee: '100000000',
@@ -786,6 +800,8 @@ export async function submitVerifyWithdrawal(
         proofVal,
         nullifierVal,
         merkleRootVal,
+        exchangeRateVal,
+        rateDenominatorVal,
         withdrawalAmountVal
       )
     )

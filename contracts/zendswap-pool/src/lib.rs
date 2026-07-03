@@ -592,6 +592,8 @@ impl ZendSwapPool {
         proof: Bytes,
         nullifier_hash: BytesN<32>,
         merkle_root: BytesN<32>,
+        exchange_rate: u64,
+        rate_denom: u64,
         withdrawal_amount: i128,
     ) -> Result<(), Error> {
         extend_ttl(&env);
@@ -625,11 +627,15 @@ impl ZendSwapPool {
             BytesN::from_array(env, &bytes)
         }
 
-        let (_, rate_denom): (u64, u64) = env
+        let (_, expected_rate_denom): (u64, u64) = env
             .storage()
             .instance()
             .get(&DataKey::RateTable(asset_in_id, asset_out_id))
             .unwrap();
+
+        if rate_denom != expected_rate_denom {
+            return Err(Error::VerificationFailed);
+        }
 
         let recent_rates: Vec<u64> = env
             .storage()
@@ -637,47 +643,39 @@ impl ZendSwapPool {
             .get(&DataKey::RecentRates(asset_in_id, asset_out_id))
             .unwrap_or_else(|| Vec::new(&env));
 
-        let mut unique_rates = Vec::new(&env);
+        let mut valid_rate = false;
         for rate in recent_rates.iter() {
-            let mut duplicate = false;
-            for r in unique_rates.iter() {
-                if r == rate {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if !duplicate {
-                unique_rates.push_back(rate);
-            }
-        }
-
-        let mut verified = false;
-        let verifier: Address = env.storage().instance().get(&DataKey::Verifier).unwrap();
-
-        for rate in unique_rates.iter() {
-            let mut public_inputs = Vec::new(&env);
-            public_inputs.push_back(u64_to_bytes32(&env, asset_in_id));
-            public_inputs.push_back(u64_to_bytes32(&env, rate));
-            public_inputs.push_back(u64_to_bytes32(&env, rate_denom));
-            public_inputs.push_back(nullifier_hash.clone());
-            public_inputs.push_back(u64_to_bytes32(&env, asset_out_id));
-            public_inputs.push_back(merkle_root.clone());
-
-            let args = soroban_sdk::vec![
-                &env,
-                proof.clone().into_val(&env),
-                public_inputs.into_val(&env)
-            ];
-            let invoke_res =
-                env.try_invoke_contract::<bool, Val>(&verifier, &Symbol::new(&env, "verify"), args);
-
-            if let Ok(Ok(true)) = invoke_res {
-                verified = true;
+            if rate == exchange_rate {
+                valid_rate = true;
                 break;
             }
         }
 
-        if !verified {
+        if !valid_rate {
+            return Err(Error::VerificationFailed);
+        }
+
+        let verifier: Address = env.storage().instance().get(&DataKey::Verifier).unwrap();
+
+        let mut public_inputs = Vec::new(&env);
+        public_inputs.push_back(u64_to_bytes32(&env, asset_in_id));
+        public_inputs.push_back(u64_to_bytes32(&env, exchange_rate));
+        public_inputs.push_back(u64_to_bytes32(&env, rate_denom));
+        public_inputs.push_back(nullifier_hash.clone());
+        public_inputs.push_back(u64_to_bytes32(&env, asset_out_id));
+        public_inputs.push_back(merkle_root.clone());
+
+        let args = soroban_sdk::vec![
+            &env,
+            proof.clone().into_val(&env),
+            public_inputs.into_val(&env)
+        ];
+        let invoke_res =
+            env.try_invoke_contract::<bool, Val>(&verifier, &Symbol::new(&env, "verify"), args);
+
+        if let Ok(Ok(true)) = invoke_res {
+            // Success
+        } else {
             return Err(Error::VerificationFailed);
         }
 

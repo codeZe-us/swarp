@@ -27,12 +27,15 @@ export default function Home() {
   const notes = useStore((state) => state.notes);
   const transactions = useStore((state) => state.transactions);
   const config = useStore((state) => state.config);
+  const isConfigLoaded = useStore((state) => state.isConfigLoaded);
 
   const isConnected = status === 'connected';
 
   
   const [balances, setBalances] = useState({ USDC: 0, EURC: 0, MGUSD: 0, YLDS: 0, XLM: 0 });
   const [isLoading, setIsLoading] = useState(false);
+  
+  const showLoading = isLoading || !isConfigLoaded;
 
   
   useEffect(() => {
@@ -179,7 +182,7 @@ export default function Home() {
             <div className="p-6 md:p-8 flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">PORTFOLIO VALUE</span>
             <div className="flex flex-col items-start gap-4">
-              {isLoading ? (
+              {showLoading ? (
                 <ShimmerLoader className="w-[200px] h-[48px]" borderRadius={8} />
               ) : (
                 <div className="flex items-baseline font-display">
@@ -198,7 +201,7 @@ export default function Home() {
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">USDC</span>
-            {isLoading ? (
+            {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
               <div>
@@ -209,7 +212,7 @@ export default function Home() {
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">EURC</span>
-            {isLoading ? (
+            {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
               <div>
@@ -220,7 +223,7 @@ export default function Home() {
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">MGUSD</span>
-            {isLoading ? (
+            {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
               <div>
@@ -231,7 +234,7 @@ export default function Home() {
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">YLDS</span>
-            {isLoading ? (
+            {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
               <div>
@@ -242,7 +245,7 @@ export default function Home() {
           </div>
           <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">XLM</span>
-            {isLoading ? (
+            {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
               <div>
@@ -253,7 +256,7 @@ export default function Home() {
           </div>
           <div className="p-6 md:p-8 flex-1 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED NOTES</span>
-            {isLoading ? (
+            {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
               <div>
@@ -269,7 +272,7 @@ export default function Home() {
           <div className="flex items-start justify-between mb-8">
             <div>
               <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED POOL</span>
-              {isLoading ? (
+              {showLoading ? (
                 <ShimmerLoader className="w-[150px] h-[36px]" borderRadius={8} />
               ) : (
                 <div className="text-[32px] font-display text-white leading-none">
@@ -283,7 +286,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-6 pt-2">
-            {isLoading ? (
+            {showLoading ? (
               <div className="space-y-4">
                 <ShimmerLoader className="w-full h-[60px]" borderRadius={12} />
                 <ShimmerLoader className="w-full h-[60px]" borderRadius={12} />
@@ -375,7 +378,7 @@ export default function Home() {
           </div>
           
           <div className="space-y-1">
-            {!isLoading && filteredTransactions.slice(0, 5).map((tx) => {
+            {!showLoading && filteredTransactions.slice(0, 5).map((tx) => {
               const isDeposit = tx.type === 'deposit';
               const isPrivate = tx.privacy === 'private';
               
@@ -440,7 +443,7 @@ export default function Home() {
               );
             })}
             
-            {isLoading ? (
+            {showLoading ? (
               <div className="space-y-4">
                 <ShimmerLoader className="w-full h-[80px]" borderRadius={12} />
                 <ShimmerLoader className="w-full h-[80px]" borderRadius={12} />
