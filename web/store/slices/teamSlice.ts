@@ -42,34 +42,6 @@ export const createTeamSlice: StateCreator<
           role: 'Owner',
           status: 'Active',
         },
-        {
-          id: 'amara-id',
-          name: 'Amara Okafor',
-          address: 'GDQPSJ7RZX2XZKM55W347A22Z567KM47Z5X73KXMX7KMK2A4K3Z7K4XM',
-          role: 'Admin',
-          status: 'Active',
-        },
-        {
-          id: 'liam-id',
-          name: 'Liam Schäfer',
-          address: 'GBR3UYEWZX2XZKM55W347A22Z567KM47Z5X73KXMX7KMK2A4K3Z7K4XM',
-          role: 'Member',
-          status: 'Active',
-        },
-        {
-          id: 'sofia-id',
-          name: 'Sofia Rossi',
-          address: 'GCR6MLL2HF5RV5NKJSNEMV7MQDKONZ27RYHHMULKF34ICW2QA6QL6FLL',
-          role: 'Member',
-          status: 'Pending',
-        },
-        {
-          id: 'gc2s-id',
-          name: 'GC2S Admin',
-          address: 'GC2S532SGRZ7HVDYMXCULDHLXZL3UQIE4CBKNC2JBAJV7HMTC5CUHNLG',
-          role: 'Admin',
-          status: 'Pending',
-        },
       ];
 
       set({ teamMembers: defaultMembers, signersRequired: signersCount });
