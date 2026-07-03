@@ -722,7 +722,7 @@ export async function submitVerifyWithdrawal(
   try {
     account = await withRetry(() => rpcServer.getAccount(caller));
   } catch (error) {
-    throw new SorobanNetworkError('Failed to fetch caller account details from RPC.', error);
+    throw new SorobanNetworkError('Failed to fetch account. Please ensure your wallet is funded on Testnet using the "Fund Testnet" button.', error);
   }
 
   const contract = new Contract(POOL_CONTRACT_ID);
@@ -993,7 +993,7 @@ export async function submitVerifyKyc(
   try {
     account = await withRetry(() => rpcServer.getAccount(caller));
   } catch (error) {
-    throw new SorobanNetworkError('Failed to fetch caller account details from RPC.', error);
+    throw new SorobanNetworkError('Failed to fetch account. Please ensure your wallet is funded on Testnet using the "Fund Testnet" button.', error);
   }
 
   const contract = new Contract(POOL_CONTRACT_ID);
