@@ -45,8 +45,18 @@ export const createWalletSlice: StateCreator<
             try {
               const networkDetails = await StellarWalletsKit.getNetwork();
               netName = (networkDetails?.network || '').toLowerCase();
-            } catch (err) {
+            } catch (err: any) {
               console.warn('StellarWalletsKit getNetwork failed, bypassing check for this wallet', err);
+              if (err?.message?.includes('does not support')) {
+                await disconnectWallet();
+                throw new ZendSwapError({
+                  code: 'WALLET_NETWORK_UNSUPPORTED',
+                  title: 'Network Check Unsupported',
+                  message: 'Your wallet does not support network detection, so we cannot securely verify if you are on Testnet. For your safety, please use a fully supported wallet like Freighter.',
+                  severity: 'error',
+                  source: 'wallet'
+                });
+              }
             }
           }
           
@@ -80,8 +90,8 @@ export const createWalletSlice: StateCreator<
       await get().loadPayroll(address);
       await get().loadTeam(address);
     } catch (err: unknown) {
-      const zError = handleError(err, 'wallet_connect');
-      set({ status: 'error', error: zError });
+      handleError(err, 'wallet_connect');
+      set({ status: 'disconnected', error: null, kit: null });
     }
   },
   disconnect: async () => {
