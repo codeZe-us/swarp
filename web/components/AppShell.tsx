@@ -102,12 +102,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Top Navigation */}
       <div className="md:hidden flex items-center justify-between p-4 bg-darkBackground border-b border-borderSubtle">
-        <div className="flex items-center gap-3 font-display">
-          <div className="w-8 h-8 rounded-[9px] bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] flex items-center justify-center shadow-[0_0_20px_rgba(123,55,168,0.2)]">
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
+        <div className="flex items-center gap-2 font-display">
+          <img src="/logo.png" alt="Swarp Logo" className="w-7 h-7" />
           <span className="font-extrabold text-xl tracking-tight text-white">Swarp</span>
         </div>
         <button 
@@ -147,12 +143,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </svg>
               </button>
             </div>
-            <div className="hidden md:flex items-center gap-3 font-display">
-              <div className="w-8 h-8 rounded-[9px] bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] flex items-center justify-center shadow-[0_0_20px_rgba(123,55,168,0.2)]">
-                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
+            <div className="hidden md:flex items-center gap-2 font-display">
+              <img src="/logo.png" alt="Swarp Logo" className="w-7 h-7" />
               <span className="font-extrabold text-xl tracking-tight text-white">Swarp</span>
             </div>
 
