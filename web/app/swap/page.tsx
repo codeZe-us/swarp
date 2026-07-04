@@ -658,8 +658,8 @@ export default function SwapPage() {
           {isConnected && (
             <div className="flex flex-col items-end gap-2">
               <Link
-                href="/fund"
-                className="px-3 py-1.5 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[6px] text-[10px] uppercase tracking-wider transition duration-150 font-display bg-transparent"
+                href="/faucet"
+                className="px-3 py-1.5 border animate-border-pulse text-[#B488DC] hover:text-white hover:bg-[#5E2A8C]/20 font-bold rounded-[6px] text-[10px] uppercase tracking-wider transition-all duration-300 font-display bg-transparent"
               >
                 Fund Testnet
               </Link>

@@ -112,7 +112,7 @@ export default function NotesPage() {
                   </div>
                   <Link 
                     href={`/swap?noteId=${note.id}`}
-                    className="bg-[#5E2A8C] hover:bg-[#7C3AED] text-white font-bold py-2 px-5 rounded-[9px] text-[13px] transition-all font-display"
+                    className="bg-[#5E2A8C] hover:bg-[#4A1F70] hover:brightness-110 text-white font-bold py-2 px-5 rounded-[9px] text-[13px] transition-all font-display"
                   >
                     Withdraw
                   </Link>

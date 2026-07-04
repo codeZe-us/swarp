@@ -266,7 +266,7 @@ export default function FaucetPage() {
               <button 
                 onClick={handleMintAsset}
                 disabled={status !== 'connected'}
-                className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white py-4 rounded-xl text-[15px] font-bold transition-all shadow-[0_0_15px_rgba(124,58,237,0.3)] disabled:opacity-50 disabled:cursor-not-allowed mb-4 flex items-center justify-center"
+                className="w-full bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white py-4 rounded-xl text-[15px] font-bold transition-all shadow-[0_0_15px_rgba(123,55,168,0.3)] disabled:opacity-50 disabled:cursor-not-allowed mb-4 flex items-center justify-center"
               >
                 {`Mint ${activeAsset}`}
               </button>

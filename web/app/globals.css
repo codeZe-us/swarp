@@ -36,3 +36,13 @@ html, body {
 [class*="swk"] img {
   display: none !important;
 }
+
+@keyframes borderPulse {
+  0% { border-color: rgba(94, 42, 140, 0.3); }
+  50% { border-color: rgba(180, 136, 220, 0.8); }
+  100% { border-color: rgba(94, 42, 140, 0.3); }
+}
+
+.animate-border-pulse {
+  animation: borderPulse 2s infinite ease-in-out;
+}
