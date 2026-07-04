@@ -688,7 +688,7 @@ export default function SwapPage() {
       {activeTab === 'deposit' ? (
         <div className="flex flex-col gap-6 items-center">
           {}
-          <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6 relative">
+          <div className="w-full max-w-lg bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-4 md:p-6 relative">
             
             {}
             <div className="flex items-center justify-between mb-5">
@@ -899,7 +899,7 @@ export default function SwapPage() {
       ) : (
         
         <div className="flex flex-col gap-6 items-center w-full">
-          <div className="w-full max-w-[500px] bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6">
+          <div className="w-full max-w-lg bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-4 md:p-6">
             
             {}
             <div className="flex items-center justify-between mb-5">
