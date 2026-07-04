@@ -94,18 +94,61 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     },
   ];
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
   return (
     <div className="flex flex-col min-h-screen bg-appBackground text-primaryText selection:bg-primaryAccent/30 selection:text-white">
       <FreighterBanner />
-      {}
       <WalletConnect />
 
-      <div className="flex flex-1 overflow-hidden">
-        {}
-        <aside className="w-64 bg-darkBackground border-r border-borderSubtle flex flex-col justify-between p-6">
+      {/* Mobile Top Navigation */}
+      <div className="md:hidden flex items-center justify-between p-4 bg-darkBackground border-b border-borderSubtle">
+        <div className="flex items-center gap-3 font-display">
+          <div className="w-8 h-8 rounded-[9px] bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] flex items-center justify-center shadow-[0_0_20px_rgba(123,55,168,0.2)]">
+            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <span className="font-extrabold text-xl tracking-tight text-white">Swarp</span>
+        </div>
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="text-mutedText hover:text-white p-2"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile Backdrop overlay */}
+        {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black/60 z-40 md:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Sidebar Drawer */}
+        <aside className={`
+          fixed inset-y-0 left-0 z-50 w-64 bg-darkBackground border-r border-borderSubtle flex flex-col justify-between p-6
+          transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}>
           <div className="flex flex-col gap-8">
-            {}
-            <div className="flex items-center gap-3 font-display">
+            <div className="flex items-center justify-between md:hidden">
+              <span className="font-extrabold text-xl tracking-tight text-white font-display">Menu</span>
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="text-mutedText hover:text-white p-2"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="hidden md:flex items-center gap-3 font-display">
               <div className="w-8 h-8 rounded-[9px] bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] flex items-center justify-center shadow-[0_0_20px_rgba(123,55,168,0.2)]">
                 <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -114,15 +157,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <span className="font-extrabold text-xl tracking-tight text-white">Swarp</span>
             </div>
 
-            {}
             <nav className="flex flex-col gap-2 font-display">
-              <span className="text-[10px] font-bold text-mutedText/60 tracking-wider uppercase mb-2 font-sans">Menu</span>
+              <span className="hidden md:block text-[10px] font-bold text-mutedText/60 tracking-wider uppercase mb-2 font-sans">Menu</span>
               {navItems.map((item) => {
                 const active = pathname === item.href;
                 return (
                   <Link 
                     key={item.name} 
                     href={item.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className={`flex items-center justify-between px-3 py-2.5 rounded-[9px] text-sm font-medium transition duration-200 group ${
                       active 
                         ? 'bg-primaryAccent/10 text-white border border-primaryAccent/20' 
@@ -139,7 +182,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
 
-          {}
           <div className="bg-cardSurface border border-borderSubtle rounded-[12px] p-4 flex flex-col gap-3 mt-auto">
             {isConnected && address ? (
               <div className="flex flex-col gap-2">
@@ -188,8 +230,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        {}
-        <main className="flex-1 overflow-y-auto bg-darkBackground p-8">
+        <main className="flex-1 overflow-y-auto bg-darkBackground p-4 md:p-8">
           {children}
         </main>
       </div>

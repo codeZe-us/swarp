@@ -371,7 +371,7 @@ export default function PayrollPage() {
 
           {}
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full min-w-[600px] text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-[#1D1D1F] text-mutedText font-bold uppercase tracking-wider text-[10px] font-display">
                   <th className="pb-3 pr-4">Recipient</th>
