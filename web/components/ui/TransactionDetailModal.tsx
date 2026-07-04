@@ -101,7 +101,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
     >
       <div
         ref={modalRef}
-        className="w-full max-w-md bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] shadow-2xl relative flex flex-col overflow-hidden transition-all duration-300 font-sans"
+        className="w-full max-w-md bg-[#0B0B0C] border border-purple-500/50 animate-border-pulse rounded-[13px] shadow-[0_0_30px_rgba(124,58,237,0.15)] relative flex flex-col overflow-hidden transition-all duration-300 font-sans"
       >
         {/* Close Button */}
         <button
@@ -176,18 +176,6 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Tooltip explanation */}
-          <div className="bg-[#1D1D1F]/30 border border-[#1D1D1F] rounded-[9px] p-3 text-[11px] text-mutedText leading-relaxed">
-            {transaction.privacy === 'private' ? (
-              <p>
-                🔒 **Shielded Withdrawal**: The transaction withdrew funds privately using a Zero-Knowledge proof. The on-chain inputs reveal no link to your initial deposit address or deposit transaction.
-              </p>
-            ) : (
-              <p>
-                🌐 **Public Deposit**: The transaction locked funds into the privacy pool. The deposit amount and token are visible on-chain. Privacy is fully established once the withdrawal is privately executed.
-              </p>
-            )}
-          </div>
 
           {/* Paired Swap information */}
           {pairedInfo ? (
