@@ -12,6 +12,9 @@ import { ZendSwapError, handleError } from '../lib/errors';
 import { ErrorDisplay } from '../components/ui/ErrorDisplay';
 import { ShimmerLoader } from '../components/ui/ShimmerLoader';
 import { useToastStore } from '../store/useToast';
+import { CheckCircle2, ChevronRight, Search, Zap, Clock, TrendingUp, TrendingDown, ArrowRightLeft, ShieldCheck, PieChart, Activity, Wallet, Lock, Plus, ArrowUpRight } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Home() {
   const [filter, setFilter] = useState<'all' | 'swaps' | 'payroll'>('all');
@@ -125,28 +128,32 @@ export default function Home() {
     });
   }, [sortedTransactions, filter]);
 
-  
-  const chartPoints = useMemo(() => {
+  const chartData = useMemo(() => {
     if (!isConnected || sortedTransactions.length === 0) {
-      return totalValue > 0 ? `M 0,100 C 200,90 400,60 600,40` : 'M 0,100 L 600,100';
+      return Array.from({ length: 10 }).map((_, i) => ({
+        name: `Day ${i + 1}`,
+        value: totalValue > 0 ? totalValue * (1 - (9 - i) * 0.01) : 0
+      }));
     }
     const txsToUse = sortedTransactions.slice(0, 10);
     let currentPort = totalValue;
-    const checkpoints = txsToUse.map((tx, idx) => {
-      const x = 600 - (idx / (Math.max(txsToUse.length - 1, 1))) * 600;
-      const state = { x, val: currentPort };
+    const data = txsToUse.map((tx) => {
+      const state = {
+        name: new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        value: currentPort
+      };
       const amt = parseFloat(tx.amount);
       const change = tx.asset === 'EURC' ? amt / decimalRate : amt;
       if (tx.type === 'withdrawal') currentPort += change;
       else currentPort -= change;
       return state;
     });
-    checkpoints.reverse();
-    const minVal = Math.min(...checkpoints.map((c) => c.val)) * 0.9;
-    const maxVal = Math.max(...checkpoints.map((c) => c.val)) * 1.1;
-    const range = maxVal - minVal || 1;
-    const pointsStr = checkpoints.map((c) => `${c.x},${100 - ((c.val - minVal) / range) * 80}`).join(' L ');
-    return `M 0,100 L ${pointsStr}`;
+    // Add one more point for the start of the period
+    data.push({
+        name: 'Start',
+        value: currentPort
+    });
+    return data.reverse();
   }, [isConnected, sortedTransactions, totalValue, decimalRate]);
 
   const percentChange = useMemo(() => {
@@ -166,8 +173,26 @@ export default function Home() {
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="flex flex-col gap-8 max-w-6xl mx-auto animate-fade-in pb-12">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="flex flex-col gap-8 max-w-6xl mx-auto pb-12"
+    >
       
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -193,10 +218,24 @@ export default function Home() {
       <div className="flex flex-col gap-6">
         
         {}
-        <div className="bg-[#141419] border border-white/5 rounded-xl grid grid-cols-2 md:flex overflow-hidden">
-            <div className="col-span-2 md:col-span-1 p-6 md:p-8 md:flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">PORTFOLIO VALUE</span>
-            <div className="flex flex-col items-start gap-4">
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="bg-[#53237E] border border-white/5 rounded-xl grid grid-cols-2 md:flex overflow-hidden shadow-2xl relative"
+          style={{
+            backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px)',
+            backgroundSize: '32px 32px',
+            backgroundPosition: 'center center'
+          }}
+        >
+          <motion.div 
+            variants={itemVariants} 
+            className="col-span-2 md:col-span-1 p-6 md:p-8 md:flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between relative overflow-hidden group"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-black/20 to-transparent mix-blend-overlay" />
+            <span className="text-[11px] font-bold text-white/80 uppercase tracking-widest block mb-4 relative z-10">PORTFOLIO VALUE</span>
+            <div className="flex flex-col items-start gap-4 relative z-10">
               {showLoading ? (
                 <ShimmerLoader className="w-[200px] h-[48px]" borderRadius={8} />
               ) : (
@@ -209,82 +248,82 @@ export default function Home() {
                   </span>
                 </div>
               )}
-              <span className={`inline-flex px-2.5 py-1 rounded-[6px] text-[11px] font-bold border ${
+              <span className={`inline-flex px-2.5 py-1 rounded-[6px] text-[11px] font-bold border relative z-10 ${
                 percentChange >= 0 
-                  ? 'bg-[#3B1C5F]/40 text-[#A874F5] border-[#A874F5]/10' 
-                  : 'bg-red-500/10 text-red-400 border-red-500/10'
+                  ? 'bg-black/20 text-white/90 border-transparent shadow-sm' 
+                  : 'bg-red-500/20 text-red-100 border-transparent shadow-sm'
               }`}>
                 {percentChange >= 0 ? '+' : ''}{percentChange.toFixed(1)}% 30d
               </span>
             </div>
-          </div>
-          <div className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 border-r md:border-r border-white/5 flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">USDC</span>
+          </motion.div>
+          <motion.div variants={itemVariants} className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 border-r md:border-r border-white/5 flex flex-col justify-between hover:bg-white/5 transition-colors duration-300">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest block mb-4 relative z-10">USDC</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
-              <div>
+              <div className="relative z-10">
                 <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-                <div className="text-[13px] text-gray-500">≈ ${balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                <div className="text-[13px] text-white/60">≈ ${balances.USDC.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
               </div>
             )}
-          </div>
-          <div className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">EURC</span>
+          </motion.div>
+          <motion.div variants={itemVariants} className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 border-r md:border-r border-white/5 flex flex-col justify-between hover:bg-white/5 transition-colors duration-300">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest block mb-4 relative z-10">EURC</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
-              <div>
+              <div className="relative z-10">
                 <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.EURC.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-                <div className="text-[13px] text-gray-500">≈ ${(balances.EURC / decimalRate).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                <div className="text-[13px] text-white/60">≈ ${(balances.EURC / decimalRate).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
               </div>
             )}
-          </div>
-          <div className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 border-r md:border-r border-white/5 flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">MGUSD</span>
+          </motion.div>
+          <motion.div variants={itemVariants} className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 border-r md:border-r border-white/5 flex flex-col justify-between hover:bg-white/5 transition-colors duration-300">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest block mb-4 relative z-10">MGUSD</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
-              <div>
+              <div className="relative z-10">
                 <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-                <div className="text-[13px] text-gray-500">≈ ${balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                <div className="text-[13px] text-white/60">≈ ${balances.MGUSD.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
               </div>
             )}
-          </div>
-          <div className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">YLDS</span>
+          </motion.div>
+          <motion.div variants={itemVariants} className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 border-r md:border-r border-white/5 flex flex-col justify-between hover:bg-white/5 transition-colors duration-300">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest block mb-4 relative z-10">YLDS</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
-              <div>
+              <div className="relative z-10">
                 <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.YLDS.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-                <div className="text-[13px] text-gray-500">≈ ${balances.YLDS.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                <div className="text-[13px] text-white/60">≈ ${balances.YLDS.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
               </div>
             )}
-          </div>
-          <div className="p-6 md:p-8 md:flex-1 border-r border-white/5 flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">XLM</span>
+          </motion.div>
+          <motion.div variants={itemVariants} className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 border-r md:border-r border-white/5 flex flex-col justify-between hover:bg-white/5 transition-colors duration-300">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest block mb-4 relative z-10">XLM</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
-              <div>
+              <div className="relative z-10">
                 <div className="text-[26px] font-display text-white mb-1 leading-none">{balances.XLM.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-                <div className="text-[13px] text-gray-500">≈ ${(balances.XLM * 0.08).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                <div className="text-[13px] text-white/60">≈ ${(balances.XLM * 0.08).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
               </div>
             )}
-          </div>
-          <div className="p-6 md:p-8 md:flex-1 flex flex-col justify-between">
-            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED NOTES</span>
+          </motion.div>
+          <motion.div variants={itemVariants} className="p-6 md:p-8 md:flex-1 flex flex-col justify-between hover:bg-white/5 transition-colors duration-300">
+            <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest block mb-4 relative z-10">SHIELDED NOTES</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
             ) : (
-              <div>
+              <div className="relative z-10">
                 <div className="text-[26px] font-display text-white mb-1 leading-none">{activeNotes.length}</div>
-                <div className="text-[13px] text-gray-500">pending withdrawal</div>
+                <div className="text-[13px] text-white/60">pending withdrawal</div>
               </div>
             )}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {}
         <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
@@ -348,35 +387,50 @@ export default function Home() {
           </div>
         </div>
 
-        {}
-        <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
-          <div className="flex items-center justify-between mb-8">
+        <motion.div variants={itemVariants} className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8 shadow-xl hover:border-white/10 transition-colors duration-500">
+          <div className="flex items-center justify-between mb-2">
             <h3 className="text-[15px] font-bold text-white">Portfolio</h3>
-            <span className="text-[13px] font-mono text-gray-500">Mar - Jun 2025</span>
+            <span className="text-[13px] font-mono text-gray-500">Last 30 Days</span>
           </div>
-          <div className="h-[180px] w-full relative">
-            <svg viewBox="0 0 600 120" className="w-full h-full preserve-3d" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.2" />
-                  <stop offset="100%" stopColor="#7C3AED" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path d={`${chartPoints} L 600,120 L 0,120 Z`} fill="url(#chartGrad)" />
-              <path d={chartPoints} fill="none" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="600" cy="30" r="3" fill="#7C3AED" />
-            </svg>
-            <div className="absolute bottom-0 left-0 w-full flex justify-between text-[11px] font-mono text-gray-500 px-2 pb-[-8px]">
-              <span>Mar</span>
-              <span>Apr</span>
-              <span>May</span>
-              <span>Jun</span>
-            </div>
+          <div className="h-[200px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#7C3AED" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#6B7280', fontSize: 11 }} 
+                  dy={10} 
+                  minTickGap={30}
+                />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#141419', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                  itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                  labelStyle={{ color: '#6B7280', marginBottom: '4px' }}
+                  formatter={(value: number) => [`$${value.toFixed(2)}`, 'Value']}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#7C3AED" 
+                  strokeWidth={2}
+                  fillOpacity={1} 
+                  fill="url(#colorValue)" 
+                  animationDuration={1500}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
 
         {}
-        <div className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
+        <motion.div variants={itemVariants} className="bg-[#141419] border border-white/5 rounded-xl p-6 md:p-8">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-[15px] font-bold text-white">Transactions</h3>
             <div className="flex items-center gap-2">
@@ -472,7 +526,7 @@ export default function Home() {
               <div className="text-center text-sm text-gray-500 py-8">No transactions</div>
             ) : null}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       <TransactionDetailModal
@@ -482,6 +536,6 @@ export default function Home() {
         notes={notes}
         exchangeRate={{ numerator: rateNum, denominator: rateDen }}
       />
-    </div>
+    </motion.div>
   );
 }
