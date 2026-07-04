@@ -1,6 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+
+const pageVariants: any = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } }
+};
+
+const itemVariants: any = {
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
 import { useStore } from '../../store/useStore';
 import { getTokenBalance } from '../../lib/contracts';
 import { formatCurrency } from '../../lib/utils';
@@ -165,17 +176,22 @@ export default function FaucetPage() {
   };
 
   return (
-    <div className="max-w-[1000px] mx-auto pt-8 pb-12 animate-fade-in px-4">
-      {}
-      <div className="mb-10">
+    <motion.div 
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+      className="max-w-[1000px] mx-auto pt-8 pb-12 px-4"
+    >
+      {/* Header */}
+      <motion.div variants={itemVariants} className="mb-10">
         <h1 className="text-[32px] font-bold text-white mb-2">Faucet</h1>
         <p className="text-gray-400 text-sm">Mint mock testnet assets to your wallet.</p>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         
-        {}
-        <div className="space-y-6">
+        {/* Left column */}
+        <motion.div variants={itemVariants} className="space-y-6">
           
           {}
           <div className="bg-[#141419] border border-white/5 rounded-xl p-6 flex items-center justify-between">
@@ -256,38 +272,12 @@ export default function FaucetPage() {
               </button>
             )}
           </div>
-        </div>
+        </motion.div>
 
-        {}
-        <div className="space-y-6">
+        {/* Right column */}
+        <motion.div variants={itemVariants} className="space-y-6">
           
-          <div className="bg-[#141419] border border-white/5 rounded-xl p-6">
-            <h3 className="text-[15px] font-bold text-white mb-6">Network</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between text-[13px]">
-                <span className="text-gray-500">Chain</span>
-                <span className="text-white font-bold">Stellar</span>
-              </div>
-              <div className="w-full h-px bg-white/5"></div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-gray-500">Mode</span>
-                <span className="text-[#F59E0B] font-bold">Testnet</span>
-              </div>
-              <div className="w-full h-px bg-white/5"></div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-gray-500">RPC</span>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-[#10B981]"></div>
-                  <span className="text-[#10B981] font-bold">Online</span>
-                </div>
-              </div>
-              <div className="w-full h-px bg-white/5"></div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-gray-500">VM</span>
-                <span className="text-[#A874F5] font-bold">Soroban</span>
-              </div>
-            </div>
-          </div>
+          
 
           <div className="bg-[#141419] border border-white/5 rounded-xl p-6">
             <h3 className="text-[15px] font-bold text-white mb-6">Mint limits</h3>
@@ -317,8 +307,8 @@ export default function FaucetPage() {
           <p className="text-[12px] text-gray-500 leading-relaxed px-2">
             Mock assets only. No real value. Tokens exist on Stellar testnet and are reset periodically.
           </p>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }

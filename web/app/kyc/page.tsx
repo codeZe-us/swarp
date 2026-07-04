@@ -5,6 +5,17 @@ import { useWallet } from '@/hooks/useWallet';
 import { Button } from '@/components/ui/Button';
 import { submitVerifyKyc } from '@/lib/contracts';
 import { useToastStore } from '@/store/useToast';
+import { motion } from 'framer-motion';
+
+const pageVariants: any = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } }
+};
+
+const itemVariants: any = {
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
 
 export default function KycPage() {
   const { address: walletAddress } = useWallet();
@@ -79,16 +90,21 @@ export default function KycPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto">
-      <div>
+    <motion.div 
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col gap-6 max-w-4xl mx-auto"
+    >
+      <motion.div variants={itemVariants}>
         <span className="text-[10px] font-bold text-primaryAccent tracking-wider uppercase">Application</span>
         <div className="flex items-center gap-3 mt-1">
           <h1 className="text-3xl font-extrabold text-white">KYC Verification</h1>
         </div>
         <p className="text-sm text-mutedText mt-1">Verify compliance identity parameters in zero-knowledge without revealing your personal data.</p>
-      </div>
+      </motion.div>
 
-      <div className="bg-cardSurface border border-borderSubtle rounded-2xl p-8 flex flex-col items-center justify-center min-h-[300px] text-center gap-6">
+      <motion.div variants={itemVariants} className="bg-cardSurface border border-borderSubtle rounded-2xl p-8 flex flex-col items-center justify-center min-h-[300px] text-center gap-6">
         <div className={`w-20 h-20 rounded-full flex items-center justify-center ${kycStatus === 'verified' ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-primaryAccent/10 border border-primaryAccent/20 text-primaryAccent'}`}>
           {kycStatus === 'verified' ? (
             <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -125,9 +141,9 @@ export default function KycPage() {
              'Generate Proof & Verify'}
           </Button>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="bg-cardSurface/40 border border-borderSubtle rounded-2xl p-6 w-full text-left mt-2">
+      <motion.div variants={itemVariants} className="bg-cardSurface/40 border border-borderSubtle rounded-2xl p-6 w-full text-left mt-2">
         <h3 className="text-base font-bold text-white mb-3">How it works</h3>
         <ol className="list-decimal list-inside space-y-2 text-sm text-mutedText font-medium">
           <li><strong className="text-white">Local Proving:</strong> A Zero-Knowledge proof is generated directly in your browser.</li>
@@ -135,7 +151,7 @@ export default function KycPage() {
           <li><strong className="text-white">On-Chain Verification:</strong> Only the cryptographic proof is submitted to Soroban.</li>
           <li><strong className="text-white">Pool Access:</strong> Once verified, your wallet is cleared to interact with the private liquidity pool.</li>
         </ol>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,6 +1,17 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const pageVariants: any = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } }
+};
+
+const itemVariants: any = {
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
 import { useStore } from '../../store/useStore';
 import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 import { Badge } from '../../components/ui/Badge';
@@ -104,10 +115,15 @@ export default function TeamPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 max-w-5xl mx-auto font-sans">
+    <motion.div 
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col gap-8 max-w-5xl mx-auto font-sans"
+    >
       
-      {}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header */}
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-bold text-brandLightPurple tracking-wider uppercase font-display">Governance</span>
           <h1 className="text-3xl font-extrabold text-white mt-1 font-display">Team</h1>
@@ -125,19 +141,19 @@ export default function TeamPage() {
             Invite member
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {}
+      {/* Top Stats */}
       {isFetchingData ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
           <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
           <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
-        </div>
+        </motion.div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {}
+        {/* Members */}
         <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between min-h-[148px]">
           <div>
             <span className="text-[10px] font-bold text-mutedText uppercase tracking-wider font-display">Members</span>
@@ -170,16 +186,16 @@ export default function TeamPage() {
           <p className="text-[10px] text-mutedText mt-2">Invitations currently awaiting acceptance.</p>
         </div>
 
-      </div>
+        </motion.div>
       )}
 
-      {}
+      {/* Main Content */}
       {isFetchingData ? (
-        <div className="w-full bg-[#0B0B0C] border border-borderSubtle rounded-[13px] overflow-hidden min-h-[300px]">
+        <motion.div variants={itemVariants} className="w-full bg-[#0B0B0C] border border-borderSubtle rounded-[13px] overflow-hidden min-h-[300px]">
           <ShimmerLoader className="w-full h-full min-h-[300px]" borderRadius={13} />
-        </div>
+        </motion.div>
       ) : !isConnected ? (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
+        <motion.div variants={itemVariants} className="bg-red-500/10 border border-red-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
           <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -195,9 +211,9 @@ export default function TeamPage() {
           >
             Connect Wallet
           </button>
-        </div>
+        </motion.div>
       ) : (
-        <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col gap-6">
+        <motion.div variants={itemVariants} className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col gap-6">
           
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] text-left text-xs border-collapse">
@@ -297,68 +313,21 @@ export default function TeamPage() {
             </table>
           </div>
 
-        </div>
+        </motion.div>
       )}
 
       {}
       {isConnected && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {}
-          <div className="md:col-span-2 bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-bold text-mutedText uppercase tracking-wider font-display">Multi-sig configuration</span>
-              <h3 className="text-md font-bold text-white font-display mt-0.5">Approval Threshold</h3>
-              <p className="text-[11px] text-mutedText leading-relaxed mt-1">
-                Configure the minimum number of co-signers required to approve and execute batch salary distributions.
-              </p>
-            </div>
-
-            {}
-            <div className="flex items-center gap-4 mt-6">
-              <div className="flex items-center gap-2">
-                <select
-                  value={signersRequired}
-                  onChange={(e) => handleSignersThresholdChange(parseInt(e.target.value, 10))}
-                  className="bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2 text-white font-mono font-bold outline-none focus:border-[#5E2A8C] text-sm"
-                >
-                  {Array.from({ length: activeMembersCount }, (_, i) => i + 1).map((val) => (
-                    <option key={val} value={val}>
-                      {val}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-xs text-mutedText font-semibold font-display">
-                  of <span className="text-white font-mono font-bold">{activeMembersCount}</span> active members required
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-5 pt-4 border-t border-[#1D1D1F] text-[10px] text-mutedText/70 font-semibold leading-normal">
-              ℹ️ Multi-signature approval for payroll will be enforced by the pool contract.
-            </div>
-          </div>
-
-          {}
-          <div className="md:col-span-1 bg-[#1D1D1F]/20 border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-brandLightPurple uppercase tracking-wider font-display">Security notice</span>
-            <p className="text-xs text-mutedText leading-relaxed mt-2.5">
-              Only members with Owner or Admin roles can adjust signature weights on the underlying Stellar accounts. Member invites generate a temporary key that is upgraded on wallet approval.
-            </p>
-            <div className="w-8 h-8 rounded-full bg-brandPurple/10 border border-brandPurple/20 flex items-center justify-center text-brandLightPurple mt-6">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-          </div>
-
-        </div>
+        <></>
       )}
 
       {}
-      <p className="text-[10px] text-mutedText/60 text-center leading-relaxed font-semibold max-w-lg mx-auto">
-        Invited members receive a one-time link. They connect a Stellar wallet to accept, then appear here, no email account or password required.
-      </p>
+      {/* Footer message */}
+      <motion.div variants={itemVariants}>
+        <p className="text-[10px] text-mutedText/60 text-center leading-relaxed font-semibold max-w-lg mx-auto">
+          Invited members receive a one-time link. They connect a Stellar wallet to accept, then appear here, no email account or password required.
+        </p>
+      </motion.div>
 
       {}
       {isInviteOpen && (
@@ -447,6 +416,6 @@ export default function TeamPage() {
         </div>
       )}
 
-    </div>
+    </motion.div>
   );
 }

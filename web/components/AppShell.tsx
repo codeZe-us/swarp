@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from '../hooks/useWallet';
 import { useStore } from '../store/useStore';
 import { WalletConnect } from './WalletConnect';
@@ -20,10 +21,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const configError = useStore((state) => state.configError);
 
   useEffect(() => {
-    fetchConfig().then(() => {
-      autoReconnect();
-    });
-  }, [autoReconnect, fetchConfig]);
+    fetchConfig();
+  }, [fetchConfig]);
 
   // Removed blocking loading screen to allow AppShell and Home Page to render immediately with shimmer loaders
 
@@ -231,7 +230,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <main className="flex-1 overflow-y-auto bg-darkBackground p-4 md:p-8">
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="h-full"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

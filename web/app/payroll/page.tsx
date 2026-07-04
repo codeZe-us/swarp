@@ -2,6 +2,17 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const pageVariants: any = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } }
+};
+
+const itemVariants: any = {
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
 import { useStore } from '../../store/useStore';
 import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 import { Badge } from '../../components/ui/Badge';
@@ -237,10 +248,15 @@ export default function PayrollPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 max-w-5xl mx-auto font-sans">
+    <motion.div 
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col gap-8 max-w-5xl mx-auto font-sans"
+    >
       
-      {}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header */}
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-bold text-brandLightPurple tracking-wider uppercase font-display">Employer console</span>
           <h1 className="text-3xl font-extrabold text-white mt-1 font-display">Private payroll</h1>
@@ -262,19 +278,20 @@ export default function PayrollPage() {
             Add recipient
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {}
+      {/* Top Stats */}
       {isFetchingData ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
           <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
           <ShimmerLoader className="min-h-[148px]" borderRadius={13} />
-        </div>
+        </motion.div>
       ) : (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {}
+        {/* Total */}
         <div className="bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] rounded-[13px] p-6 flex flex-col justify-between min-h-[148px] shadow-[0_0_28px_rgba(123,55,168,0.25)] border-none">
           <div>
             <span className="text-[10px] font-bold text-white/80 uppercase tracking-wider font-display">This run total</span>
@@ -314,16 +331,17 @@ export default function PayrollPage() {
           <p className="text-[10px] text-mutedText mt-2">Timestamp of last local execution trigger.</p>
         </div>
 
-      </div>
+      </motion.div>
       )}
 
       {}
+      {/* Main Table Area */}
       {isFetchingData ? (
-        <div className="w-full bg-[#0B0B0C] border border-borderSubtle rounded-[13px] overflow-hidden min-h-[300px]">
+        <motion.div variants={itemVariants} className="w-full bg-[#0B0B0C] border border-borderSubtle rounded-[13px] overflow-hidden min-h-[300px]">
           <ShimmerLoader className="w-full h-full min-h-[300px]" borderRadius={13} />
-        </div>
+        </motion.div>
       ) : !isConnected ? (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
+        <motion.div variants={itemVariants} className="bg-red-500/10 border border-red-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
           <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -339,9 +357,9 @@ export default function PayrollPage() {
           >
             Connect Wallet
           </button>
-        </div>
+        </motion.div>
       ) : !kycVerified ? (
-        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
+        <motion.div variants={itemVariants} className="bg-yellow-500/10 border border-yellow-500/20 rounded-[12px] p-6 text-center flex flex-col items-center justify-center gap-3">
           <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-500">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -357,15 +375,15 @@ export default function PayrollPage() {
           >
             Verify Identity
           </Link>
-        </div>
+        </motion.div>
       ) : (
-        <div className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col gap-6">
+        <motion.div variants={itemVariants} className="bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col gap-6">
           
           {}
           <div className="flex items-center justify-between">
             <h3 className="text-md font-bold text-white font-display">{payRunTitle}</h3>
             <span className="text-[9px] font-bold text-mutedText/70 tracking-widest uppercase font-mono">
-              📢 AMOUNTS VISIBLE ONLY TO YOU
+              AMOUNTS VISIBLE ONLY TO YOU
             </span>
           </div>
 
@@ -490,13 +508,16 @@ export default function PayrollPage() {
             </div>
           </div>
 
-        </div>
+        </motion.div>
       )}
 
       {}
-      <p className="text-[10px] text-mutedText/60 text-center leading-relaxed font-semibold max-w-lg mx-auto">
-        Each payout is a separate shielded withdrawal. On-chain, recipients and amounts can&apos;t be linked to your company or to each other.
-      </p>
+      {/* Footer message */}
+      <motion.div variants={itemVariants}>
+        <p className="text-[10px] text-mutedText/60 text-center leading-relaxed font-semibold max-w-lg mx-auto">
+          Each payout is a separate shielded withdrawal. On-chain, recipients and amounts can&apos;t be linked to your company or to each other.
+        </p>
+      </motion.div>
 
       {}
       {isFormOpen && (
@@ -656,6 +677,6 @@ export default function PayrollPage() {
         </div>
       )}
 
-    </div>
+    </motion.div>
   );
 }
