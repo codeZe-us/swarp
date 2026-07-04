@@ -1,4 +1,4 @@
-# Swarp: Private Stablecoin Exchange & Payroll on Stellar
+# <img src="./web/public/logo.png" alt="Swarp Logo" width="30" /> Swarp: Private Stablecoin Exchange & Payroll on Stellar
 
 **Live Demo:** [https://swarp-web.vercel.app/](https://swarp-web.vercel.app/)
 
