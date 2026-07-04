@@ -91,7 +91,7 @@ export default function NotesPage() {
             const assetDef = getAssetByCode(note.asset);
             const hexColors: Record<string, string> = {
               USDC: '#FFFFFF',
-              EURC: '#7C3AED',
+              EURC: '#5E2A8C',
               MGUSD: '#A874F5',
               YLDS: '#06B6D4'
             };

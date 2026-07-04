@@ -357,7 +357,7 @@ export default function Home() {
               
               const hexColors: Record<string, string> = {
                 USDC: '#FFFFFF',
-                EURC: '#7C3AED',
+                EURC: '#5E2A8C',
                 MGUSD: '#A874F5',
                 YLDS: '#06B6D4',
                 XLM: '#10B981'
@@ -397,8 +397,8 @@ export default function Home() {
               <AreaChart data={chartData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#7C3AED" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#5E2A8C" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#5E2A8C" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <XAxis 
@@ -413,12 +413,12 @@ export default function Home() {
                   contentStyle={{ backgroundColor: '#141419', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
                   itemStyle={{ color: '#fff', fontWeight: 'bold' }}
                   labelStyle={{ color: '#6B7280', marginBottom: '4px' }}
-                  formatter={(value: number) => [`$${value.toFixed(2)}`, 'Value']}
+                  formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Value']}
                 />
                 <Area 
                   type="monotone" 
                   dataKey="value" 
-                  stroke="#7C3AED" 
+                  stroke="#5E2A8C" 
                   strokeWidth={2}
                   fillOpacity={1} 
                   fill="url(#colorValue)" 
