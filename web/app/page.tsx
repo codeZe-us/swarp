@@ -173,7 +173,7 @@ export default function Home() {
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  const containerVariants = {
+  const containerVariants: any = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -181,7 +181,7 @@ export default function Home() {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: any = {
     hidden: { opacity: 0, y: 15 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
@@ -202,14 +202,14 @@ export default function Home() {
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <Link 
             href="/faucet" 
-            className="px-3 py-1.5 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[6px] text-[10px] uppercase tracking-wider transition duration-150 font-display bg-transparent"
+            className="px-3 py-1.5 border animate-border-pulse text-[#B488DC] hover:text-white hover:bg-[#5E2A8C]/20 font-bold rounded-[6px] text-[10px] uppercase tracking-wider transition-all duration-300 font-display bg-transparent"
           >
             Fund Testnet
           </Link>
           <Link href="/payroll" className="bg-transparent border border-white/10 hover:bg-white/5 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
             Run payroll
           </Link>
-          <Link href="/swap" className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-[0_0_15px_rgba(124,58,237,0.3)] hover:shadow-[0_0_20px_rgba(124,58,237,0.5)]">
+          <Link href="/swap" className="px-5 py-2.5 bg-gradient-to-br from-[#5E2A8C] to-[#4A1F70] hover:brightness-110 text-white font-bold rounded-[9px] text-sm transition-all shadow-[0_0_15px_rgba(123,55,168,0.3)] hover:shadow-[0_0_20px_rgba(123,55,168,0.5)] font-display tracking-wider">
             New swap
           </Link>
         </div>
