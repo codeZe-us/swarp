@@ -1,6 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+
+const pageVariants: any = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } }
+};
+
+const itemVariants: any = {
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
 import { useStore } from '../../store/useStore';
 import { getTokenBalance } from '../../lib/contracts';
 import { formatCurrency } from '../../lib/utils';
@@ -165,17 +176,22 @@ export default function FaucetPage() {
   };
 
   return (
-    <div className="max-w-[1000px] mx-auto pt-8 pb-12 animate-fade-in px-4">
-      {}
-      <div className="mb-10">
+    <motion.div 
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+      className="max-w-[1000px] mx-auto pt-8 pb-12 px-4"
+    >
+      {/* Header */}
+      <motion.div variants={itemVariants} className="mb-10">
         <h1 className="text-[32px] font-bold text-white mb-2">Faucet</h1>
         <p className="text-gray-400 text-sm">Mint mock testnet assets to your wallet.</p>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         
-        {}
-        <div className="space-y-6">
+        {/* Left column */}
+        <motion.div variants={itemVariants} className="space-y-6">
           
           {}
           <div className="bg-[#141419] border border-white/5 rounded-xl p-6 flex items-center justify-between">
@@ -256,10 +272,10 @@ export default function FaucetPage() {
               </button>
             )}
           </div>
-        </div>
+        </motion.div>
 
-        {}
-        <div className="space-y-6">
+        {/* Right column */}
+        <motion.div variants={itemVariants} className="space-y-6">
           
           
 
@@ -291,8 +307,8 @@ export default function FaucetPage() {
           <p className="text-[12px] text-gray-500 leading-relaxed px-2">
             Mock assets only. No real value. Tokens exist on Stellar testnet and are reset periodically.
           </p>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }

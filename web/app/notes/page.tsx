@@ -1,6 +1,17 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+
+const pageVariants: any = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } }
+};
+
+const itemVariants: any = {
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
 import { useStore } from '../../store/useStore';
 import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 import { formatCurrency } from '../../lib/utils';
@@ -23,9 +34,14 @@ export default function NotesPage() {
   }, []);
 
   return (
-    <div className="max-w-[860px] mx-auto pt-8 pb-12 animate-fade-in px-4">
-      {}
-      <div className="flex items-start justify-between mb-10">
+    <motion.div 
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+      className="max-w-[860px] mx-auto pt-8 pb-12 px-4"
+    >
+      {/* Header */}
+      <motion.div variants={itemVariants} className="flex items-start justify-between mb-10">
         <div>
           <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Shielded</span>
           <h1 className="text-3xl font-extrabold text-white font-display mt-1">Notes</h1>
@@ -36,15 +52,15 @@ export default function NotesPage() {
         <div className="text-mutedText font-mono text-[13px] self-end pb-1">
           {notes.length} total
         </div>
-      </div>
+      </motion.div>
 
-      {}
+      {/* Stats */}
       {isFetchingData ? (
-        <div className="bg-[#141419] border border-white/5 rounded-xl flex overflow-hidden mb-6 min-h-[120px]">
+        <motion.div variants={itemVariants} className="bg-[#141419] border border-white/5 rounded-xl flex overflow-hidden mb-6 min-h-[120px]">
           <ShimmerLoader className="w-full h-full min-h-[120px]" borderRadius={12} />
-        </div>
+        </motion.div>
       ) : (
-      <div className="bg-[#141419] border border-white/5 rounded-xl flex overflow-hidden mb-6">
+      <motion.div variants={itemVariants} className="bg-[#141419] border border-white/5 rounded-xl flex overflow-hidden mb-6">
         <div className="p-6 flex-1 border-r border-white/5">
           <span className="text-[11px] font-bold text-mutedText uppercase tracking-widest block mb-4">TOTAL NOTES</span>
           <div className="text-[32px] font-extrabold text-white leading-none font-display">{notes.length}</div>
@@ -57,11 +73,11 @@ export default function NotesPage() {
           <span className="text-[11px] font-bold text-mutedText uppercase tracking-widest block mb-4">USED</span>
           <div className="text-[32px] font-extrabold text-mutedText leading-none font-display">{usedNotes.length}</div>
         </div>
-      </div>
+      </motion.div>
       )}
 
-      {}
-      <div className="space-y-4">
+      {/* List */}
+      <motion.div variants={itemVariants} className="space-y-4">
         {isFetchingData ? (
           <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] overflow-hidden min-h-[180px]">
             <ShimmerLoader className="w-full h-full min-h-[180px]" borderRadius={13} />
@@ -82,7 +98,7 @@ export default function NotesPage() {
             const color = hexColors[note.asset] || '#6B7280';
             
             return (
-              <div key={note.id} className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6">
+              <motion.div variants={itemVariants} key={note.id} className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-[3px] h-8 rounded-full" style={{ backgroundColor: color }}></div>
@@ -122,11 +138,11 @@ export default function NotesPage() {
                     {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
-              </div>
+              </motion.div>
             );
           })
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -2,6 +2,17 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const pageVariants: any = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } }
+};
+
+const itemVariants: any = {
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
 import { useStore } from '../../store/useStore';
 import { createNote, computeNullifier } from '../../lib/note';
 import { submitDeposit, submitVerifyWithdrawal, submitExecuteWithdrawal, getTokenBalance, establishTrustline } from '../../lib/contracts';
@@ -630,9 +641,14 @@ export default function SwapPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto font-sans">
-      {}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <motion.div 
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col gap-6 max-w-4xl mx-auto font-sans"
+    >
+      {/* Header section */}
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Application</span>
           <h1 className="text-3xl font-extrabold text-white mt-1 font-display">Private swap</h1>
@@ -656,10 +672,10 @@ export default function SwapPage() {
             View History
           </Link>
         </div>
-      </div>
+      </motion.div>
 
-      {}
-      <div className="flex justify-center mt-2 mb-4">
+      {/* Tabs */}
+      <motion.div variants={itemVariants} className="flex justify-center mt-2 mb-4">
         <div className="flex bg-[#0B0B0C] border border-[#1D1D1F] p-1 rounded-[12px] gap-1 w-full max-w-[320px] h-[42px] items-center">
           <button
             onClick={() => setActiveTab('deposit')}
@@ -682,11 +698,19 @@ export default function SwapPage() {
             Withdraw
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {}
-      {activeTab === 'deposit' ? (
-        <div className="flex flex-col gap-6 items-center">
+      {/* Tab Content */}
+      <AnimatePresence mode="wait">
+        {activeTab === 'deposit' ? (
+          <motion.div 
+            key="deposit"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.2 }}
+            className="flex flex-col gap-6 items-center"
+          >
           {}
           <div className="w-full max-w-lg bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-4 md:p-6 relative">
             
@@ -895,10 +919,16 @@ export default function SwapPage() {
             </p>
           </div>
 
-        </div>
-      ) : (
-        
-        <div className="flex flex-col gap-6 items-center w-full">
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="withdraw"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+            className="flex flex-col gap-6 items-center w-full"
+          >
           <div className="w-full max-w-lg bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-4 md:p-6">
             
             {}
@@ -1198,8 +1228,9 @@ export default function SwapPage() {
               <span className="text-amber-500/80">Note: The deposit asset type will be revealed when you withdraw. The amount stays private.</span>
             </p>
           </div>
-        </div>
-      )}
-    </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

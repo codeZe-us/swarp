@@ -2,6 +2,17 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
+
+const pageVariants: any = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.1 } }
+};
+
+const itemVariants: any = {
+  hidden: { opacity: 0, y: 15 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
 import { verifyDisclosure, DisclosurePayload } from '../../lib/disclosure';
 import { Badge } from '../../components/ui/Badge';
 
@@ -38,8 +49,13 @@ export default function AuditPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl mx-auto font-sans">
-      <div className="flex items-center justify-between">
+    <motion.div 
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col gap-6 max-w-3xl mx-auto font-sans"
+    >
+      <motion.div variants={itemVariants} className="flex items-center justify-between">
         <div>
           <span className="text-[10px] font-bold text-[#B488DC] tracking-wider uppercase font-display">Compliance</span>
           <h1 className="text-3xl font-extrabold text-white mt-1 font-display">Auditor Portal</h1>
@@ -51,9 +67,9 @@ export default function AuditPage() {
         >
           Back to Swap
         </Link>
-      </div>
+      </motion.div>
 
-      <div className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6 flex flex-col gap-5">
+      <motion.div variants={itemVariants} className="bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-6 flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <label className="text-xs font-bold text-mutedText uppercase tracking-wider font-display">
             Auditor Secret Key
@@ -139,7 +155,7 @@ export default function AuditPage() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
