@@ -149,17 +149,32 @@ export default function Home() {
     return `M 0,100 L ${pointsStr}`;
   }, [isConnected, sortedTransactions, totalValue, decimalRate]);
 
+  const percentChange = useMemo(() => {
+    if (!isConnected || sortedTransactions.length === 0 || totalValue === 0) return 0;
+    const txsToUse = sortedTransactions.slice(0, 10);
+    let oldestPort = totalValue;
+    txsToUse.forEach(tx => {
+      const amt = parseFloat(tx.amount);
+      const change = tx.asset === 'EURC' ? amt / decimalRate : amt;
+      if (tx.type === 'withdrawal') oldestPort += change;
+      else oldestPort -= change;
+    });
+    
+    if (oldestPort <= 0) return 0;
+    return ((totalValue - oldestPort) / oldestPort) * 100;
+  }, [isConnected, sortedTransactions, totalValue, decimalRate]);
+
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl mx-auto animate-fade-in pb-12">
       
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-white font-display mt-1">{`Dashboard`}</h1>
           <p className="text-sm text-mutedText mt-1">{today}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <Link 
             href="/faucet" 
             className="px-3 py-1.5 border border-[#2775CA]/50 text-[#2775CA] hover:bg-[#2775CA]/10 font-bold rounded-[6px] text-[10px] uppercase tracking-wider transition duration-150 font-display bg-transparent"
@@ -178,8 +193,8 @@ export default function Home() {
       <div className="flex flex-col gap-6">
         
         {}
-          <div className="bg-[#141419] border border-white/5 rounded-xl flex flex-col md:flex-row overflow-hidden">
-            <div className="p-6 md:p-8 flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+        <div className="bg-[#141419] border border-white/5 rounded-xl grid grid-cols-2 md:flex overflow-hidden">
+            <div className="col-span-2 md:col-span-1 p-6 md:p-8 md:flex-[1.5] border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">PORTFOLIO VALUE</span>
             <div className="flex flex-col items-start gap-4">
               {showLoading ? (
@@ -194,12 +209,16 @@ export default function Home() {
                   </span>
                 </div>
               )}
-              <span className="inline-flex bg-[#3B1C5F]/40 text-[#A874F5] px-2.5 py-1 rounded-[6px] text-[11px] font-bold border border-[#A874F5]/10">
-                +12.4% 30d
+              <span className={`inline-flex px-2.5 py-1 rounded-[6px] text-[11px] font-bold border ${
+                percentChange >= 0 
+                  ? 'bg-[#3B1C5F]/40 text-[#A874F5] border-[#A874F5]/10' 
+                  : 'bg-red-500/10 text-red-400 border-red-500/10'
+              }`}>
+                {percentChange >= 0 ? '+' : ''}{percentChange.toFixed(1)}% 30d
               </span>
             </div>
           </div>
-          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+          <div className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 border-r md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">USDC</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
@@ -210,7 +229,7 @@ export default function Home() {
               </div>
             )}
           </div>
-          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+          <div className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">EURC</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
@@ -221,7 +240,7 @@ export default function Home() {
               </div>
             )}
           </div>
-          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+          <div className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 border-r md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">MGUSD</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
@@ -232,7 +251,7 @@ export default function Home() {
               </div>
             )}
           </div>
-          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+          <div className="p-6 md:p-8 md:flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">YLDS</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
@@ -243,7 +262,7 @@ export default function Home() {
               </div>
             )}
           </div>
-          <div className="p-6 md:p-8 flex-1 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+          <div className="p-6 md:p-8 md:flex-1 border-r border-white/5 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">XLM</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />
@@ -254,7 +273,7 @@ export default function Home() {
               </div>
             )}
           </div>
-          <div className="p-6 md:p-8 flex-1 flex flex-col justify-between">
+          <div className="p-6 md:p-8 md:flex-1 flex flex-col justify-between">
             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-4">SHIELDED NOTES</span>
             {showLoading ? (
               <ShimmerLoader className="w-[80%] h-[40px]" borderRadius={8} />

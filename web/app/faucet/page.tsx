@@ -261,33 +261,7 @@ export default function FaucetPage() {
         {}
         <div className="space-y-6">
           
-          <div className="bg-[#141419] border border-white/5 rounded-xl p-6">
-            <h3 className="text-[15px] font-bold text-white mb-6">Network</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between text-[13px]">
-                <span className="text-gray-500">Chain</span>
-                <span className="text-white font-bold">Stellar</span>
-              </div>
-              <div className="w-full h-px bg-white/5"></div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-gray-500">Mode</span>
-                <span className="text-[#F59E0B] font-bold">Testnet</span>
-              </div>
-              <div className="w-full h-px bg-white/5"></div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-gray-500">RPC</span>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-[#10B981]"></div>
-                  <span className="text-[#10B981] font-bold">Online</span>
-                </div>
-              </div>
-              <div className="w-full h-px bg-white/5"></div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-gray-500">VM</span>
-                <span className="text-[#A874F5] font-bold">Soroban</span>
-              </div>
-            </div>
-          </div>
+          
 
           <div className="bg-[#141419] border border-white/5 rounded-xl p-6">
             <h3 className="text-[15px] font-bold text-white mb-6">Mint limits</h3>

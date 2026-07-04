@@ -302,57 +302,7 @@ export default function TeamPage() {
 
       {}
       {isConnected && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {}
-          <div className="md:col-span-2 bg-cardSurface border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-bold text-mutedText uppercase tracking-wider font-display">Multi-sig configuration</span>
-              <h3 className="text-md font-bold text-white font-display mt-0.5">Approval Threshold</h3>
-              <p className="text-[11px] text-mutedText leading-relaxed mt-1">
-                Configure the minimum number of co-signers required to approve and execute batch salary distributions.
-              </p>
-            </div>
-
-            {}
-            <div className="flex items-center gap-4 mt-6">
-              <div className="flex items-center gap-2">
-                <select
-                  value={signersRequired}
-                  onChange={(e) => handleSignersThresholdChange(parseInt(e.target.value, 10))}
-                  className="bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2 text-white font-mono font-bold outline-none focus:border-[#5E2A8C] text-sm"
-                >
-                  {Array.from({ length: activeMembersCount }, (_, i) => i + 1).map((val) => (
-                    <option key={val} value={val}>
-                      {val}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-xs text-mutedText font-semibold font-display">
-                  of <span className="text-white font-mono font-bold">{activeMembersCount}</span> active members required
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-5 pt-4 border-t border-[#1D1D1F] text-[10px] text-mutedText/70 font-semibold leading-normal">
-              ℹ️ Multi-signature approval for payroll will be enforced by the pool contract.
-            </div>
-          </div>
-
-          {}
-          <div className="md:col-span-1 bg-[#1D1D1F]/20 border border-borderSubtle rounded-[13px] p-6 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-brandLightPurple uppercase tracking-wider font-display">Security notice</span>
-            <p className="text-xs text-mutedText leading-relaxed mt-2.5">
-              Only members with Owner or Admin roles can adjust signature weights on the underlying Stellar accounts. Member invites generate a temporary key that is upgraded on wallet approval.
-            </p>
-            <div className="w-8 h-8 rounded-full bg-brandPurple/10 border border-brandPurple/20 flex items-center justify-center text-brandLightPurple mt-6">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-          </div>
-
-        </div>
+        <></>
       )}
 
       {}

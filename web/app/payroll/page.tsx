@@ -365,7 +365,7 @@ export default function PayrollPage() {
           <div className="flex items-center justify-between">
             <h3 className="text-md font-bold text-white font-display">{payRunTitle}</h3>
             <span className="text-[9px] font-bold text-mutedText/70 tracking-widest uppercase font-mono">
-              📢 AMOUNTS VISIBLE ONLY TO YOU
+              AMOUNTS VISIBLE ONLY TO YOU
             </span>
           </div>
 

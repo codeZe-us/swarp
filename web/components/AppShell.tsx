@@ -20,10 +20,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const configError = useStore((state) => state.configError);
 
   useEffect(() => {
-    fetchConfig().then(() => {
-      autoReconnect();
-    });
-  }, [autoReconnect, fetchConfig]);
+    fetchConfig();
+  }, [fetchConfig]);
 
   // Removed blocking loading screen to allow AppShell and Home Page to render immediately with shimmer loaders
 
