@@ -45,7 +45,7 @@ export const createWalletSlice: StateCreator<
             try {
               const networkDetails = await StellarWalletsKit.getNetwork();
               netName = (networkDetails?.network || '').toLowerCase();
-            } catch (err) {
+            } catch (err: any) {
               console.warn('StellarWalletsKit getNetwork failed, bypassing check for this wallet', err);
             }
           }
