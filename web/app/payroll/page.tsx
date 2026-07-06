@@ -249,7 +249,17 @@ export default function PayrollPage() {
         
       } catch (error: any) {
         console.error(`Failed to process payment for ${recipient.name}:`, error);
-        alert(`Payment failed for ${recipient.name}: ${error.message}`);
+        
+        let errorMessage = error?.message || 'Unknown error occurred';
+        if (errorMessage.includes('Missing required trustline')) {
+          errorMessage = `${recipient.name} lacks a trustline for ${recipient.asset}. Ask them to add it to their wallet.`;
+        }
+
+        useToastStore.getState().addToast({ 
+          title: `Payment failed for ${recipient.name}`, 
+          message: errorMessage, 
+          severity: 'error' 
+        });
         
         setIsExecuting(false);
         return;

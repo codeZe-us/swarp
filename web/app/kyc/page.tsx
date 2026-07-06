@@ -23,6 +23,29 @@ export default function KycPage() {
   const [isProving, setIsProving] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [kycStatus, setKycStatus] = useState<'unverified' | 'verified'>('unverified');
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isProving || isVerifying) {
+      interval = setInterval(() => {
+        setProgress(p => {
+          if (isVerifying) {
+            return p < 99 ? p + 2 : p;
+          } else {
+            return p < 85 ? p + 1 : p;
+          }
+        });
+      }, 100);
+    } else {
+      if (kycStatus === 'verified') {
+        setProgress(100);
+      } else {
+        setProgress(0);
+      }
+    }
+    return () => clearInterval(interval);
+  }, [isProving, isVerifying, kycStatus]);
 
   useEffect(() => {
     const savedStatus = localStorage.getItem(`kyc_status_${walletAddress}`);
@@ -105,42 +128,84 @@ export default function KycPage() {
       </motion.div>
 
       <motion.div variants={itemVariants} className="bg-cardSurface border border-borderSubtle rounded-2xl p-8 flex flex-col items-center justify-center min-h-[300px] text-center gap-6">
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center ${kycStatus === 'verified' ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-primaryAccent/10 border border-primaryAccent/20 text-primaryAccent'}`}>
-          {kycStatus === 'verified' ? (
-            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        {isProving || isVerifying ? (
+          <div className="relative flex items-center justify-center w-full py-8">
+            <svg className="w-64 h-64 transform -rotate-90">
+              <defs>
+                <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#c084fc" />
+                  <stop offset="100%" stopColor="#7e22ce" />
+                </linearGradient>
+              </defs>
+              <circle
+                cx="128"
+                cy="128"
+                r="112"
+                stroke="currentColor"
+                strokeWidth="12"
+                fill="transparent"
+                className="text-gray-800/50"
+              />
+              <circle
+                cx="128"
+                cy="128"
+                r="112"
+                stroke="url(#purpleGradient)"
+                strokeWidth="12"
+                fill="transparent"
+                strokeDasharray={2 * Math.PI * 112}
+                strokeDashoffset={(2 * Math.PI * 112) - (Math.min(progress, 100) / 100) * (2 * Math.PI * 112)}
+                className="transition-all duration-300 ease-out"
+                strokeLinecap="round"
+              />
             </svg>
-          ) : (
-            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          )}
-        </div>
-        
-        <div>
-          <h2 className="text-xl font-bold text-white">
-            {kycStatus === 'verified' ? 'Identity Verified' : 'Compliance & Identity Shell'}
-          </h2>
-          <p className="text-sm text-mutedText mt-2 max-w-sm mx-auto">
-            {kycStatus === 'verified' 
-              ? 'Your Zero-Knowledge proof has been accepted. You can now interact with the private pool.'
-              : 'Generate a Zero-Knowledge proof locally and submit it to Soroban to verify your credentials.'}
-          </p>
-        </div>
+            <div className="absolute flex flex-col items-center justify-center">
+              <span className="text-5xl font-extrabold text-white">
+                {Math.round(progress)}%
+              </span>
+              <span className="text-sm text-purple-300 font-medium mt-2 text-center animate-pulse">
+                {isVerifying ? 'Verifying on-chain...' : 'Generating ZK Proof...'}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center ${kycStatus === 'verified' ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-primaryAccent/10 border border-primaryAccent/20 text-primaryAccent'}`}>
+              {kycStatus === 'verified' ? (
+                <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              )}
+            </div>
+            
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                {kycStatus === 'verified' ? 'Identity Verified' : 'Compliance & Identity Shell'}
+              </h2>
+              <p className="text-sm text-mutedText mt-2 max-w-sm mx-auto">
+                {kycStatus === 'verified' 
+                  ? 'Your Zero-Knowledge proof has been accepted. You can now interact with the private pool.'
+                  : 'Generate a Zero-Knowledge proof locally and submit it to Soroban to verify your credentials.'}
+              </p>
+            </div>
 
-        <div className="mt-4 w-full max-w-sm">
-          <Button
-            className="w-full text-base py-3 font-bold"
-            disabled={!walletAddress || isProving || isVerifying || kycStatus === 'verified'}
-            onClick={handleVerifyKyc}
-          >
-            {!walletAddress ? 'Connect Wallet' :
-             kycStatus === 'verified' ? 'Verified ✓' :
-             isProving ? 'Generating Proof (Local)...' :
-             isVerifying ? 'Verifying on Soroban...' :
-             'Generate Proof & Verify'}
-          </Button>
-        </div>
+            <div className="mt-4 w-full max-w-sm">
+              <Button
+                className="w-full text-base py-3 font-bold"
+                disabled={!walletAddress || isProving || isVerifying || kycStatus === 'verified'}
+                onClick={handleVerifyKyc}
+              >
+                {!walletAddress ? 'Connect Wallet' :
+                 kycStatus === 'verified' ? 'Verified ✓' :
+                 'Generate Proof & Verify'}
+              </Button>
+            </div>
+          </>
+        )}
       </motion.div>
 
       <motion.div variants={itemVariants} className="bg-cardSurface/40 border border-borderSubtle rounded-2xl p-6 w-full text-left mt-2">
