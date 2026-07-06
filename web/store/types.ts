@@ -13,7 +13,7 @@ export interface Note {
 }
 
 export interface Transaction {
-  type: 'deposit' | 'withdrawal';
+  type: 'deposit' | 'withdrawal' | 'payroll';
   amount: string;
   asset: string;
   txHash: string;

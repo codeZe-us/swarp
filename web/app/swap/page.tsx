@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const pageVariants: any = {
@@ -28,6 +29,7 @@ import { ShimmerLoader } from '../../components/ui/ShimmerLoader';
 import { useToastStore } from '../../store/useToast';
 
 export default function SwapPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>('deposit');
   
   const address = useStore((state) => state.address);
@@ -84,6 +86,42 @@ export default function SwapPage() {
   const [currentRate, setCurrentRate] = useState<{ numerator: number; denominator: number }>({ numerator: 9200000, denominator: 10000000 });
   const [withdrawCurrentRate, setWithdrawCurrentRate] = useState<{ numerator: number; denominator: number } | null>(null);
   const [isFetchingData, setIsFetchingData] = useState(true);
+  const [allRates, setAllRates] = useState<{ [key: string]: string }>({});
+
+  useEffect(() => {
+    async function fetchAllRates() {
+      const rates: { [key: string]: string } = {};
+      const usdcAsset = getAssetByCode('USDC');
+      if (!usdcAsset) return;
+
+      for (const asset of ASSETS) {
+        if (asset.code === 'USDC') {
+          rates[asset.code] = '1.0000';
+          continue;
+        }
+        try {
+          const rate = await getRate(asset.id, usdcAsset.id);
+          const rateValue = rate.numerator / rate.denominator;
+          rates[asset.code] = rateValue.toFixed(4);
+        } catch (e) {
+          rates[asset.code] = '0.0000';
+        }
+      }
+      setAllRates(rates);
+    }
+    fetchAllRates();
+  }, []);
+
+  const shieldedBalances = useMemo(() => {
+    const bals: { [key: string]: number } = { USDC: 0, EURC: 0 };
+    notes.forEach(n => {
+      if (n.status === 'deposited' || n.status === 'created') {
+        const amount = Number(n.amount) / 10_000_000;
+        bals[n.asset] = (bals[n.asset] || 0) + amount;
+      }
+    });
+    return bals;
+  }, [notes]);
 
   useEffect(() => {
     fetchPoolState();
@@ -329,6 +367,7 @@ export default function SwapPage() {
       setDepositTxStatus('success');
       setAmountIn('');
       useToastStore.getState().addToast({ title: 'Success', message: `Deposit Completed Successfully! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
+      router.push('/');
     } catch (error: unknown) {
       console.error('Deposit flow failed:', error);
       handleError(error, 'transaction');
@@ -574,6 +613,7 @@ export default function SwapPage() {
       setSelectedNoteId(null);
       setCanResumeNoteId(null);
       useToastStore.getState().addToast({ title: 'Success', message: `Withdrawal Successful! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
+      router.push('/');
     } catch (error: unknown) {
       console.error('Withdraw flow failed:', error);
       if (error instanceof Error && error.message.includes('Insufficient pool reserves')) {
@@ -632,6 +672,7 @@ export default function SwapPage() {
       setSelectedNoteId(null);
       setCanResumeNoteId(null);
       useToastStore.getState().addToast({ title: 'Success', message: `Withdrawal Resumed & Successful! Tx Hash: ${result.txHash.slice(0, 12)}...`, severity: 'success' });
+      router.push('/');
     } catch (error: any) {
       console.error('Resume flow failed:', error);
       handleError(error, 'transaction');
@@ -673,6 +714,63 @@ export default function SwapPage() {
           </Link>
         </div>
       </motion.div>
+
+      {/* Balances Summary */}
+      {isConnected && (
+        <motion.div variants={itemVariants} className="flex flex-col md:flex-row gap-4 mb-2">
+          <div className="flex-1 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[13px] p-5 relative overflow-hidden">
+            <h3 className="text-[10px] font-bold text-mutedText uppercase tracking-wider mb-4 font-display">Public Wallet Balance</h3>
+            <div className="flex flex-col gap-3">
+              {Object.keys(balances).map(asset => {
+                const amount = balances[asset] || 0;
+                return (
+                  <div key={asset} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded-full ${getAssetByCode(asset)?.iconBgColor} flex items-center justify-center ${getAssetByCode(asset)?.iconTextColor} text-[10px] font-bold font-sans`}>
+                        {getAssetByCode(asset)?.iconSymbol}
+                      </div>
+                      <span className="text-sm font-bold text-white">{asset}</span>
+                    </div>
+                    <span className="text-sm font-bold text-white font-mono">
+                      {amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex-1 bg-gradient-to-br from-[#12081A] to-[#0B0B0C] border border-[#5E2A8C]/30 rounded-[13px] p-5 relative overflow-hidden shadow-[0_0_20px_rgba(94,42,140,0.1)]">
+            <div className="absolute top-0 right-0 p-4 opacity-20 text-[#5E2A8C]">
+              <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h3 className="text-[10px] font-bold text-[#B488DC] uppercase tracking-wider mb-4 font-display flex items-center gap-2">
+              Shielded Pool Balance
+              <Badge variant="private" className="scale-[0.85] origin-left border-[#5E2A8C]/30">PRIVATE</Badge>
+            </h3>
+            <div className="flex flex-col gap-3">
+              {Object.keys(balances).map(asset => {
+                const amt = shieldedBalances[asset] || 0;
+                return (
+                  <div key={asset} className="flex items-center justify-between relative z-10">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded-full ${getAssetByCode(asset)?.iconBgColor} flex items-center justify-center ${getAssetByCode(asset)?.iconTextColor} text-[10px] font-bold font-sans`}>
+                        {getAssetByCode(asset)?.iconSymbol}
+                      </div>
+                      <span className="text-sm font-bold text-white">{asset}</span>
+                    </div>
+                    <span className="text-sm font-bold text-white font-mono">
+                      {amt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Tabs */}
       <motion.div variants={itemVariants} className="flex justify-center mt-2 mb-4">
@@ -778,7 +876,7 @@ export default function SwapPage() {
 
                     {isDropdownInOpen && (
                       <div className="absolute right-0 mt-2 w-36 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display">
-                        {ASSETS.filter(a => a.code !== assetOutCode).map((asset) => (
+                        {ASSETS.map((asset) => (
                           <button
                             key={asset.code}
                             onClick={() => {
@@ -803,82 +901,41 @@ export default function SwapPage() {
                   </div>
                 </div>
               </div>
+            </div>
 
-              {}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                <button
-                  onClick={handleFlipAssets}
-                  className="w-9 h-9 rounded-full bg-[#0B0B0C] border border-[#1D1D1F] hover:border-[#5E2A8C] flex items-center justify-center text-mutedText hover:text-white shadow shadow-black transition duration-200"
-                >
-                  <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                  </svg>
-                </button>
-              </div>
-
-              {}
-              <div className="bg-[#000000] border border-[#1D1D1F] rounded-[12px] p-4 flex flex-col gap-1 h-[96px]">
-                <div className="flex items-center justify-between text-xs text-mutedText font-semibold">
-                  <span>You can withdraw</span>
-                  <span>after proof</span>
+            {amountIn && Number(amountIn) > 0 && allRates[assetInCode] && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="mt-3 bg-[#12081A] border border-[#5E2A8C]/30 rounded-[12px] p-4 shadow-inner overflow-hidden"
+              >
+                <div className="text-[10px] text-[#B488DC] font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <span>Estimated Output Value</span>
+                  <div className="h-[1px] flex-1 bg-[#5E2A8C]/30"></div>
                 </div>
-                <div className="flex items-center justify-between mt-1">
-                  <div className="text-[#B488DC] text-3xl font-bold font-mono select-all">
-                    {formattedCalculatedOut || '0.00'}
-                  </div>
-                  <div className="relative" ref={dropdownOutRef}>
-                    <button
-                      onClick={() => setIsDropdownOutOpen(!isDropdownOutOpen)}
-                      className="flex items-center gap-2 bg-[#0B0B0C] border border-[#1D1D1F] hover:border-mutedText/50 px-3 py-1.5 rounded-[9px] text-white text-sm font-bold shadow transition duration-200 font-display"
-                    >
-                      {getAssetByCode(assetOutCode) && (
-                        <>
-                          <div className={`w-5 h-5 rounded-full ${getAssetByCode(assetOutCode)!.iconBgColor} flex items-center justify-center ${getAssetByCode(assetOutCode)!.iconTextColor} text-[10px] font-bold font-sans`}>
-                            {getAssetByCode(assetOutCode)!.iconSymbol}
-                          </div>
-                          <span>{assetOutCode}</span>
-                        </>
-                      )}
-                      <svg className={`w-3.5 h-3.5 text-mutedText transition-transform duration-200 ${isDropdownOutOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-
-                    {isDropdownOutOpen && (
-                      <div className="absolute right-0 mt-2 w-36 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display">
-                        {ASSETS.filter(a => a.code !== assetInCode).map((asset) => (
-                          <button
-                            key={asset.code}
-                            onClick={() => {
-                              setAssetOutCode(asset.code);
-                              setIsDropdownOutOpen(false);
-                            }}
-                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-[9px] text-xs font-bold transition duration-150 ${
-                              assetOutCode === asset.code
-                                ? 'bg-[#1D1D1F] text-white'
-                                : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
-                            }`}
-                          >
-                            <div className={`w-5 h-5 rounded-full ${asset.iconBgColor} flex items-center justify-center ${asset.iconTextColor} text-[9px] font-bold font-sans`}>
-                              {asset.iconSymbol}
-                            </div>
-                            {asset.code}
-                          </button>
-                        ))}
+                <div className="grid grid-cols-2 gap-3">
+                  {ASSETS.filter(a => a.code !== assetInCode).map(asset => {
+                    const inRate = parseFloat(allRates[assetInCode] || '0');
+                    const outRate = parseFloat(allRates[asset.code] || '0');
+                    let amountOut = 0;
+                    if (outRate > 0 && inRate > 0) {
+                      amountOut = (parseFloat(amountIn) * inRate) / outRate;
+                    }
+                    return (
+                      <div key={asset.code} className="flex items-center gap-2">
+                        <div className={`w-5 h-5 rounded-full ${asset.iconBgColor} flex items-center justify-center ${asset.iconTextColor} text-[9px] font-bold font-sans`}>
+                          {asset.iconSymbol}
+                        </div>
+                        <span className="text-xs font-bold text-white font-mono flex-1 text-right">
+                          {amountOut.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                        </span>
+                        <span className="text-[10px] font-bold text-mutedText w-8">{asset.code}</span>
                       </div>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
-              </div>
-            </div>
-
-            {}
-            <div className="flex justify-between items-center text-xs text-mutedText mt-4 font-semibold px-1 font-mono">
-              <span className="font-sans">Rate</span>
-              <span className="text-white font-bold">
-                {`1 ${assetInCode} = ${decimalRate.toFixed(4)} ${assetOutCode}`}
-              </span>
-            </div>
+              </motion.div>
+            )}
 
             {}
             <div className="mt-5">
@@ -1106,7 +1163,7 @@ export default function SwapPage() {
                         <span className="font-bold text-sm text-amber-400">Pool Liquidity Too Low</span>
                         <span className="leading-relaxed text-amber-100/90">{liquidityError}</span>
                         <span className="text-amber-200/80 mt-1">
-                          <strong>Note:</strong> Your personal wallet balance is separate from the swap pool's reserves. To fix this, someone needs to provide liquidity to the pool by depositing {withdrawAssetOutCode} via the Deposit tab.
+                          <strong>Fix:</strong> Add {withdrawAssetOutCode} liquidity via the Deposit tab.
                         </span>
                         <button
                           onClick={() => {
