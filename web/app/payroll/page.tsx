@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const pageVariants: any = {
@@ -22,6 +23,7 @@ import { Recipient } from '../../store/types';
 import { useToastStore } from '../../store/useToast';
 
 export default function PayrollPage() {
+  const router = useRouter();
   
   const address = useStore((state) => state.address);
   const status = useStore((state) => state.status);
@@ -32,6 +34,8 @@ export default function PayrollPage() {
   
   
   const recipients = useStore((state) => state.recipients);
+  const [isRecipientDropdownOpen, setIsRecipientDropdownOpen] = useState(false);
+  const [isAssetDropdownOpen, setIsAssetDropdownOpen] = useState(false);
   const lastRunDate = useStore((state) => state.lastRunDate);
   const addRecipient = useStore((state) => state.addRecipient);
   const updateRecipient = useStore((state) => state.updateRecipient);
@@ -84,6 +88,27 @@ export default function PayrollPage() {
   }, []);
 
   
+  const availableTeamMembers = useMemo(() => {
+    return teamMembers.filter(m => {
+      // Exclude if already in payroll, unless editing that exact recipient
+      if (editingRecipient && editingRecipient.address === m.address) return true;
+      return !recipients.some(r => r.address === m.address);
+    });
+  }, [teamMembers, recipients, editingRecipient]);
+
+  // Compute USD value. In a real app we would use oracle prices.
+  // For this testnet, we'll use approximate prices:
+  const getAssetPrice = (asset: string) => {
+    switch (asset) {
+      case 'USDC': return 1.00;
+      case 'EURC': return 1.08;
+      case 'MGUSD': return 1.00;
+      case 'YLDS': return 1.00;
+      case 'XLM': return 0.10;
+      default: return 1.00;
+    }
+  };
+
   const totals = useMemo(() => {
     let usdcSum = 0;
     let eurcSum = 0;
@@ -91,13 +116,13 @@ export default function PayrollPage() {
 
     recipients.forEach((r) => {
       const amt = parseFloat(r.amount) || 0;
+      const price = getAssetPrice(r.asset);
+      usdTotal += amt * price;
+
       if (r.asset === 'USDC') {
         usdcSum += amt;
-        usdTotal += amt;
-      } else {
+      } else if (r.asset === 'EURC') {
         eurcSum += amt;
-        
-        usdTotal += amt / decimalRate;
       }
     });
 
@@ -106,7 +131,7 @@ export default function PayrollPage() {
       eurc: eurcSum,
       usd: usdTotal,
     };
-  }, [recipients, decimalRate]);
+  }, [recipients]);
 
   
   const handleOpenAdd = () => {
@@ -214,7 +239,7 @@ export default function PayrollPage() {
         
         
         addTransaction({
-          type: 'withdrawal',
+          type: 'payroll',
           amount: recipient.amount,
           asset: recipient.asset,
           txHash: txHash,
@@ -236,6 +261,7 @@ export default function PayrollPage() {
     await runPayroll();
     setIsExecuting(false);
     useToastStore.getState().addToast({ title: 'Success', message: `Private Payroll Successful! Executed ${recipients.length} transfers. Total: $${totals.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, severity: 'success' });
+    router.push('/');
   };
 
   
@@ -262,7 +288,7 @@ export default function PayrollPage() {
           <h1 className="text-3xl font-extrabold text-white mt-1 font-display">Private payroll</h1>
           <p className="text-sm text-mutedText mt-1">Pay your whole team in one run — salaries never touch the public ledger.</p>
         </div>
-        <div>
+        <div className="flex items-center gap-3">
           <button
             onClick={handleOpenAdd}
             disabled={!isConnected || !kycVerified}
@@ -277,6 +303,12 @@ export default function PayrollPage() {
             </svg>
             Add recipient
           </button>
+          <Link
+            href="/payroll/history"
+            className="px-4 py-2 border border-[rgba(94,42,140,0.4)] text-white hover:bg-[#5E2A8C]/10 font-bold rounded-[9px] text-xs uppercase tracking-wider transition duration-150 font-display bg-transparent text-center"
+          >
+            View History
+          </Link>
         </div>
       </motion.div>
 
@@ -427,15 +459,14 @@ export default function PayrollPage() {
                     {}
                     <td className="py-4 pr-4">
                       <div className="flex items-center gap-2">
-                        {r.asset === 'USDC' ? (
-                          <div className="flex items-center gap-1.5 bg-usdcColor/10 border border-usdcColor/20 px-2 py-0.5 rounded text-[10px] font-bold text-blue-400 font-display select-none">
-                            <span className="text-xs">$</span> USDC
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 bg-brandPurple/10 border border-brandPurple/20 px-2 py-0.5 rounded text-[10px] font-bold text-[#B488DC] font-display select-none">
-                            <span className="text-xs">€</span> EURC
-                          </div>
-                        )}
+                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold font-display select-none border ${
+                          r.asset === 'USDC' ? 'bg-usdcColor/10 border-usdcColor/20 text-blue-400' :
+                          r.asset === 'EURC' ? 'bg-brandPurple/10 border-brandPurple/20 text-[#B488DC]' :
+                          r.asset === 'XLM' ? 'bg-white/10 border-white/20 text-white' :
+                          'bg-green-500/10 border-green-500/20 text-green-400'
+                        }`}>
+                          <span className="text-xs">{r.asset === 'USDC' ? '$' : r.asset === 'EURC' ? '€' : ''}</span> {r.asset}
+                        </div>
                         <span className="text-sm font-bold text-white font-mono select-all">
                           {parseFloat(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
@@ -450,7 +481,7 @@ export default function PayrollPage() {
                           title="Edit member details"
                           className="text-mutedText hover:text-white transition duration-150 p-1"
                         >
-                          <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                         </button>
@@ -459,7 +490,7 @@ export default function PayrollPage() {
                           title="Remove from payroll run"
                           className="text-mutedText hover:text-red-400 transition duration-150 p-1"
                         >
-                          <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         </button>
@@ -546,26 +577,43 @@ export default function PayrollPage() {
               {}
               <div className="flex flex-col gap-1.5">
                 <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Recipient (Team Member)</label>
-                <select
-                  value={formName}
-                  onChange={(e) => {
-                    const selectedName = e.target.value;
-                    setFormName(selectedName);
-                    const member = teamMembers.find(m => m.name === selectedName);
-                    if (member) {
-                      setFormAddress(member.address);
-                      if (!formDept) setFormDept(member.role);
-                    } else {
-                      setFormAddress('');
-                    }
-                  }}
-                  className="bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2.5 text-white outline-none focus:border-[#5E2A8C] text-xs font-semibold appearance-none"
-                >
-                  <option value="" disabled>Select team member...</option>
-                  {teamMembers.map(m => (
-                    <option key={m.id} value={m.name}>{m.name}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsRecipientDropdownOpen(!isRecipientDropdownOpen)}
+                    className="w-full flex items-center justify-between bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2.5 text-white outline-none focus:border-[#5E2A8C] text-xs font-semibold"
+                  >
+                    <span className={formName ? 'text-white' : 'text-mutedText'}>{formName || 'Select team member...'}</span>
+                    <svg className={`w-3.5 h-3.5 text-mutedText transition-transform duration-200 ${isRecipientDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {isRecipientDropdownOpen && (
+                    <div className="absolute left-0 right-0 mt-2 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display max-h-40 overflow-y-auto">
+                      {availableTeamMembers.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-mutedText text-center">No available team members</div>
+                      ) : (
+                        availableTeamMembers.map(m => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setFormName(m.name);
+                              setFormAddress(m.address);
+                              if (!formDept) setFormDept(m.role);
+                              setIsRecipientDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-[9px] text-xs font-bold transition duration-150 ${
+                              formName === m.name ? 'bg-[#1D1D1F] text-white' : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
+                            }`}
+                          >
+                            {m.name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {}
@@ -608,14 +656,37 @@ export default function PayrollPage() {
                 </div>
                 <div className="col-span-1 flex flex-col gap-1.5">
                   <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Asset</label>
-                  <select
-                    value={formAsset}
-                    onChange={(e: any) => setFormAsset(e.target.value)}
-                    className="bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2.5 text-white outline-none focus:border-[#5E2A8C] text-xs font-semibold"
-                  >
-                    <option value="USDC">USDC</option>
-                    <option value="EURC">EURC</option>
-                  </select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsAssetDropdownOpen(!isAssetDropdownOpen)}
+                      className="w-full flex items-center justify-between bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2.5 text-white outline-none focus:border-[#5E2A8C] text-xs font-semibold"
+                    >
+                      <span>{formAsset}</span>
+                      <svg className={`w-3.5 h-3.5 text-mutedText transition-transform duration-200 ${isAssetDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {isAssetDropdownOpen && (
+                      <div className="absolute left-0 right-0 mt-2 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display">
+                        {['USDC', 'EURC', 'MGUSD', 'YLDS', 'XLM'].map(asset => (
+                          <button
+                            key={asset}
+                            type="button"
+                            onClick={() => {
+                              setFormAsset(asset);
+                              setIsAssetDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-[9px] text-xs font-bold transition duration-150 ${
+                              formAsset === asset ? 'bg-[#1D1D1F] text-white' : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
+                            }`}
+                          >
+                            {asset}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

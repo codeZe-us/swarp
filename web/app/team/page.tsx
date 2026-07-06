@@ -40,7 +40,7 @@ export default function TeamPage() {
   const [inviteName, setInviteName] = useState('');
   const [inviteAddress, setInviteAddress] = useState('');
   const [inviteRole, setInviteRole] = useState<'Admin' | 'Member'>('Member');
-
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(true);
 
   
@@ -378,14 +378,40 @@ export default function TeamPage() {
               {}
               <div className="flex flex-col gap-1.5">
                 <label className="text-mutedText font-bold uppercase tracking-wider text-[10px]">Role</label>
-                <select
-                  value={inviteRole}
-                  onChange={(e: any) => setInviteRole(e.target.value)}
-                  className="bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2.5 text-white outline-none focus:border-[#5E2A8C] text-xs font-semibold"
-                >
-                  <option value="Admin">Admin (can approve payroll & view logs)</option>
-                  <option value="Member">Member (read-only viewer)</option>
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+                    className="w-full flex items-center justify-between bg-[#000000] border border-[#1D1D1F] rounded-[9px] p-2.5 text-white outline-none focus:border-[#5E2A8C] text-xs font-semibold"
+                  >
+                    <span>{inviteRole === 'Admin' ? 'Admin (can approve payroll & view logs)' : 'Member (read-only viewer)'}</span>
+                    <svg className={`w-3.5 h-3.5 text-mutedText transition-transform duration-200 ${isRoleDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {isRoleDropdownOpen && (
+                    <div className="absolute left-0 right-0 mt-2 bg-[#0B0B0C] border border-[#1D1D1F] rounded-[9px] shadow-xl z-50 p-1 font-display">
+                      {[
+                        { value: 'Admin', label: 'Admin (can approve payroll & view logs)' },
+                        { value: 'Member', label: 'Member (read-only viewer)' }
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setInviteRole(option.value as 'Admin' | 'Member');
+                            setIsRoleDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-[9px] text-xs font-bold transition duration-150 ${
+                            inviteRole === option.value ? 'bg-[#1D1D1F] text-white' : 'text-mutedText hover:bg-[#1D1D1F]/50 hover:text-white'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {}
